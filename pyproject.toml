@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "python-gitea"
 authors = [{ name = "Isaac C. F. Wong", email = "isaac.cf.wong@gmail.com" }]
-description = "A Python library for interacting with the Gitea API, offering a simple interface to access repositories, users, organizations, issues, and more for automation and data management."
+description = "A Python package for interacting with the Gitea API, offering a simple interface to access repositories, users, organizations, issues, and more for automation and data management."
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
