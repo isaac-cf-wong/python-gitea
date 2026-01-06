@@ -3,9 +3,9 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "python_package_template"
+name = "python-gitea"
 authors = [{ name = "Isaac C. F. Wong", email = "isaac.cf.wong@gmail.com" }]
-description = "A GitHub template repository for a Python package"
+description = "A Python library for interacting with the Gitea API, offering a simple interface to access repositories, users, organizations, issues, and more for automation and data management."
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -54,20 +54,20 @@ docs = [
 ]
 
 [project.scripts]
-python_package_template = "python_package_template.cli.main:app"
+gitea-cli = "gitea.cli.main:app"
 
 [project.urls]
-Documentation = "https://isaac-cf-wong.github.io/python-package-template"
-Source = "https://github.com/isaac-cf-wong/python-package-template"
-Tracker = "https://github.com/isaac-cf-wong/python-package-template/issues"
-Home = "https://github.com/isaac-cf-wong/python-package-template"
-"Release Notes" = "https://github.com/isaac-cf-wong/python-package-template/releases"
+Documentation = "https://isaac-cf-wong.github.io/python-gitea"
+Source = "https://github.com/isaac-cf-wong/python-gitea"
+Tracker = "https://github.com/isaac-cf-wong/python-gitea/issues"
+Home = "https://github.com/isaac-cf-wong/python-gitea"
+"Release Notes" = "https://github.com/isaac-cf-wong/python-gitea/releases"
 
 [tool.hatch.version]
 source = "vcs"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/python_package_template"]
+packages = ["src/gitea"]
 
 [tool.bandit]
 exclude_dirs = ["build", "dist", "tests", "scripts"]
