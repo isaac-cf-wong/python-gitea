@@ -8,8 +8,13 @@ from abc import ABC, abstractmethod
 class Client(ABC):  # pylint: disable=too-few-public-methods
     """Abstract base class for Gitea clients."""
 
-    def __init__(self, token: str, base_url: str):
-        """"""
+    def __init__(self, token: str, base_url: str) -> None:
+        """Construct the base client.
+
+        Args:
+            token: The API token for authentication.
+            base_url: The base URL of the Gitea instance.
+        """
         self.token = token
         self.base_url = base_url.rstrip("/")
         self.headers = {
