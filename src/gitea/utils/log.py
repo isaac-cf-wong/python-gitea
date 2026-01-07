@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from python_package_template.version import __version__
+from gitea.version import __version__
 
 
 def get_version_information() -> str:
@@ -37,7 +37,7 @@ def setup_logger(
     else:
         level = int(log_level)
 
-    logger = logging.getLogger("python_package_template")
+    logger = logging.getLogger("python-gitea")
     logger.propagate = False
     logger.setLevel(level)
 
@@ -67,4 +67,4 @@ def setup_logger(
 
     if print_version:
         version = get_version_information()
-        logger.info("Running python_package_template version: %s", version)
+        logger.info("Running python-gitea version: %s", version)

@@ -1,8 +1,8 @@
-site_name: Python Package Documentation
-site_description: A GitHub template repository for a Python package
-site_url: https://isaac-cf-wong.github.io/python-package-template
-repo_url: https://github.com/isaac-cf-wong/python-package-template
-repo_name: python-package-template
+site_name: python-gitea
+site_description: A Python package for interacting with the Gitea API, offering a simple interface to access repositories, users, organizations, issues, and more for automation and data management.
+site_url: https://isaac-cf-wong.github.io/python-gitea
+repo_url: https://github.com/isaac-cf-wong/python-gitea
+repo_name: python-gitea
 
 theme:
   name: material
@@ -68,29 +68,10 @@ plugins:
 nav:
   - Home: index.md
   - Installation: user_guide/installation.md
-  - User Guide:
-      - Quick Start: user_guide/quick_start.md
-      - Packaging: user_guide/packaging.md
-      - Project Structure: user_guide/project_structure.md
-      - Development Tools: user_guide/development_tools.md
-      - Testing: user_guide/testing.md
-      - Documentation: user_guide/documentation.md
-      - CI/CD and Releases: user_guide/ci_cd.md
-      - Customization: user_guide/customization.md
   - API Reference:
       - Overview: reference/index.md
-      - Modules:
-          - python_package_template:
-              - Overview: reference/python_package_template/index.md
-              - Hello World: reference/python_package_template/hello_world.md
-              - version: reference/python_package_template/version.md
-              - Utils:
-                  - Overview: reference/python_package_template/utils/index.md
-                  - Logging: reference/python_package_template/utils/log.md
   - Developer Guide:
       - Contributing: CONTRIBUTING.md
-      - Code Quality: dev/code_quality.md
-      - Changelog: dev/changelog.md
   - Security: SECURITY.md
   - Troubleshooting: dev/troubleshooting.md
 
