@@ -70,6 +70,18 @@ nav:
   - Installation: user_guide/installation.md
   - API Reference:
       - Overview: reference/index.md
+      - gitea:
+          - Package: reference/gitea/index.md
+          - Version: reference/gitea/version.md
+          - Client:
+              - Overview: reference/gitea/client/index.md
+              - Base: reference/gitea/client/base.md
+          - CLI:
+              - Overview: reference/gitea/cli/index.md
+              - Main: reference/gitea/cli/main.md
+          - Utils:
+              - Overview: reference/gitea/utils/index.md
+              - Logging: reference/gitea/utils/log.md
   - Developer Guide:
       - Contributing: CONTRIBUTING.md
   - Security: SECURITY.md
