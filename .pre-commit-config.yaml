@@ -69,7 +69,8 @@ repos:
       - id: pylint
         args: [--rcfile=pyproject.toml]
         stages: [pre-commit]
-        additional_dependencies: ["mkdocs_gen_files", "typer", "requests"]
+        additional_dependencies:
+          ["mkdocs_gen_files", "typer", "requests", "aiohttp"]
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
