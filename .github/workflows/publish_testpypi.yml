@@ -48,10 +48,29 @@ jobs:
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build
+          pip install build hatch
+
+      - name: Set version for publishing
+        run: |
+          cp pyproject.toml pyproject.toml.backup
+          if [ -n "${{ inputs.tag_name }}" ]; then
+            # Use the tag, stripping 'v' prefix if present
+            VERSION=$(echo "${{ inputs.tag_name }}" | sed 's/^v//')
+          else
+            # For untagged builds, use a dev version without local part
+            # Get the dev version from hatch-vcs, then strip +local
+            VERSION=$(hatch version | sed 's/+.*//')
+          fi
+
+          # Update pyproject.toml with sed
+          sed -i "s/dynamic = \[\"version\"\]/version = \"$VERSION\"\ndynamic = []/" pyproject.toml
 
       - name: Build distribution
         run: python -m build
+
+      - name: Restore original pyproject.toml
+        run: mv pyproject.toml.backup pyproject.toml
+        if: always()
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v6
