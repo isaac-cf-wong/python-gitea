@@ -42,6 +42,7 @@ test = [
     "pytest-runner",
     "pytest==9.0.2",
     "pytest-github-actions-annotate-failures",
+    "pytest-asyncio",
     "shellcheck-py==0.11.0.1",
 ]
 dev = ["pytest", "pre-commit", "black", "flake8"]
