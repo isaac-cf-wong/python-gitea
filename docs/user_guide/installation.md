@@ -1,14 +1,6 @@
 # Installation
 
-<!-- prettier-ignore-start -->
-
-!!!warning
-    This is an example installation guide page for a Python package template.
-    Adjust the content as needed for your specific package.
-
-<!-- prettier-ignore-end -->
-
-We recommend using `uv` to manage virtual environments for installing `python_package_template`.
+We recommend using `uv` to manage virtual environments for installing `python-gitea`.
 
 If you don't have `uv` installed, you can install it with pip. See the project pages for more details:
 
@@ -40,13 +32,13 @@ If you don't have `uv` installed, you can install it with pip. See the project p
 
 <!-- prettier-ignore-end -->
 
-The recommended way to install `python_package_template` is from PyPI:
+The recommended way to install `python-gitea` is from PyPI:
 
 ```bash
 # Create a virtual environment (recommended with uv)
 uv venv --python 3.10
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install python_package_template
+uv pip install python-gitea
 ```
 
 ### Optional Dependencies
@@ -55,13 +47,13 @@ For development or specific features:
 
 ```bash
 # Development dependencies (testing, linting, etc.)
-uv pip install python_package_template[dev]
+uv pip install "python-gitea[dev]"
 
 # Documentation dependencies
-uv pip install python_package_template[docs]
+uv pip install "python-gitea[docs]"
 
 # All dependencies
-uv pip install python_package_template[dev,docs]
+uv pip install "python-gitea[dev,docs]"
 ```
 
 ## Install from Source
@@ -69,8 +61,8 @@ uv pip install python_package_template[dev,docs]
 For the latest development version:
 
 ```bash
-git clone git@github.com:isaac-cf-wong/python-package-template.git
-cd python-package-template
+git clone git@github.com:isaac-cf-wong/python-gitea.git
+cd python-gitea
 # Create a virtual environment (recommended with uv)
 uv venv --python 3.10
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
@@ -82,8 +74,8 @@ uv pip install .
 To set up for development:
 
 ```bash
-git clone git@github.com:isaac-cf-wong/python-package-template.git
-cd python-package-template
+git clone git@github.com:isaac-cf-wong/python-gitea.git
+cd python-gitea
 
 # Create a virtual environment (recommended with uv)
 uv venv --python 3.10
@@ -100,14 +92,14 @@ pre-commit install --hook-type commit-msg
 
 ## Verify Installation
 
-Check that `python_package_template` is installed correctly:
+Check that `python-gitea` is installed correctly:
 
 ```bash
-python_package_template --help
+gitea-cli --help
 ```
 
 ```bash
-python -c "import python_package_template; print(python_package_template.__version__)"
+python -c "import gitea; print(gitea.__version__)"
 ```
 
 ## Dependencies
@@ -121,7 +113,7 @@ python -c "import python_package_template; print(python_package_template.__versi
 <!-- prettier-ignore-start -->
 
 1. Check the [troubleshooting guide](../dev/troubleshooting.md)
-2. Search existing [issues](https://github.com/isaac-cf-wong/python-package-template/issues)
+2. Search existing [issues](https://github.com/isaac-cf-wong/python-gitea/issues)
 3. Create a new issue with:
     - Your operating system and Python version
     - Full error message
