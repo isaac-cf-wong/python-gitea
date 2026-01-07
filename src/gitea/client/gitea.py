@@ -20,9 +20,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         super().__init__(token=token, base_url=base_url)
         self.session = requests.Session()
 
-    def _request(
-        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs
-    ) -> requests.Response:
+    def _request(self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs) -> dict:
         """Make an HTTP request to the Gitea API.
 
         Args:
@@ -31,11 +29,11 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The HTTP response.
+            The JSON response from the API.
         """
         url = self._build_url(endpoint=endpoint)
         response = self.session.request(
             method, url, headers={**self.headers, **(headers or {})}, timeout=timeout, **kwargs
         )
         response.raise_for_status()
-        return response
+        return response.json()
