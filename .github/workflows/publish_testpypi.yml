@@ -52,7 +52,6 @@ jobs:
 
       - name: Set version for publishing
         run: |
-          cp pyproject.toml pyproject.toml.backup
           if [ -n "${{ inputs.tag_name }}" ]; then
             # Use the tag, stripping 'v' prefix if present
             VERSION=$(echo "${{ inputs.tag_name }}" | sed 's/^v//')
@@ -67,10 +66,6 @@ jobs:
 
       - name: Build distribution
         run: python -m build
-
-      - name: Restore original pyproject.toml
-        run: mv pyproject.toml.backup pyproject.toml
-        if: always()
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v6
