@@ -1,17 +1,20 @@
 name: Python Publish
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       tag_name:
         description: "Tag name for the publish (e.g., v1.2.3)"
-        required: true
+        required: false
         type: string
   workflow_call:
     inputs:
       tag_name:
         description: "Tag name for the publish (e.g., v1.2.3)"
-        required: true
+        required: false
         type: string
 
 jobs:
@@ -20,13 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag_name || github.event.inputs.tag_name }}
+          ref: ${{ inputs.tag_name || github.sha }}
           fetch-depth: 0
 
       - name: Output build information
         run: |
           echo "### Publishing Build :package:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version tag**: ${{ inputs.tag_name || github.event.inputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version tag**: ${{ inputs.tag_name || github.sha }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Set up Python
         uses: actions/setup-python@v6
