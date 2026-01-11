@@ -21,12 +21,14 @@ def register_commands() -> None:
     from gitea.cli.user.get_user_level_runners import get_user_level_runners_command
     from gitea.cli.user.get_registration_token import get_registration_token_command
     from gitea.cli.user.delete_user_level_runner import delete_user_level_runner_command
+    from gitea.cli.user.get_workflow_runs import get_workflow_runs_command
 
     user_app.command("get-user")(get_user_command)
     user_app.command("get-workflow-jobs")(get_workflow_jobs_command)
     user_app.command("get-user-level-runners")(get_user_level_runners_command)
     user_app.command("get-registration-token")(get_registration_token_command)
     user_app.command("delete-user-level-runner")(delete_user_level_runner_command)
+    user_app.command("get-workflow-runs")(get_workflow_runs_command)
 
 
 register_commands()
