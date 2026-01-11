@@ -21,23 +21,20 @@ def get_user_command(
         username: The username of the user to retrieve. If None, retrieves the authenticated user.
     """
     from gitea.client.gitea import Gitea
-    from rich.console import Console
-    import json
-    from pathlib import Path
+    from typing import Any
 
-    output: Path | None = ctx.obj.get("output")
+    from gitea.cli.utility import execute_api_command
+
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
 
-    with Gitea(token=token, base_url=base_url) as client:
-        user_info = client.user.get_user(username=username)
+    def api_call() -> dict[str, Any]:
+        """API call to get user information.
 
-    json_output = json.dumps(user_info, indent=4)
+        Returns:
+            The user information as a dictionary.
+        """
+        with Gitea(token=token, base_url=base_url) as client:
+            return client.user.get_user(username=username)
 
-    console = Console()
-
-    if output:
-        output.write_text(json_output)
-        console.print(f"Output saved to {output}")
-    else:
-        console.print_json(json_output)
+    execute_api_command(ctx=ctx, api_call=api_call, command_name="get-user")

@@ -29,23 +29,20 @@ def get_workflow_jobs_command(
         limit: The number of items per page for pagination.
     """
     from gitea.client.gitea import Gitea
-    from rich.console import Console
-    import json
-    from pathlib import Path
+    from typing import Any
 
-    output: Path | None = ctx.obj.get("output")
+    from gitea.cli.utility import execute_api_command
+
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
 
-    with Gitea(token=token, base_url=base_url) as client:
-        result = client.user.get_workflow_jobs(status=status, page=page, limit=limit)
+    def api_call() -> dict[str, Any]:
+        """API call to get workflow jobs.
 
-    json_output = json.dumps(result, indent=4)
+        Returns:
+            A dictionary containing the workflow jobs with the specified status.
+        """
+        with Gitea(token=token, base_url=base_url) as client:
+            return client.user.get_workflow_jobs(status=status, page=page, limit=limit)
 
-    console = Console()
-
-    if output:
-        output.write_text(json_output)
-        console.print(f"Output saved to {output}")
-    else:
-        console.print_json(json_output)
+    execute_api_command(ctx=ctx, api_call=api_call, command_name="get-workflow-jobs")

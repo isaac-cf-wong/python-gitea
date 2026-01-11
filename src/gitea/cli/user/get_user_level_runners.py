@@ -13,23 +13,23 @@ def get_user_level_runners_command(
 ) -> None:
     """Get user-level runners for the authenticated user."""
     from gitea.client.gitea import Gitea
-    from rich.console import Console
-    import json
     from pathlib import Path
+    from typing import Any
+
+    from gitea.cli.utility import execute_api_command
 
     output: Path | None = ctx.obj.get("output")
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
 
-    with Gitea(token=token, base_url=base_url) as client:
-        result = client.user.get_user_level_runners()
+    def api_call() -> dict[str, Any]:
+        """
+        API call to get user-level runners.
 
-    json_output = json.dumps(result, indent=4)
+        Returns:
+            A dictionary containing the user-level runners.
+        """
+        with Gitea(token=token, base_url=base_url) as client:
+            return client.user.get_user_level_runners()
 
-    console = Console()
-
-    if output:
-        output.write_text(json_output)
-        console.print(f"Output saved to {output}")
-    else:
-        console.print_json(json_output)
+    execute_api_command(ctx=ctx, api_call=api_call, command_name="get-user-level-runners")
