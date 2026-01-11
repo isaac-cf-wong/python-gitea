@@ -83,3 +83,34 @@ class User(BaseUser, Resource):
         """
         endpoint = f"/user/actions/runners/{runner_id}"
         return self._delete(endpoint=endpoint, **kwargs)
+
+    def get_workflow_runs(  # noqa: PLR0913
+        self,
+        event: str | None = None,
+        branch: str | None = None,
+        status: Literal["pending", "queued", "in_progress", "failure", "success", "skipped"] | None = None,
+        actor: str | None = None,
+        head_sha: str | None = None,
+        page: int | None = None,
+        limit: int | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Get workflow runs for the authenticated user filtered by various parameters.
+
+        Args:
+            event: The event that triggered the workflow run.
+            branch: The branch name to filter workflow runs.
+            status: The status to filter workflow runs by.
+            actor: The username of the actor who triggered the workflow run.
+            head_sha: The commit SHA to filter workflow runs.
+            page: The page number for pagination.
+            limit: The number of items per page for pagination.
+
+        Returns:
+            A dictionary containing the workflow runs with the specified filters.
+        """
+        endpoint = "/user/actions/runs"
+        params = self._build_get_workflow_runs_params(
+            event=event, branch=branch, status=status, actor=actor, head_sha=head_sha, page=page, limit=limit
+        )
+        return self._get(endpoint=endpoint, params=params, **kwargs)
