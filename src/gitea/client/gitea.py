@@ -20,7 +20,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             base_url: The base URL of the Gitea instance.
         """
         super().__init__(token=token, base_url=base_url)
-        self.session: requests.Session | None = requests.Session()
+        self.session: requests.Session | None = None
 
     def __enter__(self) -> Gitea:
         """Enter the context manager.
