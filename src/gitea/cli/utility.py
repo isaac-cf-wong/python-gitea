@@ -12,7 +12,7 @@ import typer
 
 def execute_api_command(
     ctx: typer.Context,
-    api_call: Callable[[], Any],
+    api_call: Callable[[], dict[str, Any]],
     command_name: str = "Command",
 ) -> None:
     """Execute an API command and output results.
