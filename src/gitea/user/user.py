@@ -56,7 +56,7 @@ class User(BaseUser, Resource):
         Returns:
             A dictionary containing the user-level runners.
         """
-        endpoint = "/user/runners" if runner_id is None else f"/user/runners/{runner_id}"
+        endpoint = "/user/actions/runners" if runner_id is None else f"/user/actions/runners/{runner_id}"
         return self._get(endpoint=endpoint, **kwargs)
 
     def get_registration_token(self, **kwargs: Any) -> dict[str, Any]:
