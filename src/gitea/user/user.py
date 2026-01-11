@@ -43,8 +43,8 @@ class User(BaseUser, Resource):
             A dictionary containing the workflow jobs with the specified status.
         """
         endpoint = "/user/actions/jobs"
-        payload = self._build_get_workflow_jobs_params(status=status, page=page, limit=limit)
-        return self._get(endpoint=endpoint, params=payload, **kwargs)
+        params = self._build_get_workflow_jobs_params(status=status, page=page, limit=limit)
+        return self._get(endpoint=endpoint, params=params, **kwargs)
 
     def get_user_level_runners(self, runner_id: str | None = None, **kwargs: Any) -> dict[str, Any]:
         """Get user-level runners for the authenticated user.
