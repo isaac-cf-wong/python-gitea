@@ -48,3 +48,12 @@ class User(Resource):
         if limit is not None:
             payload["limit"] = str(limit)
         return self._get(endpoint=endpoint, params=payload, **kwargs)
+
+    def get_user_level_runners(self, **kwargs) -> dict[str, Any]:
+        """Get user-level runners for the authenticated user.
+
+        Returns:
+            A dictionary containing the user-level runners.
+        """
+        endpoint = "/user/runners"
+        return self._get(endpoint=endpoint, **kwargs)
