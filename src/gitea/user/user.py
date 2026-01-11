@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from gitea.resource.resource import Resource
+from gitea.user.base import BaseUser
 
 
-class User(Resource):
+class User(BaseUser, Resource):
     """Gitea User resource."""
 
     def get_user(self, username: str | None = None, **kwargs) -> dict[str, Any]:
@@ -42,11 +43,7 @@ class User(Resource):
             A dictionary containing the workflow jobs with the specified status.
         """
         endpoint = "/user/actions/jobs"
-        payload = {"status": status}
-        if page is not None:
-            payload["page"] = str(page)
-        if limit is not None:
-            payload["limit"] = str(limit)
+        payload = self._build_get_workflow_jobs_params(status=status, page=page, limit=limit)
         return self._get(endpoint=endpoint, params=payload, **kwargs)
 
     def get_user_level_runners(self, **kwargs) -> dict[str, Any]:
