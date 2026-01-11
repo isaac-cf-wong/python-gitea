@@ -85,9 +85,6 @@ nav:
           - User:
               - Overview: reference/gitea/user/index.md
               - User: reference/gitea/user/user.md
-          - CLI:
-              - Overview: reference/gitea/cli/index.md
-              - Main: reference/gitea/cli/main.md
           - Utils:
               - Overview: reference/gitea/utils/index.md
               - Logging: reference/gitea/utils/log.md
