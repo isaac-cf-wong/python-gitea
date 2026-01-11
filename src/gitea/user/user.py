@@ -11,7 +11,7 @@ from gitea.user.base import BaseUser
 class User(BaseUser, Resource):
     """Gitea User resource."""
 
-    def get_user(self, username: str | None = None, **kwargs: dict[str, Any]) -> dict[str, Any]:
+    def get_user(self, username: str | None = None, **kwargs: Any) -> dict[str, Any]:
         """Get user information.
 
         Args:
@@ -29,7 +29,7 @@ class User(BaseUser, Resource):
         status: Literal["pending", "queued", "in_progress", "failure", "success", "skipped"],
         page: int | None = None,
         limit: int | None = None,
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Get workflow jobs for the authenticated user filtered by status.
 
@@ -46,7 +46,7 @@ class User(BaseUser, Resource):
         payload = self._build_get_workflow_jobs_params(status=status, page=page, limit=limit)
         return self._get(endpoint=endpoint, params=payload, **kwargs)
 
-    def get_user_level_runners(self, runner_id: str | None = None, **kwargs: dict[str, Any]) -> dict[str, Any]:
+    def get_user_level_runners(self, runner_id: str | None = None, **kwargs: Any) -> dict[str, Any]:
         """Get user-level runners for the authenticated user.
 
         Args:
@@ -59,7 +59,7 @@ class User(BaseUser, Resource):
         endpoint = "/user/runners" if runner_id is None else f"/user/runners/{runner_id}"
         return self._get(endpoint=endpoint, **kwargs)
 
-    def get_registration_token(self, **kwargs: dict[str, Any]) -> dict[str, Any]:
+    def get_registration_token(self, **kwargs: Any) -> dict[str, Any]:
         """Get a registration token for adding a new user-level runner.
 
         Args:
