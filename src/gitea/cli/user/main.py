@@ -1,3 +1,5 @@
+# ruff: noqa PLC0415
+
 """CLI commands for managing Gitea users."""
 
 from __future__ import annotations
@@ -13,6 +15,10 @@ user_app = typer.Typer(
 
 def register_commands() -> None:
     """Register user-related commands to the user_app."""
+
+    from gitea.cli.user.get_user import get_user_command
+
+    user_app.command("get-user")(get_user_command)
 
 
 register_commands()

@@ -8,6 +8,8 @@ from typing import Annotated
 
 import typer
 
+from pathlib import Path
+
 
 class LoggingLevel(str, enum.Enum):
     """Logging levels for the CLI."""
@@ -69,6 +71,21 @@ def setup_logging(level: LoggingLevel = LoggingLevel.INFO) -> None:
 
 @app.callback()
 def main(
+    ctx: typer.Context,
+    output: Annotated[Path | None, typer.Option("--output", "-o", help="Output file name.")] = None,
+    token: Annotated[
+        str | None, typer.Option("--token", "-t", help="Gitea API token.", envvar="GITEA_API_TOKEN")
+    ] = None,
+    base_url: Annotated[
+        str,
+        typer.Option(
+            "--base-url",
+            "-b",
+            help="Base URL of the Gitea instance.",
+            envvar="GITEA_BASE_URL",
+            show_default=True,
+        ),
+    ] = "https://gitea.com",
     verbose: Annotated[
         LoggingLevel,
         typer.Option("--verbose", "-v", help="Set verbosity level."),
@@ -77,9 +94,17 @@ def main(
     """Main entry point for the CLI application.
 
     Args:
+        ctx: Typer context.
+        token: Gitea API token.
+        base_url: Base URL of the Gitea instance.
         verbose: Verbosity level for logging.
     """
     setup_logging(verbose)
+    ctx.obj = {
+        "output": output,
+        "token": token,
+        "base_url": base_url,
+    }
 
 
 def register_commands() -> None:
