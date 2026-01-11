@@ -45,7 +45,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             await self.session.close()
             self.session = None
 
-    def _get_session(self, headers: dict | None = None, **kwargs) -> ClientSession:
+    def _get_session(self, headers: dict | None = None, **kwargs: Any) -> ClientSession:
         """Get or create the aiohttp ClientSession.
 
         Args:
@@ -58,7 +58,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         return ClientSession(headers=headers, **kwargs)
 
     async def _request(
-        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs
+        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs: Any
     ) -> dict[str, Any]:
         """Make an asynchronous HTTP request to the Gitea API.
 

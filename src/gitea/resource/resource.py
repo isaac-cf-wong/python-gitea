@@ -19,7 +19,7 @@ class Resource:
         """
         self.client = client
 
-    def _get(self, endpoint: str, **kwargs) -> dict[str, Any]:
+    def _get(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
         """Helper method to perform a GET request.
 
         Args:
@@ -31,7 +31,7 @@ class Resource:
         """
         return self.client._request(method="GET", endpoint=endpoint, **kwargs)
 
-    def _post(self, endpoint: str, **kwargs) -> dict[str, Any]:
+    def _post(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
         """Helper method to perform a POST request.
 
         Args:
@@ -43,7 +43,7 @@ class Resource:
         """
         return self.client._request(method="POST", endpoint=endpoint, **kwargs)
 
-    def _put(self, endpoint: str, **kwargs) -> dict[str, Any]:
+    def _put(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
         """Helper method to perform a PUT request.
 
         Args:
@@ -55,7 +55,7 @@ class Resource:
         """
         return self.client._request(method="PUT", endpoint=endpoint, **kwargs)
 
-    def _delete(self, endpoint: str, **kwargs) -> dict[str, Any]:
+    def _delete(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
         """Helper method to perform a DELETE request.
 
         Args:

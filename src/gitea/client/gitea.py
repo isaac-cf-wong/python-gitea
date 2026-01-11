@@ -48,7 +48,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             self.session = None
 
     def _request(
-        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs
+        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs: Any
     ) -> dict[str, Any]:
         """Make an HTTP request to the Gitea API.
 
