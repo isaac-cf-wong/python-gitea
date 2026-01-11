@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import requests
 
 from gitea.client.base import Client
@@ -20,7 +22,9 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         super().__init__(token=token, base_url=base_url)
         self.session = requests.Session()
 
-    def _request(self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs) -> dict:
+    def _request(
+        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs
+    ) -> dict[str, Any]:
         """Make an HTTP request to the Gitea API.
 
         Args:
