@@ -67,7 +67,7 @@ class TestAsyncGitea:
 
         with (
             patch("gitea.client.async_gitea.ClientTimeout") as mock_timeout_class,
-            patch.object(client, "_get_session", return_value=mock_session),
+            patch.object(client, "session", mock_session),
         ):
             mock_timeout = MagicMock()
             mock_timeout_class.return_value = mock_timeout
@@ -98,7 +98,7 @@ class TestAsyncGitea:
 
         with (
             patch("gitea.client.async_gitea.ClientTimeout") as mock_timeout_class,
-            patch.object(client, "_get_session", return_value=mock_session),
+            patch.object(client, "session", mock_session),
         ):
             mock_timeout = MagicMock()
             mock_timeout_class.return_value = mock_timeout
@@ -132,7 +132,7 @@ class TestAsyncGitea:
 
         with (
             patch("aiohttp.ClientTimeout") as mock_timeout_class,
-            patch.object(client, "_get_session", return_value=mock_session),
+            patch.object(client, "session", mock_session),
         ):
             mock_timeout = MagicMock()
             mock_timeout.total = 60
@@ -160,7 +160,7 @@ class TestAsyncGitea:
 
         with (
             patch("gitea.client.async_gitea.ClientTimeout") as mock_timeout_class,
-            patch.object(client, "_get_session", return_value=mock_session),
+            patch.object(client, "session", mock_session),
         ):
             mock_timeout = MagicMock()
             mock_timeout_class.return_value = mock_timeout
