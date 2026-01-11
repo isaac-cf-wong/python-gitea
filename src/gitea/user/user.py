@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from gitea.resource.resource import Resource
 
@@ -22,3 +22,29 @@ class User(Resource):
         """
         endpoint = f"/users/{username}" if username else "/user"
         return self._get(endpoint=endpoint, **kwargs)
+
+    def get_workflow_jobs(
+        self,
+        status: Literal["pending", "queued", "in_progress", "failure", "success", "skipped"],
+        page: int | None = None,
+        limit: int | None = None,
+        **kwargs,
+    ) -> dict[str, Any]:
+        """Get workflow jobs for the authenticated user filtered by status.
+
+        Args:
+            status: The status to filter workflow jobs by.
+            page: The page number for pagination.
+            limit: The number of items per page for pagination.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A dictionary containing the workflow jobs with the specified status.
+        """
+        endpoint = "user/actions/jobs"
+        payload = {"status": status}
+        if page is not None:
+            payload["page"] = str(page)
+        if limit is not None:
+            payload["limit"] = str(limit)
+        return self._get(endpoint=endpoint, params=payload, **kwargs)
