@@ -41,7 +41,7 @@ class User(Resource):
         Returns:
             A dictionary containing the workflow jobs with the specified status.
         """
-        endpoint = "user/actions/jobs"
+        endpoint = "/user/actions/jobs"
         payload = {"status": status}
         if page is not None:
             payload["page"] = str(page)
