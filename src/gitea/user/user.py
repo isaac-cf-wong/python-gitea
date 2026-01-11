@@ -69,3 +69,16 @@ class User(BaseUser, Resource):
         """
         endpoint = "/user/actions/runners/registration-token"
         return self._get(endpoint=endpoint, **kwargs)
+
+    def get_user_level_runner(self, runner_id: str, **kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Get a specific user-level runner by its ID.
+
+        Args:
+            runner_id: The ID of the runner to retrieve.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A dictionary containing the runner information.
+        """
+        endpoint = f"/user/runners/{runner_id}"
+        return self._get(endpoint=endpoint, **kwargs)
