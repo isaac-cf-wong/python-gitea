@@ -31,7 +31,7 @@ def execute_api_command(
         json_output = json.dumps(result, indent=4)
 
         if output:
-            output.write_text(json_output)
+            Path(output).write_text(json_output)
             console.print(f"Output saved to {output}")
         else:
             console.print_json(json_output)
