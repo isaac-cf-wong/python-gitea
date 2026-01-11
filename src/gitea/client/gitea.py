@@ -26,6 +26,8 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         Args:
             method: The HTTP method (GET, POST, etc.).
             endpoint: The API endpoint.
+            headers: Additional headers for the request.
+            timeout: Timeout for the request in seconds.
             **kwargs: Additional arguments for the request.
 
         Returns:
