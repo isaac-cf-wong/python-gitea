@@ -71,7 +71,10 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             The JSON response as a dictionary.
         """
         if self.session is None:
-            self.session = self._get_session()
+            raise RuntimeError(
+                "AsyncGitea must be used as an async context manager. "
+                + "Use 'async with AsyncGitea(...) as client:' to ensure proper resource cleanup."
+            )
 
         url = self._build_url(endpoint=endpoint)
         request_headers = {**self.headers, **(headers or {})}
