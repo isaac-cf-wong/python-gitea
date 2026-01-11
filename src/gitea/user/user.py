@@ -54,3 +54,12 @@ class User(BaseUser, Resource):
         """
         endpoint = "/user/runners"
         return self._get(endpoint=endpoint, **kwargs)
+
+    def get_registration_token(self, **kwargs) -> dict[str, Any]:
+        """Get a registration token for adding a new user-level runner.
+
+        Returns:
+            A dictionary containing the registration token.
+        """
+        endpoint = "/user/actions/runners/registration-token"
+        return self._get(endpoint=endpoint, **kwargs)
