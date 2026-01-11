@@ -15,7 +15,7 @@ def get_registration_token_command(
     from gitea.client.gitea import Gitea
     from typing import Any
 
-    from gitea.cli.utility import execute_api_command
+    from gitea.cli.utils import execute_api_command
 
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
