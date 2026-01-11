@@ -20,7 +20,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             base_url: The base URL of the Gitea instance.
         """
         super().__init__(token=token, base_url=base_url)
-        self.session = requests.Session()
+        self.session: requests.Session | None = requests.Session()
 
     def __enter__(self) -> Gitea:
         """Enter the context manager.
@@ -28,6 +28,9 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         Returns:
             The Gitea client instance.
         """
+        if self.session is not None:
+            raise RuntimeError("Gitea session already open; do not re-enter context manager.")
+        self.session = requests.Session()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
@@ -38,7 +41,9 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             exc_val: The exception value.
             exc_tb: The traceback.
         """
-        self.session.close()
+        if self.session:
+            self.session.close()
+            self.session = None
 
     def _request(
         self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs
