@@ -46,16 +46,17 @@ class User(BaseUser, Resource):
         payload = self._build_get_workflow_jobs_params(status=status, page=page, limit=limit)
         return self._get(endpoint=endpoint, params=payload, **kwargs)
 
-    def get_user_level_runners(self, **kwargs: dict[str, Any]) -> dict[str, Any]:
+    def get_user_level_runners(self, runner_id: str | None = None, **kwargs: dict[str, Any]) -> dict[str, Any]:
         """Get user-level runners for the authenticated user.
 
         Args:
+            runner_id: The ID of a specific runner to retrieve. If None, retrieves all user-level runners.
             **kwargs: Additional arguments for the request.
 
         Returns:
             A dictionary containing the user-level runners.
         """
-        endpoint = "/user/runners"
+        endpoint = "/user/runners" if runner_id is None else f"/user/runners/{runner_id}"
         return self._get(endpoint=endpoint, **kwargs)
 
     def get_registration_token(self, **kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -68,17 +69,4 @@ class User(BaseUser, Resource):
             A dictionary containing the registration token.
         """
         endpoint = "/user/actions/runners/registration-token"
-        return self._get(endpoint=endpoint, **kwargs)
-
-    def get_user_level_runner(self, runner_id: str, **kwargs: dict[str, Any]) -> dict[str, Any]:
-        """Get a specific user-level runner by its ID.
-
-        Args:
-            runner_id: The ID of the runner to retrieve.
-            **kwargs: Additional arguments for the request.
-
-        Returns:
-            A dictionary containing the runner information.
-        """
-        endpoint = f"/user/runners/{runner_id}"
         return self._get(endpoint=endpoint, **kwargs)
