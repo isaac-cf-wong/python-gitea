@@ -42,10 +42,9 @@ with mkdocs_gen_files.open("reference/index.md", "w") as fd:
     package_dir = src / PACKAGE_NAME
     if package_dir.exists():
         for item in package_dir.iterdir():
-            if item.is_dir() and (item / "__init__.py").exists():
+            if item.is_dir() and (item / "__init__.py").exists() and not item.name.startswith("_"):
                 # Skip private modules
-                if not item.name.startswith("_"):
-                    modules.add(item.name)
+                modules.add(item.name)
 
     # Generate module list
     for module in sorted(modules):

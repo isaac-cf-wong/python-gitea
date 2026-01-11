@@ -1,4 +1,4 @@
-# pylint: disable=import-outside-toplevel
+# ruff: noqa PLC0415
 """Main entry point for the python-gitea CLI application."""
 
 from __future__ import annotations
