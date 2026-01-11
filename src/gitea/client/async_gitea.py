@@ -12,7 +12,7 @@ from gitea.client.base import Client
 class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
     """Asynchronous Gitea API client."""
 
-    def __init__(self, token: str, base_url: str = "https://gitea.com") -> None:
+    def __init__(self, token: str | None = None, base_url: str = "https://gitea.com") -> None:
         """Initialize the asynchronous Gitea client.
 
         Args:

@@ -13,7 +13,7 @@ from gitea.user.user import User
 class Gitea(Client):  # pylint: disable=too-few-public-methods
     """Synchronous Gitea API client."""
 
-    def __init__(self, token: str, base_url: str = "https://gitea.com") -> None:
+    def __init__(self, token: str | None = None, base_url: str = "https://gitea.com") -> None:
         """Initialize the Gitea client.
 
         Args:
