@@ -13,12 +13,10 @@ def get_user_level_runners_command(
 ) -> None:
     """Get user-level runners for the authenticated user."""
     from gitea.client.gitea import Gitea
-    from pathlib import Path
     from typing import Any
 
     from gitea.cli.utility import execute_api_command
 
-    output: Path | None = ctx.obj.get("output")
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
 
