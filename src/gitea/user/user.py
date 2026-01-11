@@ -70,3 +70,16 @@ class User(BaseUser, Resource):
         """
         endpoint = "/user/actions/runners/registration-token"
         return self._get(endpoint=endpoint, **kwargs)
+
+    def delete_user_level_runner(self, runner_id: str, **kwargs: Any) -> dict[str, Any]:
+        """Delete a user-level runner.
+
+        Args:
+            runner_id: The ID of the runner to delete.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A dictionary containing the response from the delete operation.
+        """
+        endpoint = f"/user/actions/runners/{runner_id}"
+        return self._delete(endpoint=endpoint, **kwargs)
