@@ -86,6 +86,14 @@ def main(
             show_default=True,
         ),
     ] = "https://gitea.com",
+    timeout: Annotated[
+        int,
+        typer.Option(
+            "--timeout",
+            help="Timeout for API requests in seconds.",
+            show_default=True,
+        ),
+    ] = 30,
     verbose: Annotated[
         LoggingLevel,
         typer.Option("--verbose", "-v", help="Set verbosity level."),
@@ -104,6 +112,7 @@ def main(
         "output": output,
         "token": token,
         "base_url": base_url,
+        "timeout": timeout,
     }
 
 

@@ -35,6 +35,7 @@ def get_workflow_jobs_command(
 
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
+    timeout: int = ctx.obj.get("timeout")
 
     def api_call() -> dict[str, Any]:
         """API call to get workflow jobs.
@@ -43,6 +44,6 @@ def get_workflow_jobs_command(
             A dictionary containing the workflow jobs with the specified status.
         """
         with Gitea(token=token, base_url=base_url) as client:
-            return client.user.get_workflow_jobs(status=status, page=page, limit=limit)
+            return client.user.get_workflow_jobs(status=status, page=page, limit=limit, timeout=timeout)
 
     execute_api_command(ctx=ctx, api_call=api_call, command_name="get-workflow-jobs")

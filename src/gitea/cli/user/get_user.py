@@ -27,6 +27,7 @@ def get_user_command(
 
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
+    timeout: int = ctx.obj.get("timeout")
 
     def api_call() -> dict[str, Any]:
         """API call to get user information.
@@ -35,6 +36,6 @@ def get_user_command(
             The user information as a dictionary.
         """
         with Gitea(token=token, base_url=base_url) as client:
-            return client.user.get_user(username=username)
+            return client.user.get_user(username=username, timeout=timeout)
 
     execute_api_command(ctx=ctx, api_call=api_call, command_name="get-user")
