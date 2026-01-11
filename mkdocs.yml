@@ -82,6 +82,9 @@ nav:
               - Overview: reference/gitea/resource/index.md
               - Resource: reference/gitea/resource/resource.md
               - AsyncResource: reference/gitea/resource/async_resource.md
+          - User:
+              - Overview: reference/gitea/user/index.md
+              - User: reference/gitea/user/user.md
           - CLI:
               - Overview: reference/gitea/cli/index.md
               - Main: reference/gitea/cli/main.md
