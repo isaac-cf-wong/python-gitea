@@ -28,6 +28,8 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         Returns:
             The AsyncGitea client instance.
         """
+        if self.session is not None and not self.session.closed:
+            raise RuntimeError("AsyncGitea session already open; do not re-enter context manager.")
         self.session = ClientSession(headers=self.headers)
         return self
 
