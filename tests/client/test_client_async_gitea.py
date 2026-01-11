@@ -131,7 +131,7 @@ class TestAsyncGitea:
         mock_session.request.return_value = mock_cm
 
         with (
-            patch("aiohttp.ClientTimeout") as mock_timeout_class,
+            patch("gitea.client.async_gitea.ClientTimeout") as mock_timeout_class,
             patch.object(client, "session", mock_session),
         ):
             mock_timeout = MagicMock()
