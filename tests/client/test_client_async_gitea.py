@@ -1,3 +1,5 @@
+# ruff: noqa PLR2004
+
 """Unit tests for the asynchronous AsyncGitea client."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
