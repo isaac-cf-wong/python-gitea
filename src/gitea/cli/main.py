@@ -84,6 +84,9 @@ def main(
 
 def register_commands() -> None:
     """Register CLI commands."""
+    from gitea.cli.user.main import user_app
+
+    app.add_typer(user_app, name="user", help="Commands for managing Gitea users.")
 
 
 register_commands()
