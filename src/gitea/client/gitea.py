@@ -22,6 +22,24 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         super().__init__(token=token, base_url=base_url)
         self.session = requests.Session()
 
+    def __enter__(self) -> Gitea:
+        """Enter the context manager.
+
+        Returns:
+            The Gitea client instance.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit the context manager.
+
+        Args:
+            exc_type: The exception type.
+            exc_val: The exception value.
+            exc_tb: The traceback.
+        """
+        self.session.close()
+
     def _request(
         self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs
     ) -> dict[str, Any]:
