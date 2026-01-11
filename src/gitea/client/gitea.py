@@ -7,6 +7,7 @@ from typing import Any
 import requests
 
 from gitea.client.base import Client
+from gitea.user.user import User
 
 
 class Gitea(Client):  # pylint: disable=too-few-public-methods
@@ -21,6 +22,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         """
         super().__init__(token=token, base_url=base_url)
         self.session: requests.Session | None = None
+        self.user = User(client=self)
 
     def __enter__(self) -> Gitea:
         """Enter the context manager.
