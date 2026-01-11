@@ -60,6 +60,11 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         Returns:
             The JSON response from the API.
         """
+        if self.session is None:
+            raise RuntimeError(
+                "Gitea must be used as a context manager. "
+                + "Use 'with Gitea(...) as client:' to ensure proper resource cleanup."
+            )
         url = self._build_url(endpoint=endpoint)
         response = self.session.request(
             method, url, headers={**self.headers, **(headers or {})}, timeout=timeout, **kwargs
