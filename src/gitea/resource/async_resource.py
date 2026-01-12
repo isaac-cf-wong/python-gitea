@@ -18,7 +18,7 @@ class AsyncResource:
         """
         self.client = client
 
-    async def _get(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
+    async def _get(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None:
         """Helper method to perform a GET request.
 
         Args:
@@ -30,7 +30,7 @@ class AsyncResource:
         """
         return await self.client._request(method="GET", endpoint=endpoint, **kwargs)
 
-    async def _post(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
+    async def _post(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None:
         """Helper method to perform a POST request.
 
         Args:
@@ -42,7 +42,7 @@ class AsyncResource:
         """
         return await self.client._request(method="POST", endpoint=endpoint, **kwargs)
 
-    async def _put(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
+    async def _put(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None:
         """Helper method to perform a PUT request.
 
         Args:
@@ -54,7 +54,7 @@ class AsyncResource:
         """
         return await self.client._request(method="PUT", endpoint=endpoint, **kwargs)
 
-    async def _delete(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
+    async def _delete(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None:
         """Helper method to perform a DELETE request.
 
         Args:
