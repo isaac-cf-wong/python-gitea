@@ -8,7 +8,7 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/python-gitea)](https://pypi.org/project/python-gitea/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
-[![DOI](https://zenodo.org/badge/924023559.svg)](https://doi.org/10.5281/zenodo.18017404)
+[![DOI](https://zenodo.org/badge/1129170965.svg)](https://doi.org/10.5281/zenodo.18211496)
 
 **Note:** This project is still in progress. The promised features are not fully ready yet, and APIs are subject to change.
 
