@@ -23,10 +23,10 @@ def get_registration_token_command(
 
     def api_call() -> dict[str, Any]:
         """
-        API call to get user-level runners.
+        API call to get the registration token.
 
         Returns:
-            A dictionary containing the user-level runners.
+            A dictionary containing the registration token.
         """
         with Gitea(token=token, base_url=base_url) as client:
             return client.user.get_registration_token(timeout=timeout)
