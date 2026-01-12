@@ -29,11 +29,24 @@ class TestGetRegistrationTokenCommand:
 
         get_registration_token_command(ctx=mock_ctx)
 
-        mock_execute_api_command.assert_called_once_with(
-            ctx=mock_ctx,
-            api_call=mock_execute_api_command.call_args[1]["api_call"],
-            command_name="get-registration-token",
-        )
+        # Verify execute_api_command was called
+        mock_execute_api_command.assert_called_once()
+
+        # Extract the api_call closure and verify it calls the correct method
+        call_kwargs = mock_execute_api_command.call_args[1]
+        api_call = call_kwargs["api_call"]
+
+        # Mock the Gitea client and verify the closure calls get_registration_token with correct params
+        with patch("gitea.client.gitea.Gitea") as mock_gitea_class:
+            mock_client = MagicMock()
+            mock_gitea_class.return_value.__enter__.return_value = mock_client
+            mock_client.user.get_registration_token.return_value = {"token": "abc123"}
+
+            result = api_call()
+
+            # Verify the api_call invoked the correct method with correct parameters
+            mock_client.user.get_registration_token.assert_called_once_with(timeout=60)
+            assert result == {"token": "abc123"}
 
     @patch("gitea.cli.utils.execute_api_command")
     def test_get_registration_token_command_no_token(self, mock_execute_api_command, mock_ctx):
@@ -43,4 +56,20 @@ class TestGetRegistrationTokenCommand:
 
         get_registration_token_command(ctx=mock_ctx)
 
+        # Verify execute_api_command was called
         mock_execute_api_command.assert_called_once()
+
+        # Extract the api_call closure and verify it still calls with None token
+        call_kwargs = mock_execute_api_command.call_args[1]
+        api_call = call_kwargs["api_call"]
+
+        with patch("gitea.client.gitea.Gitea") as mock_gitea_class:
+            mock_client = MagicMock()
+            mock_gitea_class.return_value.__enter__.return_value = mock_client
+            mock_client.user.get_registration_token.return_value = {"token": "abc123"}
+
+            _result = api_call()
+
+            # Verify Gitea was initialized with None token
+            mock_gitea_class.assert_called_once_with(token=None, base_url="https://test.gitea.com")
+            mock_client.user.get_registration_token.assert_called_once_with(timeout=60)
