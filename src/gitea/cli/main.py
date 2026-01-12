@@ -1,9 +1,9 @@
-# ruff: noqa PLC0415
 """Main entry point for the python-gitea CLI application."""
 
 from __future__ import annotations
 
 import enum
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -34,10 +34,10 @@ def setup_logging(level: LoggingLevel = LoggingLevel.INFO) -> None:
     Args:
         level: Logging level.
     """
-    import logging
+    import logging  # noqa: PLC0415
 
-    from rich.console import Console
-    from rich.logging import RichHandler
+    from rich.console import Console  # noqa: PLC0415
+    from rich.logging import RichHandler  # noqa: PLC0415
 
     logger = logging.getLogger("python-gitea")
 
@@ -68,7 +68,30 @@ def setup_logging(level: LoggingLevel = LoggingLevel.INFO) -> None:
 
 
 @app.callback()
-def main(
+def main(  # noqa: PLR0913
+    ctx: typer.Context,
+    output: Annotated[Path | None, typer.Option("--output", "-o", help="Output file name.")] = None,
+    token: Annotated[
+        str | None, typer.Option("--token", "-t", help="Gitea API token.", envvar="GITEA_API_TOKEN")
+    ] = None,
+    base_url: Annotated[
+        str,
+        typer.Option(
+            "--base-url",
+            "-b",
+            help="Base URL of the Gitea instance.",
+            envvar="GITEA_BASE_URL",
+            show_default=True,
+        ),
+    ] = "https://gitea.com",
+    timeout: Annotated[
+        int,
+        typer.Option(
+            "--timeout",
+            help="Timeout for API requests in seconds.",
+            show_default=True,
+        ),
+    ] = 30,
     verbose: Annotated[
         LoggingLevel,
         typer.Option("--verbose", "-v", help="Set verbosity level."),
@@ -77,13 +100,25 @@ def main(
     """Main entry point for the CLI application.
 
     Args:
+        ctx: Typer context.
+        token: Gitea API token.
+        base_url: Base URL of the Gitea instance.
         verbose: Verbosity level for logging.
     """
     setup_logging(verbose)
+    ctx.obj = {
+        "output": output,
+        "token": token,
+        "base_url": base_url,
+        "timeout": timeout,
+    }
 
 
 def register_commands() -> None:
     """Register CLI commands."""
+    from gitea.cli.user.main import user_app  # noqa: PLC0415
+
+    app.add_typer(user_app, name="user", help="Commands for managing Gitea users.")
 
 
 register_commands()

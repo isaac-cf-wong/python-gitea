@@ -78,9 +78,13 @@ nav:
               - Base: reference/gitea/client/base.md
               - AsyncGitea: reference/gitea/client/async_gitea.md
               - Gitea: reference/gitea/client/gitea.md
-          - CLI:
-              - Overview: reference/gitea/cli/index.md
-              - Main: reference/gitea/cli/main.md
+          - Resource:
+              - Overview: reference/gitea/resource/index.md
+              - Resource: reference/gitea/resource/resource.md
+              - AsyncResource: reference/gitea/resource/async_resource.md
+          - User:
+              - Overview: reference/gitea/user/index.md
+              - User: reference/gitea/user/user.md
           - Utils:
               - Overview: reference/gitea/utils/index.md
               - Logging: reference/gitea/utils/log.md

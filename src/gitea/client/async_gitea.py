@@ -12,7 +12,7 @@ from gitea.client.base import Client
 class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
     """Asynchronous Gitea API client."""
 
-    def __init__(self, token: str, base_url: str = "https://gitea.com") -> None:
+    def __init__(self, token: str | None = None, base_url: str = "https://gitea.com") -> None:
         """Initialize the asynchronous Gitea client.
 
         Args:
@@ -45,7 +45,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             await self.session.close()
             self.session = None
 
-    def _get_session(self, headers: dict | None = None, **kwargs) -> ClientSession:
+    def _get_session(self, headers: dict | None = None, **kwargs: Any) -> ClientSession:
         """Get or create the aiohttp ClientSession.
 
         Args:
@@ -58,8 +58,8 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         return ClientSession(headers=headers, **kwargs)
 
     async def _request(
-        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs
-    ) -> dict[str, Any]:
+        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs: Any
+    ) -> dict[str, Any] | None:
         """Make an asynchronous HTTP request to the Gitea API.
 
         Args:
@@ -70,7 +70,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The JSON response as a dictionary.
+            The JSON response from the API. None for 204 No Content responses.
         """
         if self.session is None:
             raise RuntimeError(
@@ -85,4 +85,9 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             method=method, url=url, headers=request_headers, timeout=timeout_obj, **kwargs
         ) as response:
             response.raise_for_status()
+
+            # Handle 204 No Content responses
+            if response.status == 204:  # noqa: PLR2004
+                return None
+
             return await response.json()

@@ -69,3 +69,4 @@ testpypi
 tkinter
 venv
 xunit
+zenodo

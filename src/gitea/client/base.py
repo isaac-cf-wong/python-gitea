@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 
 class Client:  # pylint: disable=too-few-public-methods
     """Abstract base class for Gitea clients."""
 
-    def __init__(self, token: str, base_url: str) -> None:
+    def __init__(self, token: str | None, base_url: str) -> None:
         """Construct the base client.
 
         Args:
@@ -15,9 +17,9 @@ class Client:  # pylint: disable=too-few-public-methods
         """
         self.token = token
         self.base_url = base_url.rstrip("/")
-        self.headers = {
-            "Authorization": f"token {self.token}",
-        }
+        self.headers: dict[str, Any] = {}
+        if self.token:
+            self.headers["Authorization"] = f"token {self.token}"
 
     @property
     def api_url(self) -> str:

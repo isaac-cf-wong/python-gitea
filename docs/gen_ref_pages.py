@@ -65,10 +65,12 @@ for path in sorted(src.rglob("*.py")):
     elif parts[-1] == "__main__":
         continue
 
-    # Skip private modules and test files
+    # Skip private modules, test files, and CLI module
     if any(part.startswith("_") and part != "__init__" for part in parts):
         continue
     if parts and parts[-1].startswith("test_"):
+        continue
+    if "cli" in parts:  # Skip CLI module
         continue
 
     # Skip empty parts (from root __init__)

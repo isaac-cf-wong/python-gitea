@@ -7,12 +7,13 @@ from typing import Any
 import requests
 
 from gitea.client.base import Client
+from gitea.user.user import User
 
 
 class Gitea(Client):  # pylint: disable=too-few-public-methods
     """Synchronous Gitea API client."""
 
-    def __init__(self, token: str, base_url: str = "https://gitea.com") -> None:
+    def __init__(self, token: str | None = None, base_url: str = "https://gitea.com") -> None:
         """Initialize the Gitea client.
 
         Args:
@@ -21,6 +22,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         """
         super().__init__(token=token, base_url=base_url)
         self.session: requests.Session | None = None
+        self.user = User(client=self)
 
     def __enter__(self) -> Gitea:
         """Enter the context manager.
@@ -46,8 +48,8 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             self.session = None
 
     def _request(
-        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs
-    ) -> dict[str, Any]:
+        self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs: Any
+    ) -> dict[str, Any] | None:
         """Make an HTTP request to the Gitea API.
 
         Args:
@@ -58,11 +60,21 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The JSON response from the API.
+            The JSON response from the API. None for 204 No Content responses.
         """
+        if self.session is None:
+            raise RuntimeError(
+                "Gitea must be used as a context manager. "
+                + "Use 'with Gitea(...) as client:' to ensure proper resource cleanup."
+            )
         url = self._build_url(endpoint=endpoint)
         response = self.session.request(
             method, url, headers={**self.headers, **(headers or {})}, timeout=timeout, **kwargs
         )
         response.raise_for_status()
+
+        # Handle 204 No Content responses
+        if response.status_code == 204:  # noqa: PLR2004
+            return None
+
         return response.json()
