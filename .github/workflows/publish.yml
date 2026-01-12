@@ -62,6 +62,7 @@ jobs:
     environment: pypi
     permissions:
       id-token: write
+      attestations: write
 
     steps:
       - name: Download build artifacts
@@ -69,6 +70,11 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
+
+      - name: Generate attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: dist/*
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.13.0
