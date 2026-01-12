@@ -20,7 +20,7 @@ def get_user_command(
     Args:
         username: The username of the user to retrieve. If None, retrieves the authenticated user.
     """
-    from gitea.client.gitea import Gitea
+    import gitea.client.gitea
     from typing import Any
 
     from gitea.cli.utils import execute_api_command
@@ -35,7 +35,7 @@ def get_user_command(
         Returns:
             The user information as a dictionary.
         """
-        with Gitea(token=token, base_url=base_url) as client:
+        with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_user(username=username, timeout=timeout)
 
     execute_api_command(ctx=ctx, api_call=api_call, command_name="get-user")
