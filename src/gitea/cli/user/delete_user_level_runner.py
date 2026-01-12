@@ -28,7 +28,7 @@ def delete_user_level_runner_command(
     base_url: str = ctx.obj.get("base_url")
     timeout: int = ctx.obj.get("timeout")
 
-    def api_call() -> dict[str, Any]:
+    def api_call() -> dict[str, Any] | None:
         """
         API call to delete a user-level runner.
 

@@ -13,7 +13,7 @@ from rich.console import Console
 
 def execute_api_command(
     ctx: typer.Context,
-    api_call: Callable[[], dict[str, Any]],
+    api_call: Callable[[], dict[str, Any] | None],
     command_name: str = "Command",
 ) -> None:
     """Execute an API command and output results.

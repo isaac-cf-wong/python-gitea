@@ -43,7 +43,7 @@ def get_workflow_runs_command(  # noqa: PLR0913
     base_url: str = ctx.obj.get("base_url")
     timeout: int = ctx.obj.get("timeout")
 
-    def api_call() -> dict[str, Any]:
+    def api_call() -> dict[str, Any] | None:
         """API call to get workflow runs.
 
         Returns:

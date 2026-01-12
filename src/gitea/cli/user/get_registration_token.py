@@ -21,7 +21,7 @@ def get_registration_token_command(
     base_url: str = ctx.obj.get("base_url")
     timeout: int = ctx.obj.get("timeout")
 
-    def api_call() -> dict[str, Any]:
+    def api_call() -> dict[str, Any] | None:
         """
         API call to get the registration token.
 
