@@ -44,10 +44,10 @@ def get_workflow_runs_command(  # noqa: PLR0913
     timeout: int = ctx.obj.get("timeout")
 
     def api_call() -> dict[str, Any]:
-        """API call to get workflow jobs.
+        """API call to get workflow runs.
 
         Returns:
-            A dictionary containing the workflow jobs with the specified status.
+            A dictionary containing the workflow runs.
         """
         with Gitea(token=token, base_url=base_url) as client:
             return client.user.get_workflow_runs(
