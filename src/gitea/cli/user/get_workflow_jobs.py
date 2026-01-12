@@ -28,7 +28,7 @@ def get_workflow_jobs_command(
         page: The page number for pagination.
         limit: The number of items per page for pagination.
     """
-    from gitea.client.gitea import Gitea
+    import gitea.client.gitea
     from typing import Any
 
     from gitea.cli.utils import execute_api_command
@@ -43,7 +43,7 @@ def get_workflow_jobs_command(
         Returns:
             A dictionary containing the workflow jobs with the specified status.
         """
-        with Gitea(token=token, base_url=base_url) as client:
+        with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_workflow_jobs(status=status, page=page, limit=limit, timeout=timeout)
 
     execute_api_command(ctx=ctx, api_call=api_call, command_name="get-workflow-jobs")
