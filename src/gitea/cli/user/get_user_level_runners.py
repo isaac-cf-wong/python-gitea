@@ -1,9 +1,6 @@
-# ruff: noqa PLC0415
-
-"""Get user information command for Gitea CLI."""
+"""Get user-level runners command for Gitea CLI."""
 
 from __future__ import annotations
-
 
 from typing import Annotated
 
@@ -15,10 +12,10 @@ def get_user_level_runners_command(
     runner_id: Annotated[str | None, typer.Option("--runner-id", help="The ID of the runner to retrieve.")] = None,
 ) -> None:
     """Get user-level runners for the authenticated user."""
-    from gitea.client.gitea import Gitea
-    from typing import Any
+    from typing import Any  # noqa: PLC0415
 
-    from gitea.cli.utils import execute_api_command
+    from gitea.cli.utils import execute_api_command  # noqa: PLC0415
+    from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
