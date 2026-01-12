@@ -28,6 +28,11 @@ def execute_api_command(
 
     try:
         result = api_call()
+
+        if result is None:
+            console.print(f"{command_name} executed successfully. No content returned.")
+            return
+
         json_output = json.dumps(result, indent=4)
 
         if output:
