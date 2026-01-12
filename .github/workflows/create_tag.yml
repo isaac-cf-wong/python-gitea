@@ -47,5 +47,6 @@ jobs:
     permissions:
       contents: write
       id-token: write
+      attestations: write
     with:
       tag_name: ${{ needs.create_tag.outputs.new_tag }}
