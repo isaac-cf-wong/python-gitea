@@ -59,7 +59,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
 
     async def _request(
         self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs: Any
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Make an asynchronous HTTP request to the Gitea API.
 
         Args:
@@ -70,7 +70,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The JSON response as a dictionary.
+            The JSON response from the API. None for 204 No Content responses.
         """
         if self.session is None:
             raise RuntimeError(
@@ -85,4 +85,9 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             method=method, url=url, headers=request_headers, timeout=timeout_obj, **kwargs
         ) as response:
             response.raise_for_status()
+
+            # Handle 204 No Content responses
+            if response.status == 204:  # noqa: PLR2004
+                return None
+
             return await response.json()
