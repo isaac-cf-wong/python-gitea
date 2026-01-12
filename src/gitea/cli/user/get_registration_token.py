@@ -12,7 +12,7 @@ def get_registration_token_command(
     ctx: typer.Context,
 ) -> None:
     """Get registration token for the authenticated user."""
-    from gitea.client.gitea import Gitea
+    import gitea.client.gitea
     from typing import Any
 
     from gitea.cli.utils import execute_api_command
@@ -28,7 +28,7 @@ def get_registration_token_command(
         Returns:
             A dictionary containing the registration token.
         """
-        with Gitea(token=token, base_url=base_url) as client:
+        with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_registration_token(timeout=timeout)
 
     execute_api_command(ctx=ctx, api_call=api_call, command_name="get-registration-token")
