@@ -11,7 +11,7 @@ from gitea.user.base import BaseUser
 class User(BaseUser, Resource):
     """Gitea User resource."""
 
-    def get_user(self, username: str | None = None, **kwargs: Any) -> dict[str, Any]:
+    def get_user(self, username: str | None = None, **kwargs: Any) -> dict[str, Any] | None:
         """Get user information.
 
         Args:
@@ -30,7 +30,7 @@ class User(BaseUser, Resource):
         page: int | None = None,
         limit: int | None = None,
         **kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Get workflow jobs for the authenticated user filtered by status.
 
         Args:
@@ -46,7 +46,7 @@ class User(BaseUser, Resource):
         params = self._build_get_workflow_jobs_params(status=status, page=page, limit=limit)
         return self._get(endpoint=endpoint, params=params, **kwargs)
 
-    def get_user_level_runners(self, runner_id: str | None = None, **kwargs: Any) -> dict[str, Any]:
+    def get_user_level_runners(self, runner_id: str | None = None, **kwargs: Any) -> dict[str, Any] | None:
         """Get user-level runners for the authenticated user.
 
         Args:
@@ -59,7 +59,7 @@ class User(BaseUser, Resource):
         endpoint = "/user/actions/runners" if runner_id is None else f"/user/actions/runners/{runner_id}"
         return self._get(endpoint=endpoint, **kwargs)
 
-    def get_registration_token(self, **kwargs: Any) -> dict[str, Any]:
+    def get_registration_token(self, **kwargs: Any) -> dict[str, Any] | None:
         """Get a registration token for adding a new user-level runner.
 
         Args:
@@ -71,7 +71,7 @@ class User(BaseUser, Resource):
         endpoint = "/user/actions/runners/registration-token"
         return self._get(endpoint=endpoint, **kwargs)
 
-    def delete_user_level_runner(self, runner_id: str, **kwargs: Any) -> dict[str, Any]:
+    def delete_user_level_runner(self, runner_id: str, **kwargs: Any) -> dict[str, Any] | None:
         """Delete a user-level runner.
 
         Args:
@@ -94,7 +94,7 @@ class User(BaseUser, Resource):
         page: int | None = None,
         limit: int | None = None,
         **kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Get workflow runs for the authenticated user filtered by various parameters.
 
         Args:
