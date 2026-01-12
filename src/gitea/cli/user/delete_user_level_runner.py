@@ -19,7 +19,7 @@ def delete_user_level_runner_command(
     Args:
         runner_id: The ID of the runner to delete.
     """
-    from gitea.client.gitea import Gitea
+    import gitea.client.gitea
     from typing import Any
 
     from gitea.cli.utils import execute_api_command
@@ -35,7 +35,7 @@ def delete_user_level_runner_command(
         Returns:
             A dictionary containing the result of the deletion.
         """
-        with Gitea(token=token, base_url=base_url) as client:
+        with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.delete_user_level_runner(runner_id=runner_id, timeout=timeout)
 
     execute_api_command(ctx=ctx, api_call=api_call, command_name="delete-user-level-runner")
