@@ -1,9 +1,6 @@
-# ruff: noqa PLC0415
-
 """Delete user-level runner command for Gitea CLI."""
 
 from __future__ import annotations
-
 
 from typing import Annotated
 
@@ -19,10 +16,10 @@ def delete_user_level_runner_command(
     Args:
         runner_id: The ID of the runner to delete.
     """
-    import gitea.client.gitea
-    from typing import Any
+    from typing import Any  # noqa: PLC0415
 
-    from gitea.cli.utils import execute_api_command
+    import gitea.cli.utils  # noqa: PLC0415
+    import gitea.client.gitea  # noqa: PLC0415
 
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
@@ -38,4 +35,4 @@ def delete_user_level_runner_command(
         with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.delete_user_level_runner(runner_id=runner_id, timeout=timeout)
 
-    execute_api_command(ctx=ctx, api_call=api_call, command_name="delete-user-level-runner")
+    gitea.cli.utils.execute_api_command(ctx=ctx, api_call=api_call, command_name="delete-user-level-runner")

@@ -1,5 +1,3 @@
-# ruff: noqa PLC0415
-
 """Get user information command for Gitea CLI."""
 
 from __future__ import annotations
@@ -20,10 +18,10 @@ def get_user_command(
     Args:
         username: The username of the user to retrieve. If None, retrieves the authenticated user.
     """
-    import gitea.client.gitea
-    from typing import Any
+    from typing import Any  # noqa: PLC0415
 
-    from gitea.cli.utils import execute_api_command
+    import gitea.cli.utils  # noqa: PLC0415
+    import gitea.client.gitea  # noqa: PLC0415
 
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
@@ -38,4 +36,4 @@ def get_user_command(
         with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_user(username=username, timeout=timeout)
 
-    execute_api_command(ctx=ctx, api_call=api_call, command_name="get-user")
+    gitea.cli.utils.execute_api_command(ctx=ctx, api_call=api_call, command_name="get-user")

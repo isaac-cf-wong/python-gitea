@@ -36,8 +36,8 @@ def get_workflow_runs_command(  # noqa: PLR0913
     """
     from typing import Any  # noqa: PLC0415
 
-    from gitea.cli.utils import execute_api_command  # noqa: PLC0415
-    from gitea.client.gitea import Gitea  # noqa: PLC0415
+    import gitea.cli.utils  # noqa: PLC0415
+    import gitea.client.gitea  # noqa: PLC0415
 
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
@@ -49,7 +49,7 @@ def get_workflow_runs_command(  # noqa: PLR0913
         Returns:
             A dictionary containing the workflow runs.
         """
-        with Gitea(token=token, base_url=base_url) as client:
+        with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_workflow_runs(
                 event=event,
                 branch=branch,
@@ -61,4 +61,4 @@ def get_workflow_runs_command(  # noqa: PLR0913
                 timeout=timeout,
             )
 
-    execute_api_command(ctx=ctx, api_call=api_call, command_name="get-workflow-runs")
+    gitea.cli.utils.execute_api_command(ctx=ctx, api_call=api_call, command_name="get-workflow-runs")

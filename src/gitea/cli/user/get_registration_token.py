@@ -1,9 +1,6 @@
-# ruff: noqa PLC0415
-
 """Get registration token command for Gitea CLI."""
 
 from __future__ import annotations
-
 
 import typer
 
@@ -12,10 +9,10 @@ def get_registration_token_command(
     ctx: typer.Context,
 ) -> None:
     """Get registration token for the authenticated user."""
-    import gitea.client.gitea
-    from typing import Any
+    from typing import Any  # noqa: PLC0415
 
-    from gitea.cli.utils import execute_api_command
+    import gitea.cli.utils  # noqa: PLC0415
+    import gitea.client.gitea  # noqa: PLC0415
 
     token: str | None = ctx.obj.get("token")
     base_url: str = ctx.obj.get("base_url")
@@ -31,4 +28,4 @@ def get_registration_token_command(
         with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_registration_token(timeout=timeout)
 
-    execute_api_command(ctx=ctx, api_call=api_call, command_name="get-registration-token")
+    gitea.cli.utils.execute_api_command(ctx=ctx, api_call=api_call, command_name="get-registration-token")
