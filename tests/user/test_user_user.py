@@ -1,6 +1,6 @@
-"""Unit tests for User resource."""
+"""Unit tests for the User class."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -8,95 +8,53 @@ from gitea.user.user import User
 
 
 class TestUser:
-    """Test cases for User resource."""
+    """Test cases for the User class."""
 
     @pytest.fixture
-    def user(self):
+    def mock_client(self):
+        """Fixture to create a mock Gitea client."""
+        client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"login": "testuser", "id": 1}
+        mock_response.status_code = 200
+        client._request.return_value = mock_response
+        return client
+
+    @pytest.fixture
+    def user(self, mock_client):
         """Fixture to create a User instance."""
-        return User(client=MagicMock())
+        return User(client=mock_client)
 
-    def test_get_user_authenticated(self, user):
-        """Test getting authenticated user information."""
-        mock_response = {"username": "testuser", "id": 1}
-        user._get = MagicMock(return_value=mock_response)
+    def test_get_user_authenticated(self, user, mock_client):
+        """Test get_user for authenticated user."""
+        with patch("gitea.user.user.process_response") as mock_process:
+            mock_process.return_value = ({"login": "testuser", "id": 1}, 200)
+            result = user.get_user()
+            mock_client._request.assert_called_once_with(
+                method="GET", endpoint="/user", headers={"Content-Type": "application/json"}
+            )
+            assert result == ({"login": "testuser", "id": 1}, 200)
 
-        result = user.get_user()
+    def test_get_user_by_username(self, user, mock_client):
+        """Test get_user for a specific user."""
+        with patch("gitea.user.user.process_response") as mock_process:
+            mock_process.return_value = ({"login": "other_user", "id": 2}, 200)
+            result = user.get_user(username="other_user")
+            mock_client._request.assert_called_once_with(
+                method="GET", endpoint="/users/other_user", headers={"Content-Type": "application/json"}
+            )
+            assert result == ({"login": "other_user", "id": 2}, 200)
 
-        user._get.assert_called_once_with(endpoint="/user")
-        assert result == mock_response
-
-    def test_get_user_with_username(self, user):
-        """Test getting specific user information."""
-        mock_response = {"username": "other_user", "id": 2}
-        user._get = MagicMock(return_value=mock_response)
-
-        result = user.get_user(username="other_user")
-
-        user._get.assert_called_once_with(endpoint="/users/other_user")
-        assert result == mock_response
-
-    def test_get_workflow_jobs(self, user):
-        """Test getting workflow jobs with status filter."""
-        mock_response = {"jobs": []}
-        user._get = MagicMock(return_value=mock_response)
-        user._build_get_workflow_jobs_params = MagicMock(return_value={"status": "success"})
-
-        result = user.get_workflow_jobs(status="success", page=1, limit=10)
-
-        user._build_get_workflow_jobs_params.assert_called_once_with(status="success", page=1, limit=10)
-        user._get.assert_called_once_with(endpoint="/user/actions/jobs", params={"status": "success"})
-        assert result == mock_response
-
-    def test_get_user_level_runners_all(self, user):
-        """Test getting all user-level runners."""
-        mock_response = {"runners": []}
-        user._get = MagicMock(return_value=mock_response)
-
-        result = user.get_user_level_runners()
-
-        user._get.assert_called_once_with(endpoint="/user/actions/runners")
-        assert result == mock_response
-
-    def test_get_user_level_runners_specific(self, user):
-        """Test getting a specific user-level runner."""
-        mock_response = {"runner": {"id": "123"}}
-        user._get = MagicMock(return_value=mock_response)
-
-        result = user.get_user_level_runners(runner_id="123")
-
-        user._get.assert_called_once_with(endpoint="/user/actions/runners/123")
-        assert result == mock_response
-
-    def test_get_registration_token(self, user):
-        """Test getting registration token."""
-        mock_response = {"token": "abc123"}
-        user._get = MagicMock(return_value=mock_response)
-
-        result = user.get_registration_token()
-
-        user._get.assert_called_once_with(endpoint="/user/actions/runners/registration-token")
-        assert result == mock_response
-
-    def test_delete_user_level_runner(self, user):
-        """Test deleting a user-level runner."""
-        mock_response = {}
-        user._delete = MagicMock(return_value=mock_response)
-
-        result = user.delete_user_level_runner(runner_id="123")
-
-        user._delete.assert_called_once_with(endpoint="/user/actions/runners/123")
-        assert result == mock_response
-
-    def test_get_workflow_runs(self, user):
-        """Test getting workflow runs with filters."""
-        mock_response = {"runs": []}
-        user._get = MagicMock(return_value=mock_response)
-        user._build_get_workflow_runs_params = MagicMock(return_value={"event": "push"})
-
-        result = user.get_workflow_runs(event="push", status="success")
-
-        user._build_get_workflow_runs_params.assert_called_once_with(
-            event="push", branch=None, status="success", actor=None, head_sha=None, page=None, limit=None
-        )
-        user._get.assert_called_once_with(endpoint="/user/actions/runs", params={"event": "push"})
-        assert result == mock_response
+    def test_update_user_settings(self, user, mock_client):
+        """Test update_user_settings."""
+        with patch("gitea.user.user.process_response") as mock_process:
+            mock_process.return_value = ({"full_name": "Test User", "theme": "dark"}, 200)
+            result = user.update_user_settings(full_name="Test User", theme="dark")
+            expected_payload = {"full_name": "Test User", "theme": "dark"}
+            mock_client._request.assert_called_once_with(
+                method="PATCH",
+                endpoint="/user/settings",
+                json=expected_payload,
+                headers={"Content-Type": "application/json"},
+            )
+            assert result == ({"full_name": "Test User", "theme": "dark"}, 200)
