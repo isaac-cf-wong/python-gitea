@@ -22,6 +22,14 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         super().__init__(token=token, base_url=base_url)
         self.session: ClientSession | None = None
 
+    def __str__(self) -> str:
+        """Return a string representation of the AsyncGitea client.
+
+        Returns:
+            A string representing the AsyncGitea client.
+        """
+        return f"AsyncGitea Client(base_url={self.base_url})"
+
     async def __aenter__(self) -> AsyncGitea:
         """Enter the asynchronous context manager.
 
