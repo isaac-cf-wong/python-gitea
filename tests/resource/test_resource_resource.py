@@ -61,3 +61,14 @@ class TestResource:
 
         mock_client._request.assert_called_once_with(method="DELETE", endpoint="repos/test/repo/issues/1")
         assert result.json() == {"deleted": True}
+
+    def test_patch(self, resource, mock_client):
+        """Test the _patch method."""
+        mock_client._request.return_value.json.return_value = {"patched": True}
+
+        result = resource._patch("repos/test/repo/issues/1", data={"title": "Updated Title"})
+
+        mock_client._request.assert_called_once_with(
+            method="PATCH", endpoint="repos/test/repo/issues/1", data={"title": "Updated Title"}
+        )
+        assert result.json() == {"patched": True}
