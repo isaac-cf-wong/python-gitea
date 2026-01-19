@@ -82,7 +82,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         )
         try:
             response.raise_for_status()
-        except Exception as e:
+        except Exception:
             response.close()
-            raise e
+            raise
         return response
