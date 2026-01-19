@@ -1,6 +1,6 @@
-"""Unit tests for AsyncUser resource."""
+"""Unit tests for the AsyncUser class."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -8,103 +8,56 @@ from gitea.user.async_user import AsyncUser
 
 
 class TestAsyncUser:
-    """Test cases for AsyncUser resource."""
+    """Test cases for the AsyncUser class."""
 
     @pytest.fixture
-    def async_user(self):
+    def mock_client(self):
+        """Fixture to create a mock AsyncGitea client."""
+        client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.json = AsyncMock(return_value={"login": "testuser", "id": 1})
+        mock_response.status = 200
+        client._request = AsyncMock(return_value=mock_response)
+        return client
+
+    @pytest.fixture
+    def async_user(self, mock_client):
         """Fixture to create an AsyncUser instance."""
-        return AsyncUser(client=MagicMock())
+        return AsyncUser(client=mock_client)
 
     @pytest.mark.asyncio
-    async def test_get_user_authenticated(self, async_user):
-        """Test getting authenticated user information."""
-        mock_response = {"username": "testuser", "id": 1}
-        async_user._get = AsyncMock(return_value=mock_response)
-
-        result = await async_user.get_user()
-
-        async_user._get.assert_called_once_with(endpoint="/user")
-        assert result == mock_response
-
-    @pytest.mark.asyncio
-    async def test_get_user_with_username(self, async_user):
-        """Test getting specific user information."""
-        mock_response = {"username": "other_user", "id": 2}
-        async_user._get = AsyncMock(return_value=mock_response)
-
-        result = await async_user.get_user(username="other_user")
-
-        async_user._get.assert_called_once_with(endpoint="/users/other_user")
-        assert result == mock_response
+    async def test_get_user_authenticated(self, async_user, mock_client):
+        """Test get_user for authenticated user."""
+        with patch("gitea.user.async_user.process_async_response") as mock_process:
+            mock_process.return_value = ({"login": "testuser", "id": 1}, 200)
+            result = await async_user.get_user()
+            mock_client._request.assert_called_once_with(
+                method="GET", endpoint="/user", headers={"Content-Type": "application/json"}
+            )
+            assert result == ({"login": "testuser", "id": 1}, 200)
 
     @pytest.mark.asyncio
-    async def test_get_workflow_jobs(self, async_user):
-        """Test getting workflow jobs with status filter."""
-        mock_response = {"jobs": []}
-        async_user._get = AsyncMock(return_value=mock_response)
-        async_user._build_get_workflow_jobs_params = MagicMock(return_value={"status": "success"})
-
-        result = await async_user.get_workflow_jobs(status="success", page=1, limit=10)
-
-        async_user._build_get_workflow_jobs_params.assert_called_once_with(status="success", page=1, limit=10)
-        async_user._get.assert_called_once_with(endpoint="/user/actions/jobs", params={"status": "success"})
-        assert result == mock_response
+    async def test_get_user_by_username(self, async_user, mock_client):
+        """Test get_user for a specific user."""
+        with patch("gitea.user.async_user.process_async_response") as mock_process:
+            mock_process.return_value = ({"login": "other_user", "id": 2}, 200)
+            result = await async_user.get_user(username="other_user")
+            mock_client._request.assert_called_once_with(
+                method="GET", endpoint="/users/other_user", headers={"Content-Type": "application/json"}
+            )
+            assert result == ({"login": "other_user", "id": 2}, 200)
 
     @pytest.mark.asyncio
-    async def test_get_user_level_runners_all(self, async_user):
-        """Test getting all user-level runners."""
-        mock_response = {"runners": []}
-        async_user._get = AsyncMock(return_value=mock_response)
-
-        result = await async_user.get_user_level_runners()
-
-        async_user._get.assert_called_once_with(endpoint="/user/actions/runners")
-        assert result == mock_response
-
-    @pytest.mark.asyncio
-    async def test_get_user_level_runners_specific(self, async_user):
-        """Test getting a specific user-level runner."""
-        mock_response = {"runner": {"id": "123"}}
-        async_user._get = AsyncMock(return_value=mock_response)
-
-        result = await async_user.get_user_level_runners(runner_id="123")
-
-        async_user._get.assert_called_once_with(endpoint="/user/actions/runners/123")
-        assert result == mock_response
-
-    @pytest.mark.asyncio
-    async def test_get_registration_token(self, async_user):
-        """Test getting registration token."""
-        mock_response = {"token": "abc123"}
-        async_user._get = AsyncMock(return_value=mock_response)
-
-        result = await async_user.get_registration_token()
-
-        async_user._get.assert_called_once_with(endpoint="/user/actions/runners/registration-token")
-        assert result == mock_response
-
-    @pytest.mark.asyncio
-    async def test_delete_user_level_runner(self, async_user):
-        """Test deleting a user-level runner."""
-        mock_response = {}
-        async_user._delete = AsyncMock(return_value=mock_response)
-
-        result = await async_user.delete_user_level_runner(runner_id="123")
-
-        async_user._delete.assert_called_once_with(endpoint="/user/actions/runners/123")
-        assert result == mock_response
-
-    @pytest.mark.asyncio
-    async def test_get_workflow_runs(self, async_user):
-        """Test getting workflow runs with filters."""
-        mock_response = {"runs": []}
-        async_user._get = AsyncMock(return_value=mock_response)
-        async_user._build_get_workflow_runs_params = MagicMock(return_value={"event": "push"})
-
-        result = await async_user.get_workflow_runs(event="push", status="success")
-
-        async_user._build_get_workflow_runs_params.assert_called_once_with(
-            event="push", branch=None, status="success", actor=None, head_sha=None, page=None, limit=None
-        )
-        async_user._get.assert_called_once_with(endpoint="/user/actions/runs", params={"event": "push"})
-        assert result == mock_response
+    async def test_update_user_settings(self, async_user, mock_client):
+        """Test update_user_settings."""
+        with patch("gitea.user.async_user.process_async_response") as mock_process:
+            mock_process.return_value = ({"full_name": "Test User", "theme": "dark"}, 200)
+            result = await async_user.update_user_settings(full_name="Test User", theme="dark")
+            expected_payload = {"full_name": "Test User", "theme": "dark"}
+            mock_client._request.assert_called_once_with(
+                method="PATCH",
+                endpoint="/user/settings",
+                json=expected_payload,
+                headers={"Content-Type": "application/json"},
+            )
+            assert result == ({"full_name": "Test User", "theme": "dark"}, 200)

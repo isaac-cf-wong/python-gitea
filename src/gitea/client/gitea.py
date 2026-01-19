@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import requests
+from requests import Response
 
 from gitea.client.base import Client
 from gitea.user.user import User
@@ -23,6 +24,14 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         super().__init__(token=token, base_url=base_url)
         self.session: requests.Session | None = None
         self.user = User(client=self)
+
+    def __str__(self) -> str:
+        """Return a string representation of the Gitea client.
+
+        Returns:
+            A string representing the Gitea client.
+        """
+        return f"Gitea Client(base_url={self.base_url})"
 
     def __enter__(self) -> Gitea:
         """Enter the context manager.
@@ -49,7 +58,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
 
     def _request(
         self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs: Any
-    ) -> dict[str, Any] | None:
+    ) -> Response:
         """Make an HTTP request to the Gitea API.
 
         Args:
@@ -60,7 +69,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The JSON response from the API. None for 204 No Content responses.
+            The HTTP response object.
         """
         if self.session is None:
             raise RuntimeError(
@@ -71,10 +80,9 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         response = self.session.request(
             method, url, headers={**self.headers, **(headers or {})}, timeout=timeout, **kwargs
         )
-        response.raise_for_status()
-
-        # Handle 204 No Content responses
-        if response.status_code == 204:  # noqa: PLR2004
-            return None
-
-        return response.json()
+        try:
+            response.raise_for_status()
+        except Exception:
+            response.close()
+            raise
+        return response

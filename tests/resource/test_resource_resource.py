@@ -14,7 +14,9 @@ class TestResource:
     def mock_client(self):
         """Fixture to create a mock Gitea client."""
         client = MagicMock()
-        client._request = MagicMock()
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"data": "test"}
+        client._request = MagicMock(return_value=mock_response)
         return client
 
     @pytest.fixture
@@ -24,38 +26,49 @@ class TestResource:
 
     def test_get(self, resource, mock_client):
         """Test the _get method."""
-        mock_client._request.return_value = {"data": "test"}
+        mock_client._request.return_value.json.return_value = {"data": "test"}
 
         result = resource._get("users/testuser", timeout=30)
 
         mock_client._request.assert_called_once_with(method="GET", endpoint="users/testuser", timeout=30)
-        assert result == {"data": "test"}
+        assert result.json() == {"data": "test"}
 
     def test_post(self, resource, mock_client):
         """Test the _post method."""
-        mock_client._request.return_value = {"id": 1}
+        mock_client._request.return_value.json.return_value = {"id": 1}
 
         result = resource._post("repos/test/repo/issues", json={"title": "Test"})
 
         mock_client._request.assert_called_once_with(
             method="POST", endpoint="repos/test/repo/issues", json={"title": "Test"}
         )
-        assert result == {"id": 1}
+        assert result.json() == {"id": 1}
 
     def test_put(self, resource, mock_client):
         """Test the _put method."""
-        mock_client._request.return_value = {"updated": True}
+        mock_client._request.return_value.json.return_value = {"updated": True}
 
         result = resource._put("user/settings", data={"name": "New Name"})
 
         mock_client._request.assert_called_once_with(method="PUT", endpoint="user/settings", data={"name": "New Name"})
-        assert result == {"updated": True}
+        assert result.json() == {"updated": True}
 
     def test_delete(self, resource, mock_client):
         """Test the _delete method."""
-        mock_client._request.return_value = {"deleted": True}
+        mock_client._request.return_value.json.return_value = {"deleted": True}
 
         result = resource._delete("repos/test/repo/issues/1")
 
         mock_client._request.assert_called_once_with(method="DELETE", endpoint="repos/test/repo/issues/1")
-        assert result == {"deleted": True}
+        assert result.json() == {"deleted": True}
+
+    def test_patch(self, resource, mock_client):
+        """Test the _patch method."""
+        mock_client._request.return_value.json.return_value = {"patched": True}
+
+        result = resource._patch("repos/test/repo/issues/1", data={"title": "Updated Title"})
+
+        mock_client._request.assert_called_once_with(
+            method="PATCH", endpoint="repos/test/repo/issues/1", data={"title": "Updated Title"}
+        )
+        assert result.json() == {"patched": True}

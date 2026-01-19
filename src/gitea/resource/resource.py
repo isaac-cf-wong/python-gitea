@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from requests import Response
+
 if TYPE_CHECKING:
     from gitea.client.gitea import Gitea
 
@@ -19,7 +21,7 @@ class Resource:
         """
         self.client = client
 
-    def _get(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None:
+    def _get(self, endpoint: str, **kwargs: Any) -> Response:
         """Helper method to perform a GET request.
 
         Args:
@@ -27,11 +29,11 @@ class Resource:
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The JSON response as a dictionary.
+            The HTTP response.
         """
         return self.client._request(method="GET", endpoint=endpoint, **kwargs)
 
-    def _post(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None:
+    def _post(self, endpoint: str, **kwargs: Any) -> Response:
         """Helper method to perform a POST request.
 
         Args:
@@ -39,11 +41,11 @@ class Resource:
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The JSON response as a dictionary.
+            The HTTP response.
         """
         return self.client._request(method="POST", endpoint=endpoint, **kwargs)
 
-    def _put(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None:
+    def _put(self, endpoint: str, **kwargs: Any) -> Response:
         """Helper method to perform a PUT request.
 
         Args:
@@ -51,11 +53,11 @@ class Resource:
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The JSON response as a dictionary.
+            The HTTP response.
         """
         return self.client._request(method="PUT", endpoint=endpoint, **kwargs)
 
-    def _delete(self, endpoint: str, **kwargs: Any) -> dict[str, Any] | None:
+    def _delete(self, endpoint: str, **kwargs: Any) -> Response:
         """Helper method to perform a DELETE request.
 
         Args:
@@ -63,6 +65,18 @@ class Resource:
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The JSON response as a dictionary.
+            The HTTP response.
         """
         return self.client._request(method="DELETE", endpoint=endpoint, **kwargs)
+
+    def _patch(self, endpoint: str, **kwargs: Any) -> Response:
+        """Helper method to perform a PATCH request.
+
+        Args:
+            endpoint: The API endpoint.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response.
+        """
+        return self.client._request(method="PATCH", endpoint=endpoint, **kwargs)

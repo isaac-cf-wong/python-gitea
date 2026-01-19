@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from aiohttp import ClientSession, ClientTimeout
+from aiohttp import ClientResponse, ClientSession, ClientTimeout
 
 from gitea.client.base import Client
 
@@ -21,6 +21,14 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         """
         super().__init__(token=token, base_url=base_url)
         self.session: ClientSession | None = None
+
+    def __str__(self) -> str:
+        """Return a string representation of the AsyncGitea client.
+
+        Returns:
+            A string representing the AsyncGitea client.
+        """
+        return f"AsyncGitea Client(base_url={self.base_url})"
 
     async def __aenter__(self) -> AsyncGitea:
         """Enter the asynchronous context manager.
@@ -59,7 +67,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
 
     async def _request(
         self, method: str, endpoint: str, headers: dict | None = None, timeout: int = 30, **kwargs: Any
-    ) -> dict[str, Any] | None:
+    ) -> ClientResponse:
         """Make an asynchronous HTTP request to the Gitea API.
 
         Args:
@@ -70,7 +78,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The JSON response from the API. None for 204 No Content responses.
+            The aiohttp ClientResponse object.
         """
         if self.session is None:
             raise RuntimeError(
@@ -81,13 +89,12 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         url = self._build_url(endpoint=endpoint)
         request_headers = {**self.headers, **(headers or {})}
         timeout_obj = ClientTimeout(total=timeout)
-        async with self.session.request(
+        response = await self.session.request(
             method=method, url=url, headers=request_headers, timeout=timeout_obj, **kwargs
-        ) as response:
+        )
+        try:
             response.raise_for_status()
-
-            # Handle 204 No Content responses
-            if response.status == 204:  # noqa: PLR2004
-                return None
-
-            return await response.json()
+        except Exception:
+            response.release()
+            raise
+        return response
