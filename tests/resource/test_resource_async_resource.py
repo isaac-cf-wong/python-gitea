@@ -65,3 +65,15 @@ class TestAsyncResource:
 
         mock_client._request.assert_called_once_with(method="DELETE", endpoint="repos/test/repo/issues/1")
         assert await result.json() == {"deleted": True}
+
+    @pytest.mark.asyncio
+    async def test_patch(self, resource, mock_client):
+        """Test the _patch method."""
+        mock_client._request.return_value.json = AsyncMock(return_value={"patched": True})
+
+        result = await resource._patch("repos/test/repo/issues/1", json={"title": "Updated Title"})
+
+        mock_client._request.assert_called_once_with(
+            method="PATCH", endpoint="repos/test/repo/issues/1", json={"title": "Updated Title"}
+        )
+        assert await result.json() == {"patched": True}
