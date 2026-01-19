@@ -24,6 +24,14 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         self.session: requests.Session | None = None
         self.user = User(client=self)
 
+    def __str__(self) -> str:
+        """Return a string representation of the Gitea client.
+
+        Returns:
+            A string representing the Gitea client.
+        """
+        return f"Gitea Client(base_url={self.base_url})"
+
     def __enter__(self) -> Gitea:
         """Enter the context manager.
 
