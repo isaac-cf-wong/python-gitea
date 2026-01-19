@@ -41,7 +41,7 @@ class Resource:
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The HttP response.
+            The HTTP response.
         """
         return self.client._request(method="POST", endpoint=endpoint, **kwargs)
 
@@ -65,7 +65,7 @@ class Resource:
             **kwargs: Additional arguments for the request.
 
         Returns:
-            The Http response.
+            The HTTP response.
         """
         return self.client._request(method="DELETE", endpoint=endpoint, **kwargs)
 
