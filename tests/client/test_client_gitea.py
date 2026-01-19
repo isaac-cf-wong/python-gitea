@@ -43,7 +43,7 @@ class TestGitea:
             headers={"Authorization": "token test_token"},
             timeout=30,
         )
-        assert result == {"key": "value"}
+        assert result.json() == {"key": "value"}
 
     def test_request_with_custom_headers(self, client):
         """Test _request with custom headers."""
@@ -66,7 +66,7 @@ class TestGitea:
             timeout=30,
             data={"title": "Test"},
         )
-        assert result == {"data": "test"}
+        assert result.json() == {"data": "test"}
 
     def test_request_with_custom_timeout(self, client):
         """Test _request with custom timeout."""
@@ -83,7 +83,7 @@ class TestGitea:
         mock_session.request.assert_called_once_with(
             "GET", "https://gitea.example.com/api/v1/users", headers={"Authorization": "token test_token"}, timeout=60
         )
-        assert result == {}
+        assert result.json() == {}
 
     def test_request_http_error(self, client):
         """Test _request raises exception on HTTP error."""

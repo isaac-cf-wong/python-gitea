@@ -53,17 +53,13 @@ class TestAsyncGitea:
     @pytest.mark.asyncio
     async def test_request_success(self, client):
         """Test successful _request method."""
-        # Mock the session and response
+        # Mock the response
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_response.json = AsyncMock(return_value={"key": "value"})
 
-        mock_cm = MagicMock()
-        mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_cm.__aexit__ = AsyncMock(return_value=None)
-
         mock_session = MagicMock()
-        mock_session.request.return_value = mock_cm
+        mock_session.request = AsyncMock(return_value=mock_response)
 
         with (
             patch("gitea.client.async_gitea.ClientTimeout") as mock_timeout_class,
@@ -80,7 +76,7 @@ class TestAsyncGitea:
             headers={"Authorization": "token test_token"},
             timeout=mock_timeout,
         )
-        assert result == {"key": "value"}
+        assert await result.json() == {"key": "value"}
 
     @pytest.mark.asyncio
     async def test_request_with_custom_headers(self, client):
@@ -89,12 +85,8 @@ class TestAsyncGitea:
         mock_response.raise_for_status.return_value = None
         mock_response.json = AsyncMock(return_value={"data": "test"})
 
-        mock_cm = MagicMock()
-        mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_cm.__aexit__ = AsyncMock(return_value=None)
-
         mock_session = MagicMock()
-        mock_session.request.return_value = mock_cm
+        mock_session.request = AsyncMock(return_value=mock_response)
 
         with (
             patch("gitea.client.async_gitea.ClientTimeout") as mock_timeout_class,
@@ -114,7 +106,7 @@ class TestAsyncGitea:
             headers=expected_headers,
             timeout=mock_timeout,
         )
-        assert result == {"data": "test"}
+        assert await result.json() == {"data": "test"}
 
     @pytest.mark.asyncio
     async def test_request_with_custom_timeout(self, client):
@@ -123,12 +115,8 @@ class TestAsyncGitea:
         mock_response.raise_for_status.return_value = None
         mock_response.json = AsyncMock(return_value={})
 
-        mock_cm = MagicMock()
-        mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_cm.__aexit__ = AsyncMock(return_value=None)
-
         mock_session = MagicMock()
-        mock_session.request.return_value = mock_cm
+        mock_session.request = AsyncMock(return_value=mock_response)
 
         with (
             patch("gitea.client.async_gitea.ClientTimeout") as mock_timeout_class,
@@ -143,7 +131,7 @@ class TestAsyncGitea:
         # Check that timeout is passed
         call_args = mock_session.request.call_args
         assert call_args[1]["timeout"].total == 60
-        assert result == {}
+        assert await result.json() == {}
 
     @pytest.mark.asyncio
     async def test_request_http_error(self, client):
@@ -151,12 +139,8 @@ class TestAsyncGitea:
         mock_response = MagicMock()
         mock_response.raise_for_status.side_effect = Exception("404 Client Error")
 
-        mock_cm = MagicMock()
-        mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_cm.__aexit__ = AsyncMock(return_value=None)
-
         mock_session = MagicMock()
-        mock_session.request.return_value = mock_cm
+        mock_session.request = AsyncMock(return_value=mock_response)
 
         with (
             patch("gitea.client.async_gitea.ClientTimeout") as mock_timeout_class,
