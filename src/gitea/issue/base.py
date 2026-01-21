@@ -93,3 +93,32 @@ class BaseIssue:
             params["limit"] = limit
 
         return endpoint, params
+
+    def _get_issue_endpoint(self, owner: str, repository: str, index: int) -> str:
+        """Construct the endpoint URL for a specific issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+
+        Returns:
+            The endpoint URL for the specific issue.
+
+        """
+        return f"/repos/{owner}/{repository}/issues/{index}"
+
+    def _get_issue_helper(self, owner: str, repository: str, index: int) -> str:
+        """Get the endpoint and parameters for retrieving a specific issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+
+        Returns:
+            The API endpoint for retrieving the specific issue.
+
+        """
+        endpoint = self._get_issue_endpoint(owner=owner, repository=repository, index=index)
+        return endpoint
