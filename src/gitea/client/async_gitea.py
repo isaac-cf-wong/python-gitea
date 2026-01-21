@@ -18,6 +18,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         Args:
             token: The API token for authentication.
             base_url: The base URL of the Gitea instance.
+
         """
         super().__init__(token=token, base_url=base_url)
         self.session: ClientSession | None = None
@@ -27,6 +28,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
 
         Returns:
             A string representing the AsyncGitea client.
+
         """
         return f"AsyncGitea Client(base_url={self.base_url})"
 
@@ -35,6 +37,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
 
         Returns:
             The AsyncGitea client instance.
+
         """
         if self.session is not None and not self.session.closed:
             raise RuntimeError("AsyncGitea session already open; do not re-enter context manager.")
@@ -48,6 +51,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             exc_type: The exception type.
             exc_val: The exception value.
             exc_tb: The traceback.
+
         """
         if self.session:
             await self.session.close()
@@ -62,6 +66,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
 
         Returns:
             The aiohttp ClientSession instance.
+
         """
         return ClientSession(headers=headers, **kwargs)
 
@@ -79,6 +84,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
 
         Returns:
             The aiohttp ClientResponse object.
+
         """
         if self.session is None:
             raise RuntimeError(

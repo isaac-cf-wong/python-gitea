@@ -22,9 +22,11 @@ def get_workflow_jobs_command(
     """Get workflow jobs for the authenticated user filtered by status.
 
     Args:
+        ctx: The Typer context.
         status: The status to filter workflow jobs by. Options: pending, queued, in_progress, failure, success, skipped.
         page: The page number for pagination.
         limit: The number of items per page for pagination.
+
     """
     from typing import Any  # noqa: PLC0415
 
@@ -36,10 +38,11 @@ def get_workflow_jobs_command(
     timeout: int = ctx.obj.get("timeout")
 
     def api_call() -> dict[str, Any] | None:
-        """API call to get workflow jobs.
+        """Get workflow jobs.
 
         Returns:
             A dictionary containing the workflow jobs with the specified status.
+
         """
         with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_workflow_jobs(status=status, page=page, limit=limit, timeout=timeout)

@@ -17,11 +17,12 @@ class AsyncResource:
 
         Args:
             client: An instance of the AsyncGitea client.
+
         """
         self.client = client
 
     async def _get(self, endpoint: str, **kwargs: Any) -> ClientResponse:
-        """Helper method to perform a GET request.
+        """Perform a GET request.
 
         Args:
             endpoint: The API endpoint.
@@ -29,11 +30,12 @@ class AsyncResource:
 
         Returns:
             The response as a ClientResponse object.
+
         """
         return await self.client._request(method="GET", endpoint=endpoint, **kwargs)
 
     async def _post(self, endpoint: str, **kwargs: Any) -> ClientResponse:
-        """Helper method to perform a POST request.
+        """Perform a POST request.
 
         Args:
             endpoint: The API endpoint.
@@ -41,11 +43,12 @@ class AsyncResource:
 
         Returns:
             The response as a ClientResponse object.
+
         """
         return await self.client._request(method="POST", endpoint=endpoint, **kwargs)
 
     async def _put(self, endpoint: str, **kwargs: Any) -> ClientResponse:
-        """Helper method to perform a PUT request.
+        """Perform a PUT request.
 
         Args:
             endpoint: The API endpoint.
@@ -53,11 +56,12 @@ class AsyncResource:
 
         Returns:
             The response as a ClientResponse object.
+
         """
         return await self.client._request(method="PUT", endpoint=endpoint, **kwargs)
 
     async def _delete(self, endpoint: str, **kwargs: Any) -> ClientResponse:
-        """Helper method to perform a DELETE request.
+        """Perform a DELETE request.
 
         Args:
             endpoint: The API endpoint.
@@ -65,11 +69,12 @@ class AsyncResource:
 
         Returns:
             The response as a ClientResponse object.
+
         """
         return await self.client._request(method="DELETE", endpoint=endpoint, **kwargs)
 
     async def _patch(self, endpoint: str, **kwargs: Any) -> ClientResponse:
-        """Helper method to perform a PATCH request.
+        """Perform a PATCH request.
 
         Args:
             endpoint: The API endpoint.
@@ -77,5 +82,6 @@ class AsyncResource:
 
         Returns:
             The response as a ClientResponse object.
+
         """
         return await self.client._request(method="PATCH", endpoint=endpoint, **kwargs)

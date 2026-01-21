@@ -26,6 +26,7 @@ def get_workflow_runs_command(  # noqa: PLR0913
     """Get workflow runs for the authenticated user filtered by various parameters.
 
     Args:
+        ctx: The Typer context.
         event: The event that triggered the workflow run.
         branch: The branch name to filter workflow runs.
         status: The status to filter workflow jobs by. Options: pending, queued, in_progress, failure, success, skipped.
@@ -33,6 +34,7 @@ def get_workflow_runs_command(  # noqa: PLR0913
         head_sha: The head SHA to filter workflow runs.
         page: The page number for pagination.
         limit: The number of items per page for pagination.
+
     """
     from typing import Any  # noqa: PLC0415
 
@@ -44,10 +46,11 @@ def get_workflow_runs_command(  # noqa: PLR0913
     timeout: int = ctx.obj.get("timeout")
 
     def api_call() -> dict[str, Any] | None:
-        """API call to get workflow runs.
+        """Get workflow runs.
 
         Returns:
             A dictionary containing the workflow runs.
+
         """
         with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_workflow_runs(

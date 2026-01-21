@@ -22,7 +22,6 @@ class TestVersion:
 
     def test_version_not_installed(self):
         """Test version fallback when package is not installed."""
-
         with patch("importlib.metadata.version", side_effect=PackageNotFoundError("python-gitea")):
             importlib.reload(gitea.version)
             from gitea.version import __version__  # noqa: PLC0415

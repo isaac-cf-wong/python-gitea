@@ -1,6 +1,4 @@
-"""
-Configuration and fixtures for pytest.
-"""
+"""Configuration and fixtures for pytest."""
 
 from __future__ import annotations
 
@@ -9,9 +7,10 @@ import pytest
 
 @pytest.fixture
 def some_name() -> str:
-    """A simple fixture that provides a string name.
+    """Provide a sample name for testing.
 
     Returns:
         A string name.
+
     """
     return "developer"

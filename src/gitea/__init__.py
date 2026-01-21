@@ -1,6 +1,4 @@
-"""
-Top-level package for python-gitea.
-"""
+"""Top-level package for python-gitea."""
 
 from __future__ import annotations
 

@@ -19,6 +19,7 @@ def process_response(response: Response) -> tuple[dict[str, Any] | list[dict[str
 
     Returns:
         A tuple containing the response data and status code.
+
     """
     status_code = response.status_code
     if status_code == 204:  # noqa: PLR2004
@@ -42,6 +43,7 @@ async def process_async_response(response: ClientResponse) -> tuple[dict[str, An
 
     Returns:
         A tuple containing the response data and status code.
+
     """
     status_code = response.status
     if status_code == 204:  # noqa: PLR2004
