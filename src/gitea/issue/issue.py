@@ -134,3 +134,36 @@ class Issue(BaseIssue, Resource):
         )
         data, status_code = process_response(response)
         return cast(list[dict[str, Any]], data), status_code
+
+    def _get_issue(self, owner: str, repository: str, index: int, **kwargs: Any) -> Response:
+        """Get a single issue by its index.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint = self._get_issue_helper(owner=owner, repository=repository, index=index)
+        return self._get(endpoint=endpoint, **kwargs)
+
+    def get_issue(self, owner: str, repository: str, index: int, **kwargs: Any) -> tuple[dict[str, Any], int]:
+        """Get a single issue by its index.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing the issue as a dictionary and the status code.
+
+        """
+        response = self._get_issue(owner=owner, repository=repository, index=index, **kwargs)
+        data, status_code = process_response(response)
+        return cast(dict[str, Any], data), status_code
