@@ -22,11 +22,11 @@ def get_user_level_runners_command(
     timeout: int = ctx.obj.get("timeout")
 
     def api_call() -> dict[str, Any] | None:
-        """
-        API call to get user-level runners.
+        """Get user-level runners.
 
         Returns:
             A dictionary containing the user-level runners.
+
         """
         with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_user_level_runners(runner_id=runner_id, timeout=timeout)

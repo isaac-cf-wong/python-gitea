@@ -14,6 +14,7 @@ def get_all_submodules(package):
 
     Args:
         package: The package to inspect.
+
     """
     submodules = []
     for _, mod_name, _ in pkgutil.walk_packages(package.__path__, package.__name__ + "."):

@@ -23,6 +23,7 @@ class User(BaseUser, Resource):
 
         Returns:
             The authenticated user's information as a Response object.
+
         """
         endpoint, kwargs = self._get_user_helper(username=username, **kwargs)
         return self._get(endpoint=endpoint, **kwargs)
@@ -36,6 +37,7 @@ class User(BaseUser, Resource):
 
         Returns:
             A tuple containing the user information as a dictionary and the status code.
+
         """
         response = self._get_user(username=username, **kwargs)
         data, status_code = process_response(response)
@@ -93,6 +95,7 @@ class User(BaseUser, Resource):
 
         Returns:
             A tuple containing the updated user settings as a dictionary and the status code.
+
         """
         response = self._update_user_settings(
             diff_view_style=diff_view_style,

@@ -1,6 +1,4 @@
-"""
-A script to infer the version number from the metadata.
-"""
+"""A script to infer the version number from the metadata."""
 
 from __future__ import annotations
 

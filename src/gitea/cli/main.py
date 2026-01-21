@@ -33,6 +33,7 @@ def setup_logging(level: LoggingLevel = LoggingLevel.INFO) -> None:
 
     Args:
         level: Logging level.
+
     """
     import logging  # noqa: PLC0415
 
@@ -97,13 +98,16 @@ def main(  # noqa: PLR0913
         typer.Option("--verbose", "-v", help="Set verbosity level."),
     ] = LoggingLevel.INFO,
 ) -> None:
-    """Main entry point for the CLI application.
+    """Enter the CLI application.
 
     Args:
         ctx: Typer context.
+        output: Output file name.
         token: Gitea API token.
         base_url: Base URL of the Gitea instance.
+        timeout: Timeout for API requests in seconds.
         verbose: Verbosity level for logging.
+
     """
     setup_logging(verbose)
     ctx.obj = {

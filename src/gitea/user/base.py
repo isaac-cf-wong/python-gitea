@@ -16,6 +16,7 @@ class BaseUser:
 
         Returns:
             The API endpoint for the user.
+
         """
         return "/user" if username is None else f"/users/{username}"
 
@@ -30,6 +31,7 @@ class BaseUser:
             A tuple containing the endpoint and the request arguments.
                 - The API endpoint for the user.
                 - A dictionary of request arguments.
+
         """
         endpoint = self._get_user_endpoint(username=username)
         default_headers = {
@@ -46,6 +48,7 @@ class BaseUser:
 
         Returns:
             The API endpoint for updating user settings.
+
         """
         return "/user/settings"
 
@@ -79,6 +82,7 @@ class BaseUser:
                 - The API endpoint for updating user settings.
                 - A dictionary representing the payload for the request.
                 - A dictionary of request arguments.
+
         """
         endpoint = self._update_user_settings_endpoint()
         default_headers = {

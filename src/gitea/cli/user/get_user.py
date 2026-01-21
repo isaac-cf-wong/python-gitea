@@ -16,7 +16,9 @@ def get_user_command(
     """Get user information.
 
     Args:
+        ctx: The Typer context.
         username: The username of the user to retrieve. If None, retrieves the authenticated user.
+
     """
     from typing import Any  # noqa: PLC0415
 
@@ -28,10 +30,11 @@ def get_user_command(
     timeout: int = ctx.obj.get("timeout")
 
     def api_call() -> dict[str, Any] | None:
-        """API call to get user information.
+        """Get user information.
 
         Returns:
             The user information as a dictionary.
+
         """
         with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_user(username=username, timeout=timeout)

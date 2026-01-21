@@ -20,6 +20,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         Args:
             token: The API token for authentication.
             base_url: The base URL of the Gitea instance.
+
         """
         super().__init__(token=token, base_url=base_url)
         self.session: requests.Session | None = None
@@ -30,6 +31,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
 
         Returns:
             A string representing the Gitea client.
+
         """
         return f"Gitea Client(base_url={self.base_url})"
 
@@ -38,6 +40,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
 
         Returns:
             The Gitea client instance.
+
         """
         if self.session is not None:
             raise RuntimeError("Gitea session already open; do not re-enter context manager.")
@@ -51,6 +54,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             exc_type: The exception type.
             exc_val: The exception value.
             exc_tb: The traceback.
+
         """
         if self.session:
             self.session.close()
@@ -70,6 +74,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
 
         Returns:
             The HTTP response object.
+
         """
         if self.session is None:
             raise RuntimeError(

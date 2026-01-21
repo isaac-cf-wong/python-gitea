@@ -23,6 +23,7 @@ class AsyncUser(BaseUser, AsyncResource):
 
         Returns:
             The authenticated user's information as a ClientResponse object.
+
         """
         endpoint, kwargs = self._get_user_helper(username=username, **kwargs)
         return await self._get(endpoint=endpoint, **kwargs)
@@ -36,6 +37,7 @@ class AsyncUser(BaseUser, AsyncResource):
 
         Returns:
             A tuple containing the user information as a dictionary and the status code.
+
         """
         response = await self._get_user(username=username, **kwargs)
         data, status_code = await process_async_response(response)
@@ -68,6 +70,7 @@ class AsyncUser(BaseUser, AsyncResource):
 
         Returns:
             The response as a ClientResponse object.
+
         """
         endpoint, payload, kwargs = self._update_user_settings_helper(
             diff_view_style=diff_view_style,
@@ -109,6 +112,7 @@ class AsyncUser(BaseUser, AsyncResource):
 
         Returns:
             A tuple containing the updated user settings as a dictionary and the status code.
+
         """
         response = await self._update_user_settings(
             diff_view_style=diff_view_style,

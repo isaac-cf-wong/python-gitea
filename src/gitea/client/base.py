@@ -14,6 +14,7 @@ class Client:  # pylint: disable=too-few-public-methods
         Args:
             token: The API token for authentication.
             base_url: The base URL of the Gitea instance.
+
         """
         self.token = token
         self.base_url = base_url.rstrip("/")
@@ -27,6 +28,7 @@ class Client:  # pylint: disable=too-few-public-methods
 
         Returns:
             str: The base API URL.
+
         """
         return f"{self.base_url}/api/v1"
 
@@ -38,5 +40,6 @@ class Client:  # pylint: disable=too-few-public-methods
 
         Returns:
             str: The full URL.
+
         """
         return f"{self.api_url}/{endpoint.lstrip('/')}"

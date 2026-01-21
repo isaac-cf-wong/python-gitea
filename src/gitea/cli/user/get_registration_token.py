@@ -19,11 +19,11 @@ def get_registration_token_command(
     timeout: int = ctx.obj.get("timeout")
 
     def api_call() -> dict[str, Any] | None:
-        """
-        API call to get the registration token.
+        """Get registration token.
 
         Returns:
             A dictionary containing the registration token.
+
         """
         with gitea.client.gitea.Gitea(token=token, base_url=base_url) as client:
             return client.user.get_registration_token(timeout=timeout)

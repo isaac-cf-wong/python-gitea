@@ -179,6 +179,8 @@ lint.extend-select = [
     "PL",  # Add pylint rules for fuller coverage
     "SIM",  # Similarities
     "T10",  # Debugger statements
+    "DOC", # Docstring
+    "D",   # Doc style
 ]
 lint.ignore = [
     "E501", # Line length (handled by formatter)

@@ -13,6 +13,7 @@ def get_version_information() -> str:
 
     Returns:
         str: Version information.
+
     """
     return __version__
 
@@ -20,15 +21,15 @@ def get_version_information() -> str:
 def setup_logger(
     outdir: str = ".", label: str | None = None, log_level: str | int = "INFO", print_version: bool = False
 ) -> None:
-    """Setup logging output: call at the start of the script to use
+    """Set up logging output: call at the start of the script to use.
 
     Args:
         outdir: Output directory for log file.
         label: Label for log file name. If None, no log file is created.
         log_level: Logging level as string or integer.
         print_version: Whether to print version information to the log.
-    """
 
+    """
     if isinstance(log_level, str):
         try:
             level = getattr(logging, log_level.upper())

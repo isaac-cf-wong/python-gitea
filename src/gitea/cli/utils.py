@@ -22,6 +22,7 @@ def execute_api_command(
         ctx: Typer context containing token, base_url, and output.
         api_call: Callable that executes the API call and returns the result.
         command_name: Name of the command for error messages.
+
     """
     output: Path | None = ctx.obj.get("output")
     console = Console()
