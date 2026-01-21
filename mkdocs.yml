@@ -76,12 +76,12 @@ nav:
           - Client:
               - Overview: reference/gitea/client/index.md
               - Base: reference/gitea/client/base.md
-              - AsyncGitea: reference/gitea/client/async_gitea.md
+              - Async Gitea: reference/gitea/client/async_gitea.md
               - Gitea: reference/gitea/client/gitea.md
           - Resource:
               - Overview: reference/gitea/resource/index.md
               - Resource: reference/gitea/resource/resource.md
-              - AsyncResource: reference/gitea/resource/async_resource.md
+              - Async Resource: reference/gitea/resource/async_resource.md
           - Issue:
               - Overview: reference/gitea/issue/index.md
               - Issue: reference/gitea/issue/issue.md
