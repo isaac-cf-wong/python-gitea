@@ -122,3 +122,80 @@ class BaseIssue:
         """
         endpoint = self._get_issue_endpoint(owner=owner, repository=repository, index=index)
         return endpoint
+
+    def _edit_issue_endpoint(self, owner: str, repository: str, index: int) -> str:
+        """Construct the endpoint URL for editing a specific issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+
+        Returns:
+            The endpoint URL for editing the specific issue.
+
+        """
+        return f"/repos/{owner}/{repository}/issues/{index}"
+
+    def _edit_issue_helper(  # noqa: PLR0913
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        assignee: str | None = None,
+        assignees: list[str] | None = None,
+        body: str | None = None,
+        due_date: datetime | None = None,
+        milestone: int | None = None,
+        ref: str | None = None,
+        state: Literal["closed", "open", "all"] | None = None,
+        title: str | None = None,
+        unset_due_date: bool | None = None,
+    ) -> tuple[str, dict[str, Any]]:
+        """Get the endpoint and parameters for editing a specific issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            assignee: The new assignee of the issue.
+            assignees: The new assignees of the issue.
+            body: The new body of the issue.
+            due_date: The new due date of the issue.
+            milestone: The new milestone of the issue.
+            ref: The new reference of the issue.
+            state: The new state of the issue.
+            title: The new title of the issue.
+            unset_due_date: Whether to unset the due date of the issue.
+
+        Returns:
+            A tuple containing the endpoint and the request arguments.
+
+                - The API endpoint for editing the specific issue.
+                - A dictionary of request arguments.
+
+        """
+        endpoint = self._edit_issue_endpoint(owner=owner, repository=repository, index=index)
+
+        payload = {}
+
+        if assignee is not None:
+            payload["assignee"] = assignee
+        if assignees is not None:
+            payload["assignees"] = assignees
+        if body is not None:
+            payload["body"] = body
+        if due_date is not None:
+            payload["due_date"] = due_date.isoformat()
+        if milestone is not None:
+            payload["milestone"] = milestone
+        if ref is not None:
+            payload["ref"] = ref
+        if state is not None:
+            payload["state"] = state
+        if title is not None:
+            payload["title"] = title
+        if unset_due_date is not None:
+            payload["unset_due_date"] = unset_due_date
+
+        return endpoint, payload
