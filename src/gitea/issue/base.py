@@ -29,7 +29,7 @@ class BaseIssue:
         state: Literal["closed", "open", "all"] | None = None,
         labels: list[str] | None = None,
         search_string: str | None = None,
-        issue_type: Literal["Issues", "pulls"] | None = None,
+        issue_type: Literal["issues", "pulls"] | None = None,
         milestones: list[str] | list[int] | None = None,
         since: datetime | None = None,
         before: datetime | None = None,
