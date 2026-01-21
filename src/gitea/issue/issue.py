@@ -167,3 +167,111 @@ class Issue(BaseIssue, Resource):
         response = self._get_issue(owner=owner, repository=repository, index=index, **kwargs)
         data, status_code = process_response(response)
         return cast(dict[str, Any], data), status_code
+
+    def _edit_issue(  # noqa: PLR0913
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        assignee: str | None = None,
+        assignees: list[str] | None = None,
+        body: str | None = None,
+        due_date: datetime | None = None,
+        milestone: int | None = None,
+        ref: str | None = None,
+        state: Literal["closed", "open", "all"] | None = None,
+        title: str | None = None,
+        unset_due_date: bool | None = None,
+        **kwargs: Any,
+    ) -> Response:
+        """Edit a specific issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            assignee: The new assignee of the issue.
+            assignees: The new assignees of the issue.
+            body: The new body of the issue.
+            due_date: The new due date of the issue.
+            milestone: The new milestone of the issue.
+            ref: The new reference of the issue.
+            state: The new state of the issue.
+            title: The new title of the issue.
+            unset_due_date: Whether to unset the due date of the issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint, payload = self._edit_issue_helper(
+            owner=owner,
+            repository=repository,
+            index=index,
+            assignee=assignee,
+            assignees=assignees,
+            body=body,
+            due_date=due_date,
+            milestone=milestone,
+            ref=ref,
+            state=state,
+            title=title,
+            unset_due_date=unset_due_date,
+        )
+        return self._patch(endpoint=endpoint, json=payload, **kwargs)
+
+    def edit_issue(  # noqa: PLR0913
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        assignee: str | None = None,
+        assignees: list[str] | None = None,
+        body: str | None = None,
+        due_date: datetime | None = None,
+        milestone: int | None = None,
+        ref: str | None = None,
+        state: Literal["closed", "open", "all"] | None = None,
+        title: str | None = None,
+        unset_due_date: bool | None = None,
+        **kwargs: Any,
+    ) -> tuple[dict[str, Any], int]:
+        """Edit a specific issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            assignee: The new assignee of the issue.
+            assignees: The new assignees of the issue.
+            body: The new body of the issue.
+            due_date: The new due date of the issue.
+            milestone: The new milestone of the issue.
+            ref: The new reference of the issue.
+            state: The new state of the issue.
+            title: The new title of the issue.
+            unset_due_date: Whether to unset the due date of the issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing the edited issue as a dictionary and the status code.
+
+        """
+        response = self._edit_issue(
+            owner=owner,
+            repository=repository,
+            index=index,
+            assignee=assignee,
+            assignees=assignees,
+            body=body,
+            due_date=due_date,
+            milestone=milestone,
+            ref=ref,
+            state=state,
+            title=title,
+            unset_due_date=unset_due_date,
+            **kwargs,
+        )
+        data, status_code = process_response(response)
+        return cast(dict[str, Any], data), status_code
