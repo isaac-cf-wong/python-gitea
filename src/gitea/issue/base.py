@@ -148,7 +148,7 @@ class BaseIssue:
         due_date: datetime | None = None,
         milestone: int | None = None,
         ref: str | None = None,
-        state: Literal["closed", "open", "all"] | None = None,
+        state: Literal["closed", "open"] | None = None,
         title: str | None = None,
         unset_due_date: bool | None = None,
     ) -> tuple[str, dict[str, Any]]:
