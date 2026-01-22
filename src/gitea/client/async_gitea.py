@@ -7,6 +7,8 @@ from typing import Any
 from aiohttp import ClientResponse, ClientSession, ClientTimeout
 
 from gitea.client.base import Client
+from gitea.issue.async_issue import AsyncIssue
+from gitea.user.async_user import AsyncUser
 
 
 class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
@@ -22,6 +24,10 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         """
         super().__init__(token=token, base_url=base_url)
         self.session: ClientSession | None = None
+
+        # Resource handlers
+        self.issue = AsyncIssue(client=self)
+        self.user = AsyncUser(client=self)
 
     def __str__(self) -> str:
         """Return a string representation of the AsyncGitea client.
