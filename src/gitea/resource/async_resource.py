@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientResponse
 
-from gitea.client.async_gitea import AsyncGitea
+if TYPE_CHECKING:
+    from gitea.client.async_gitea import AsyncGitea
 
 
 class AsyncResource:
