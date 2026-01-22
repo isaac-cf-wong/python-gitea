@@ -8,6 +8,7 @@ import requests
 from requests import Response
 
 from gitea.client.base import Client
+from gitea.issue.issue import Issue
 from gitea.user.user import User
 
 
@@ -24,6 +25,9 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         """
         super().__init__(token=token, base_url=base_url)
         self.session: requests.Session | None = None
+
+        # Resource handlers
+        self.issue = Issue(client=self)
         self.user = User(client=self)
 
     def __str__(self) -> str:
