@@ -82,6 +82,10 @@ nav:
               - Overview: reference/gitea/resource/index.md
               - Resource: reference/gitea/resource/resource.md
               - Async Resource: reference/gitea/resource/async_resource.md
+          - Repository:
+              - Overview: reference/gitea/repository/index.md
+              - Repository: reference/gitea/repository/repository.md
+              - Async Repository: reference/gitea/repository/async_repository.md
           - Issue:
               - Overview: reference/gitea/issue/index.md
               - Issue: reference/gitea/issue/issue.md
