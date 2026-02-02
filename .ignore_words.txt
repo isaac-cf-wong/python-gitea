@@ -2,6 +2,7 @@ abstractproperty
 addinivalue
 addopts
 analyse
+appname
 asdict
 autoupdate
 buildapi
