@@ -40,7 +40,7 @@ class TestPullRequest:
             endpoint="/repos/owner/repo/pulls",
             params={},
         )
-        mock_process_response.assert_called_once_with(mock_response)
+        mock_process_response.assert_called_once_with(mock_response, default=[])
         assert result == ([{"id": 1}], 200)
 
     @patch("gitea.pull_request.pull_request.process_response")
@@ -66,7 +66,7 @@ class TestPullRequest:
             endpoint="/repos/owner/repo/pulls",
             params=expected_params,
         )
-        mock_process_response.assert_called_once_with(mock_response)
+        mock_process_response.assert_called_once_with(mock_response, default=[])
         assert result == ([{"id": 1}], 200)
 
     @patch("gitea.pull_request.pull_request.process_response")
@@ -106,5 +106,5 @@ class TestPullRequest:
             endpoint="/repos/owner/repo/pulls",
             params=expected_params,
         )
-        mock_process_response.assert_called_once_with(mock_response)
+        mock_process_response.assert_called_once_with(mock_response, default=[])
         assert result == ([{"id": 1}], 200)

@@ -41,7 +41,7 @@ class TestAsyncPullRequest:
             endpoint="/repos/owner/repo/pulls",
             params={},
         )
-        mock_process_response.assert_called_once_with(mock_response)
+        mock_process_response.assert_called_once_with(mock_response, default=[])
         assert result == ([{"id": 1}], 200)
 
     @pytest.mark.asyncio
@@ -68,7 +68,7 @@ class TestAsyncPullRequest:
             endpoint="/repos/owner/repo/pulls",
             params=expected_params,
         )
-        mock_process_response.assert_called_once_with(mock_response)
+        mock_process_response.assert_called_once_with(mock_response, default=[])
         assert result == ([{"id": 1}], 200)
 
     @pytest.mark.asyncio
@@ -109,5 +109,5 @@ class TestAsyncPullRequest:
             endpoint="/repos/owner/repo/pulls",
             params=expected_params,
         )
-        mock_process_response.assert_called_once_with(mock_response)
+        mock_process_response.assert_called_once_with(mock_response, default=[])
         assert result == ([{"id": 1}], 200)
