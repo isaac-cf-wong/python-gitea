@@ -40,7 +40,7 @@ class AsyncUser(BaseUser, AsyncResource):
 
         """
         response = await self._get_user(username=username, **kwargs)
-        data, status_code = await process_async_response(response)
+        data, status_code = await process_async_response(response, default={})
         return cast(dict[str, Any], data), status_code
 
     async def _update_user_settings(  # noqa: PLR0913
@@ -125,5 +125,5 @@ class AsyncUser(BaseUser, AsyncResource):
             website=website,
             **kwargs,
         )
-        data, status_code = await process_async_response(response)
+        data, status_code = await process_async_response(response, default={})
         return cast(dict[str, Any], data), status_code

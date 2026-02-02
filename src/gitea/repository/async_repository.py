@@ -71,5 +71,5 @@ class AsyncRepository(AsyncResource, BaseRepository):
             limit=limit,
             **kwargs,
         )
-        data, status_code = await process_async_response(response=response)
+        data, status_code = await process_async_response(response=response, default=[])
         return cast(list[dict[str, Any]], data), status_code

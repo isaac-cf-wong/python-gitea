@@ -71,5 +71,5 @@ class Repository(Resource, BaseRepository):
             limit=limit,
             **kwargs,
         )
-        data, status_code = process_response(response=response)
+        data, status_code = process_response(response=response, default=[])
         return cast(list[dict[str, Any]], data), status_code

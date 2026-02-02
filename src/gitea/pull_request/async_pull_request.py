@@ -97,7 +97,7 @@ class AsyncPullRequest(BasePullRequest, AsyncResource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing a list of pull requests and the total count.
+            A tuple containing a list of pull requests and the status code.
 
                 - A list of dictionaries representing pull requests.
                 - Status code of the response.
@@ -116,5 +116,5 @@ class AsyncPullRequest(BasePullRequest, AsyncResource):
             limit=limit,
             **kwargs,
         )
-        data, status_code = await process_async_response(response)
+        data, status_code = await process_async_response(response, default=[])
         return cast(list[dict[str, Any]], data), status_code

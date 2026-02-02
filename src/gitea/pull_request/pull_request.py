@@ -116,5 +116,5 @@ class PullRequest(BasePullRequest, Resource):
             limit=limit,
             **kwargs,
         )
-        data, status_code = process_response(response)
+        data, status_code = process_response(response, default=[])
         return cast(list[dict[str, Any]], data), status_code
