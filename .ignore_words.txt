@@ -5,8 +5,10 @@ analyse
 appname
 asdict
 autoupdate
+autouse
 buildapi
 Cabe
+caplog
 capsys
 cff
 ciso

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import enum
-from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -40,7 +39,7 @@ def setup_logging(level: LoggingLevel = LoggingLevel.INFO) -> None:
     from rich.console import Console  # noqa: PLC0415
     from rich.logging import RichHandler  # noqa: PLC0415
 
-    logger = logging.getLogger("python-gitea")
+    logger = logging.getLogger("gitea")
 
     logger.setLevel(level.value)
 
@@ -69,30 +68,15 @@ def setup_logging(level: LoggingLevel = LoggingLevel.INFO) -> None:
 
 
 @app.callback()
-def main(  # noqa: PLR0913
+def main(
     ctx: typer.Context,
-    output: Annotated[Path | None, typer.Option("--output", "-o", help="Output file name.")] = None,
-    token: Annotated[
-        str | None, typer.Option("--token", "-t", help="Gitea API token.", envvar="GITEA_API_TOKEN")
+    config_path: Annotated[
+        str | None,
+        typer.Option(
+            "--config-path",
+            help="Path to the configuration file. If not provided, it uses the path specified by `GITEA_CONFIG_PATH`. If the environment variable is not defined, it uses the default location.",
+        ),
     ] = None,
-    base_url: Annotated[
-        str,
-        typer.Option(
-            "--base-url",
-            "-b",
-            help="Base URL of the Gitea instance.",
-            envvar="GITEA_BASE_URL",
-            show_default=True,
-        ),
-    ] = "https://gitea.com",
-    timeout: Annotated[
-        int,
-        typer.Option(
-            "--timeout",
-            help="Timeout for API requests in seconds.",
-            show_default=True,
-        ),
-    ] = 30,
     verbose: Annotated[
         LoggingLevel,
         typer.Option("--verbose", "-v", help="Set verbosity level."),
@@ -102,20 +86,16 @@ def main(  # noqa: PLR0913
 
     Args:
         ctx: Typer context.
-        output: Output file name.
-        token: Gitea API token.
-        base_url: Base URL of the Gitea instance.
-        timeout: Timeout for API requests in seconds.
+        config_path: Path to the configuration file.
         verbose: Verbosity level for logging.
 
     """
+    import os  # noqa: PLC0415
+
+    config_path = config_path or os.getenv("GITEA_CONFIG_PATH")
+
+    ctx.obj = {"config_path": config_path}
     setup_logging(verbose)
-    ctx.obj = {
-        "output": output,
-        "token": token,
-        "base_url": base_url,
-        "timeout": timeout,
-    }
 
 
 def register_commands() -> None:
