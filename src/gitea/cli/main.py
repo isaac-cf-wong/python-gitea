@@ -44,7 +44,7 @@ def setup_logging(level: LoggingLevel = LoggingLevel.INFO) -> None:
 
     logger.setLevel(level.value)
 
-    console = Console()
+    console = Console(stderr=True)
 
     # Remove any existing handlers to ensure RichHandler is used
     for h in logger.handlers[:]:  # Use slice copy to avoid modification during iteration
