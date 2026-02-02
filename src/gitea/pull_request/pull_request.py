@@ -97,7 +97,7 @@ class PullRequest(BasePullRequest, Resource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing a list of pull requests and the total count.
+            A tuple containing a list of pull requests and the status code.
 
                 - A list of dictionaries representing pull requests.
                 - Status code of the response.
