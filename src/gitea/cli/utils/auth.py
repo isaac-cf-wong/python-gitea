@@ -22,7 +22,7 @@ def get_auth_params(
         config_path: Path to the configuration file.
         account_name: Name of the account to use for authentication.
         token: Token for authentication.
-        base_url: Base URL of the GitHub platform.
+        base_url: Base URL of the Gitea platform.
 
     Returns:
         A tuple containing the token and base URL for authentication.
