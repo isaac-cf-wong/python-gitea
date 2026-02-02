@@ -30,9 +30,12 @@ hotfixes
 htmlcov
 inlinevar
 isort
+leastcomment
+leastupdate
 mathjax
 metaclass
 mkdocstrings
+mostcomment
 noqa
 nssm
 numpy
@@ -57,6 +60,8 @@ pythonpath
 pyupgrade
 pywin
 rcfile
+recentclose
+recentupdate
 scipy
 scriptable
 setrecursionlimit
