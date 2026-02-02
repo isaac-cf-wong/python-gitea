@@ -90,6 +90,14 @@ nav:
               - Overview: reference/gitea/issue/index.md
               - Issue: reference/gitea/issue/issue.md
               - Async Issue: reference/gitea/issue/async_issue.md
+          - Pull Request:
+              - Overview: reference/gitea/pull_request/index.md
+              - Pull Request: reference/gitea/pull_request/pull_request.md
+              - Async Pull Request: reference/gitea/pull_request/async_pull_request.md
+          - Repository:
+              - Overview: reference/gitea/repository/index.md
+              - Repository: reference/gitea/repository/repository.md
+              - Async Repository: reference/gitea/repository/async_repository.md
           - User:
               - Overview: reference/gitea/user/index.md
               - User: reference/gitea/user/user.md

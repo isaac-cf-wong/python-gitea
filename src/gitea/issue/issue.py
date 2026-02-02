@@ -132,7 +132,7 @@ class Issue(BaseIssue, Resource):
             limit=limit,
             **kwargs,
         )
-        data, status_code = process_response(response)
+        data, status_code = process_response(response, default=[])
         return cast(list[dict[str, Any]], data), status_code
 
     def _get_issue(self, owner: str, repository: str, index: int, **kwargs: Any) -> Response:
@@ -165,7 +165,7 @@ class Issue(BaseIssue, Resource):
 
         """
         response = self._get_issue(owner=owner, repository=repository, index=index, **kwargs)
-        data, status_code = process_response(response)
+        data, status_code = process_response(response, default={})
         return cast(dict[str, Any], data), status_code
 
     def _edit_issue(  # noqa: PLR0913
@@ -273,5 +273,5 @@ class Issue(BaseIssue, Resource):
             unset_due_date=unset_due_date,
             **kwargs,
         )
-        data, status_code = process_response(response)
+        data, status_code = process_response(response, default={})
         return cast(dict[str, Any], data), status_code

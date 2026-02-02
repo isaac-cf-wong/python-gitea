@@ -132,7 +132,7 @@ class AsyncIssue(BaseIssue, AsyncResource):
             limit=limit,
             **kwargs,
         )
-        data, status_code = await process_async_response(response)
+        data, status_code = await process_async_response(response, default=[])
         return cast(list[dict[str, Any]], data), status_code
 
     async def _get_issue(self, owner: str, repository: str, index: int, **kwargs: Any) -> ClientResponse:
@@ -165,7 +165,7 @@ class AsyncIssue(BaseIssue, AsyncResource):
 
         """
         response = await self._get_issue(owner=owner, repository=repository, index=index, **kwargs)
-        data, status_code = await process_async_response(response)
+        data, status_code = await process_async_response(response, default={})
         return cast(dict[str, Any], data), status_code
 
     async def _edit_issue(  # noqa: PLR0913
@@ -273,5 +273,5 @@ class AsyncIssue(BaseIssue, AsyncResource):
             unset_due_date=unset_due_date,
             **kwargs,
         )
-        data, status_code = await process_async_response(response)
+        data, status_code = await process_async_response(response, default={})
         return cast(dict[str, Any], data), status_code
