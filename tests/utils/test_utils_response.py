@@ -26,7 +26,7 @@ class TestProcessResponse:
         mock_response = MagicMock()
         mock_response.status_code = 204
 
-        result = process_response(mock_response)
+        result = process_response(mock_response, default={})
 
         assert result == ({}, 204)
         mock_response.json.assert_not_called()
@@ -36,7 +36,7 @@ class TestProcessResponse:
         mock_response = MagicMock()
         mock_response.status_code = 404
 
-        result = process_response(mock_response)
+        result = process_response(mock_response, default={})
 
         assert result == ({}, 404)
         mock_response.json.assert_not_called()
@@ -49,7 +49,7 @@ class TestProcessResponse:
         mock_response.json.side_effect = value_error
 
         with patch("gitea.utils.response.logger") as mock_logger:
-            result = process_response(mock_response)
+            result = process_response(mock_response, default={})
 
         assert result == ({}, 200)
         mock_logger.error.assert_called_once_with("Failed to parse JSON response: %s", value_error)
@@ -76,7 +76,7 @@ class TestProcessAsyncResponse:
         mock_response = MagicMock()
         mock_response.status = 204
 
-        result = await process_async_response(mock_response)
+        result = await process_async_response(mock_response, default={})
 
         assert result == ({}, 204)
         mock_response.json.assert_not_called()
@@ -87,7 +87,7 @@ class TestProcessAsyncResponse:
         mock_response = MagicMock()
         mock_response.status = 404
 
-        result = await process_async_response(mock_response)
+        result = await process_async_response(mock_response, default={})
 
         assert result == ({}, 404)
         mock_response.json.assert_not_called()
@@ -101,7 +101,7 @@ class TestProcessAsyncResponse:
         mock_response.json = AsyncMock(side_effect=value_error)
 
         with patch("gitea.utils.response.logger") as mock_logger:
-            result = await process_async_response(mock_response)
+            result = await process_async_response(mock_response, default={})
 
         assert result == ({}, 200)
         mock_logger.error.assert_called_once_with("Failed to parse JSON response: %s", value_error)
