@@ -120,9 +120,11 @@ def main(  # noqa: PLR0913
 
 def register_commands() -> None:
     """Register CLI commands."""
+    from gitea.cli.config.main import config_app  # noqa: PLC0415
     from gitea.cli.user.main import user_app  # noqa: PLC0415
 
-    app.add_typer(user_app, name="user", help="Commands for managing Gitea users.")
+    app.add_typer(config_app, name="config", help="Commands for managing configurations.")
+    app.add_typer(user_app, name="user", help="Commands for managing users.")
 
 
 register_commands()
