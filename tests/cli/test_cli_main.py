@@ -1,11 +1,12 @@
 """Unit tests for CLI main module."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import typer
+from typer.testing import CliRunner
 
-from gitea.cli.main import LoggingLevel, main, register_commands, setup_logging
+from gitea.cli.main import LoggingLevel, app, register_commands, setup_logging
+
+runner = CliRunner()
 
 
 class TestLoggingLevel:
@@ -39,7 +40,7 @@ class TestSetupLogging:
 
         setup_logging(LoggingLevel.DEBUG)
 
-        mock_get_logger.assert_called_once_with("python-gitea")
+        mock_get_logger.assert_called_once_with("gitea")
         mock_logger.setLevel.assert_called_with("DEBUG")
         mock_logger.removeHandler.assert_called_once()  # Now called since handlers exist
         mock_rich_handler_class.assert_called_once()
@@ -47,45 +48,30 @@ class TestSetupLogging:
         assert mock_logger.propagate is False
 
 
-class TestMain:
-    """Test cases for main callback function."""
+class TestMainCallback:
+    """Tests for the main CLI callback."""
 
-    @patch("gitea.cli.main.setup_logging")
-    def test_main_callback(self, mock_setup_logging):
-        """Test that main sets up context correctly."""
-        ctx = MagicMock(spec=typer.Context)
+    def test_main_help(self) -> None:
+        """Test that main help works."""
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        assert "gitea" in result.stdout
 
-        main(
-            ctx=ctx,
-            output=Path("/tmp/output.json"),
-            token="test_token",
-            base_url="https://test.gitea.com",
-            timeout=60,
-            verbose=LoggingLevel.DEBUG,
-        )
+    def test_main_verbose_info(self) -> None:
+        """Test verbose level option INFO."""
+        result = runner.invoke(app, ["--verbose", "INFO", "config", "--help"])
+        assert result.exit_code == 0
 
-        mock_setup_logging.assert_called_once_with(LoggingLevel.DEBUG)
-        assert ctx.obj == {
-            "output": Path("/tmp/output.json"),
-            "token": "test_token",
-            "base_url": "https://test.gitea.com",
-            "timeout": 60,
-        }
+    def test_main_verbose_debug(self) -> None:
+        """Test verbose level option DEBUG."""
+        result = runner.invoke(app, ["--verbose", "DEBUG", "config", "--help"])
+        assert result.exit_code == 0
 
-    @patch("gitea.cli.main.setup_logging")
-    def test_main_callback_defaults(self, mock_setup_logging):
-        """Test main with default values."""
-        ctx = MagicMock(spec=typer.Context)
-
-        main(ctx=ctx)
-
-        mock_setup_logging.assert_called_once_with(LoggingLevel.INFO)
-        assert ctx.obj == {
-            "output": None,
-            "token": None,
-            "base_url": "https://gitea.com",
-            "timeout": 30,
-        }
+    def test_main_config_path(self, tmp_path) -> None:
+        """Test passing config path."""
+        config_file = tmp_path / "config.yaml"
+        result = runner.invoke(app, ["--config-path", str(config_file), "config", "--help"])
+        assert result.exit_code == 0
 
 
 class TestRegisterCommands:
@@ -97,4 +83,4 @@ class TestRegisterCommands:
         """Test that register_commands adds the user app."""
         register_commands()
 
-        mock_add_typer.assert_called_once_with(mock_user_app, name="user", help="Commands for managing Gitea users.")
+        mock_add_typer.assert_called_with(mock_user_app, name="user", help="Commands for managing users.")

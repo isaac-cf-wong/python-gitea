@@ -33,7 +33,7 @@ class TestUser:
             mock_client._request.assert_called_once_with(
                 method="GET", endpoint="/user", headers={"Content-Type": "application/json"}
             )
-            assert result == ({"login": "testuser", "id": 1}, 200)
+            assert result == ({"login": "testuser", "id": 1}, {"status_code": 200})
 
     def test_get_user_by_username(self, user, mock_client):
         """Test get_user for a specific user."""
@@ -43,7 +43,7 @@ class TestUser:
             mock_client._request.assert_called_once_with(
                 method="GET", endpoint="/users/other_user", headers={"Content-Type": "application/json"}
             )
-            assert result == ({"login": "other_user", "id": 2}, 200)
+            assert result == ({"login": "other_user", "id": 2}, {"status_code": 200})
 
     def test_update_user_settings(self, user, mock_client):
         """Test update_user_settings."""
@@ -57,4 +57,4 @@ class TestUser:
                 json=expected_payload,
                 headers={"Content-Type": "application/json"},
             )
-            assert result == ({"full_name": "Test User", "theme": "dark"}, 200)
+            assert result == ({"full_name": "Test User", "theme": "dark"}, {"status_code": 200})

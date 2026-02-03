@@ -28,7 +28,7 @@ class User(BaseUser, Resource):
         endpoint, kwargs = self._get_user_helper(username=username, **kwargs)
         return self._get(endpoint=endpoint, **kwargs)
 
-    def get_user(self, username: str | None = None, **kwargs: Any) -> tuple[dict[str, Any], int]:
+    def get_user(self, username: str | None = None, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         """Get user information.
 
         Args:
@@ -36,12 +36,12 @@ class User(BaseUser, Resource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing the user information as a dictionary and the status code.
+            A tuple containing the user information as a dictionary and a dictionary with the status code.
 
         """
         response = self._get_user(username=username, **kwargs)
         data, status_code = process_response(response, default={})
-        return cast(dict[str, Any], data), status_code
+        return cast(dict[str, Any], data), {"status_code": status_code}
 
     def _update_user_settings(  # noqa: PLR0913
         self,
@@ -79,7 +79,7 @@ class User(BaseUser, Resource):
         theme: str | None = None,
         website: str | None = None,
         **kwargs: Any,
-    ) -> tuple[dict[str, Any], int]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Update user settings.
 
         Args:
@@ -94,7 +94,7 @@ class User(BaseUser, Resource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing the updated user settings as a dictionary and the status code.
+            A tuple containing the updated user information as a dictionary and a dictionary with the status code.
 
         """
         response = self._update_user_settings(
@@ -109,4 +109,4 @@ class User(BaseUser, Resource):
             **kwargs,
         )
         data, status_code = process_response(response, default={})
-        return cast(dict[str, Any], data), status_code
+        return cast(dict[str, Any], data), {"status_code": status_code}
