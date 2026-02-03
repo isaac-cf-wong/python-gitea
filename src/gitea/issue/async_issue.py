@@ -91,7 +91,7 @@ class AsyncIssue(BaseIssue, AsyncResource):
         page: int | None = None,
         limit: int | None = None,
         **kwargs: Any,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """List issues in a repository.
 
         Args:
@@ -133,7 +133,7 @@ class AsyncIssue(BaseIssue, AsyncResource):
             **kwargs,
         )
         data, status_code = await process_async_response(response, default=[])
-        return cast(list[dict[str, Any]], data), status_code
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
 
     async def _get_issue(self, owner: str, repository: str, index: int, **kwargs: Any) -> ClientResponse:
         """Get a single issue by its index.
@@ -151,7 +151,9 @@ class AsyncIssue(BaseIssue, AsyncResource):
         endpoint = self._get_issue_helper(owner=owner, repository=repository, index=index)
         return await self._get(endpoint=endpoint, **kwargs)
 
-    async def get_issue(self, owner: str, repository: str, index: int, **kwargs: Any) -> tuple[dict[str, Any], int]:
+    async def get_issue(
+        self, owner: str, repository: str, index: int, **kwargs: Any
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Get a single issue by its index.
 
         Args:
@@ -166,7 +168,7 @@ class AsyncIssue(BaseIssue, AsyncResource):
         """
         response = await self._get_issue(owner=owner, repository=repository, index=index, **kwargs)
         data, status_code = await process_async_response(response, default={})
-        return cast(dict[str, Any], data), status_code
+        return cast(dict[str, Any], data), {"status_code": status_code}
 
     async def _edit_issue(  # noqa: PLR0913
         self,
@@ -236,7 +238,7 @@ class AsyncIssue(BaseIssue, AsyncResource):
         title: str | None = None,
         unset_due_date: bool | None = None,
         **kwargs: Any,
-    ) -> tuple[dict[str, Any], int]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Edit a specific issue in a repository.
 
         Args:
@@ -274,4 +276,4 @@ class AsyncIssue(BaseIssue, AsyncResource):
             **kwargs,
         )
         data, status_code = await process_async_response(response, default={})
-        return cast(dict[str, Any], data), status_code
+        return cast(dict[str, Any], data), {"status_code": status_code}
