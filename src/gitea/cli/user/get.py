@@ -67,4 +67,4 @@ def get_command(
         with Gitea(token=token, base_url=base_url) as client:
             return client.user.get_user(username=username)
 
-    execute_api_command(api_call=api_call, command_name="get-user")
+    execute_api_command(api_call=api_call, command_name="gitea-cli user get")
