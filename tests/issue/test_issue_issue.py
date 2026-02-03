@@ -35,7 +35,7 @@ class TestIssue:
             mock_client._request.assert_called_once_with(
                 method="GET", endpoint="/repos/test_owner/test_repo/issues", params=expected_params
             )
-            assert result == ([{"id": 1, "title": "Issue 1"}], 200)
+            assert result == ([{"id": 1, "title": "Issue 1"}], {"status_code": 200})
 
     def test_get_issue(self, issue, mock_client):
         """Test get_issue."""
@@ -45,7 +45,7 @@ class TestIssue:
             mock_client._request.assert_called_once_with(
                 method="GET", endpoint="/repos/test_owner/test_repo/issues/123"
             )
-            assert result == ({"id": 123, "title": "Test Issue"}, 200)
+            assert result == ({"id": 123, "title": "Test Issue"}, {"status_code": 200})
 
     def test_edit_issue(self, issue, mock_client):
         """Test edit_issue."""
@@ -59,4 +59,4 @@ class TestIssue:
             mock_client._request.assert_called_once_with(
                 method="PATCH", endpoint="/repos/test_owner/test_repo/issues/123", json=expected_payload
             )
-            assert result == ({"id": 123, "title": "Updated Title"}, 200)
+            assert result == ({"id": 123, "title": "Updated Title"}, {"status_code": 200})

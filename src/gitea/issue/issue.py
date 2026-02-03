@@ -91,7 +91,7 @@ class Issue(BaseIssue, Resource):
         page: int | None = None,
         limit: int | None = None,
         **kwargs: Any,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """List issues in a repository.
 
         Args:
@@ -112,7 +112,7 @@ class Issue(BaseIssue, Resource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing the list of issues as a list of dictionaries and the status code.
+            A tuple containing a list of issues as dictionaries and a dictionary with metadata.
 
         """
         response = self._list_issues(
@@ -133,7 +133,7 @@ class Issue(BaseIssue, Resource):
             **kwargs,
         )
         data, status_code = process_response(response, default=[])
-        return cast(list[dict[str, Any]], data), status_code
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
 
     def _get_issue(self, owner: str, repository: str, index: int, **kwargs: Any) -> Response:
         """Get a single issue by its index.
@@ -151,7 +151,9 @@ class Issue(BaseIssue, Resource):
         endpoint = self._get_issue_helper(owner=owner, repository=repository, index=index)
         return self._get(endpoint=endpoint, **kwargs)
 
-    def get_issue(self, owner: str, repository: str, index: int, **kwargs: Any) -> tuple[dict[str, Any], int]:
+    def get_issue(
+        self, owner: str, repository: str, index: int, **kwargs: Any
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Get a single issue by its index.
 
         Args:
@@ -161,12 +163,12 @@ class Issue(BaseIssue, Resource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing the issue as a dictionary and the status code.
+            A tuple containing the issue as a dictionary and a dictionary with metadata.
 
         """
         response = self._get_issue(owner=owner, repository=repository, index=index, **kwargs)
         data, status_code = process_response(response, default={})
-        return cast(dict[str, Any], data), status_code
+        return cast(dict[str, Any], data), {"status_code": status_code}
 
     def _edit_issue(  # noqa: PLR0913
         self,
@@ -236,7 +238,7 @@ class Issue(BaseIssue, Resource):
         title: str | None = None,
         unset_due_date: bool | None = None,
         **kwargs: Any,
-    ) -> tuple[dict[str, Any], int]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Edit a specific issue in a repository.
 
         Args:
@@ -255,7 +257,7 @@ class Issue(BaseIssue, Resource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing the edited issue as a dictionary and the status code.
+            A tuple containing the updated issue as a dictionary and a dictionary with metadata.
 
         """
         response = self._edit_issue(
@@ -274,4 +276,4 @@ class Issue(BaseIssue, Resource):
             **kwargs,
         )
         data, status_code = process_response(response, default={})
-        return cast(dict[str, Any], data), status_code
+        return cast(dict[str, Any], data), {"status_code": status_code}
