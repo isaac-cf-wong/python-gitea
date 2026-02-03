@@ -41,7 +41,7 @@ def update_settings_command(  # noqa: PLR0913
         str | None,
         typer.Option(
             "--base-url",
-            help="Base URL of the GitHub platform. If not provided, the base URL from the specified account will be used.",
+            help="Base URL of the Gitea platform. If not provided, the base URL from the specified account will be used.",
         ),
     ] = None,
 ) -> None:
