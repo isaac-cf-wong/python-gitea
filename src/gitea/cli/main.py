@@ -74,7 +74,7 @@ def main(
         str | None,
         typer.Option(
             "--config-path",
-            help="Path to the configuration file. If not provided, it uses the path specified by `GITEA_CONFIG_PATH`. If the environment variable is not defined, it uses the default location.",
+            help="Path to the configuration file. If not provided, it uses the path specified by `PYTHON_GITEA_CONFIG_PATH`. If the environment variable is not defined, it uses the default location.",
         ),
     ] = None,
     verbose: Annotated[
