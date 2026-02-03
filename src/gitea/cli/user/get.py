@@ -46,7 +46,7 @@ def get_command(
     """
     from typing import Any  # noqa: PLC0415
 
-    from gitea.cli.utils import execute_api_command  # noqa: PLC0415
+    from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
