@@ -81,7 +81,7 @@ def list_command(  # noqa: PLR0913
         ),
     ] = None,
 ) -> None:
-    """Get a specific issue in a repository.
+    """List issues in a repository.
 
     Args:
         ctx: The Typer context.
