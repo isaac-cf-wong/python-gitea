@@ -9,6 +9,7 @@ from requests import Response
 
 from gitea.client.base import Client
 from gitea.issue.issue import Issue
+from gitea.pull_request.pull_request import PullRequest
 from gitea.repository.repository import Repository
 from gitea.user.user import User
 
@@ -29,6 +30,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
 
         # Resource handlers
         self.issue = Issue(client=self)
+        self.pull_request = PullRequest(client=self)
         self.repository = Repository(client=self)
         self.user = User(client=self)
 
