@@ -28,7 +28,7 @@ class AsyncUser(BaseUser, AsyncResource):
         endpoint, kwargs = self._get_user_helper(username=username, **kwargs)
         return await self._get(endpoint=endpoint, **kwargs)
 
-    async def get_user(self, username: str | None = None, **kwargs: Any) -> tuple[dict[str, Any], int]:
+    async def get_user(self, username: str | None = None, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         """Asynchronously get user information.
 
         Args:
@@ -36,12 +36,12 @@ class AsyncUser(BaseUser, AsyncResource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing the user information as a dictionary and the status code.
+            A tuple containing the user information as a dictionary and a dictionary with the status code.
 
         """
         response = await self._get_user(username=username, **kwargs)
         data, status_code = await process_async_response(response, default={})
-        return cast(dict[str, Any], data), status_code
+        return cast(dict[str, Any], data), {"status_code": status_code}
 
     async def _update_user_settings(  # noqa: PLR0913
         self,
@@ -96,7 +96,7 @@ class AsyncUser(BaseUser, AsyncResource):
         theme: str | None = None,
         website: str | None = None,
         **kwargs: Any,
-    ) -> tuple[dict[str, Any], int]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Asynchronously update user settings.
 
         Args:
@@ -111,7 +111,7 @@ class AsyncUser(BaseUser, AsyncResource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing the updated user settings as a dictionary and the status code.
+            A tuple containing the updated user information as a dictionary and a dictionary with the status code.
 
         """
         response = await self._update_user_settings(
@@ -126,4 +126,4 @@ class AsyncUser(BaseUser, AsyncResource):
             **kwargs,
         )
         data, status_code = await process_async_response(response, default={})
-        return cast(dict[str, Any], data), status_code
+        return cast(dict[str, Any], data), {"status_code": status_code}

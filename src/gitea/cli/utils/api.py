@@ -13,7 +13,7 @@ logger = logging.getLogger("gitea")
 
 
 def execute_api_command(
-    api_call: Callable[[], tuple[dict[str, Any], dict[str, Any]]],
+    api_call: Callable[[], tuple[dict[str, Any] | list[dict[str, Any]], dict[str, Any]]],
     command_name: str = "Command",
 ) -> None:
     """Execute an API command and output results.
