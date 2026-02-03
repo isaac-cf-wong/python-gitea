@@ -80,7 +80,7 @@ class PullRequest(BasePullRequest, Resource):
         page: int | None = None,
         limit: int | None = None,
         **kwargs: Any,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """List pull requests in a repository.
 
         Args:
@@ -97,10 +97,7 @@ class PullRequest(BasePullRequest, Resource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing a list of pull requests and the status code.
-
-                - A list of dictionaries representing pull requests.
-                - Status code of the response.
+            A tuple containing a list of pull requests and a dictionary with metadata.
 
         """
         response = self._list_pull_requests(
@@ -117,4 +114,4 @@ class PullRequest(BasePullRequest, Resource):
             **kwargs,
         )
         data, status_code = process_response(response, default=[])
-        return cast(list[dict[str, Any]], data), status_code
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
