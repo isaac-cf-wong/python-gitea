@@ -92,7 +92,7 @@ def main(
     """
     import os  # noqa: PLC0415
 
-    config_path = config_path or os.getenv("GITEA_CONFIG_PATH")
+    config_path = config_path or os.getenv("PYTHON_GITEA_CONFIG_PATH")
 
     ctx.obj = {"config_path": config_path}
     setup_logging(verbose)
