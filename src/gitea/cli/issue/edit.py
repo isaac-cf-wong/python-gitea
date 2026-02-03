@@ -106,10 +106,10 @@ def edit_command(  # noqa: PLR0913
     )
 
     def api_call() -> tuple[dict[str, Any] | list[dict[str, Any]], dict[str, Any]]:
-        """Get user information.
+        """Edit issue information.
 
         Returns:
-            The user information as a dictionary.
+            A tuple containing the issue data and metadata.
 
         """
         with Gitea(token=token, base_url=base_url) as client:
