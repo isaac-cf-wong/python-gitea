@@ -95,3 +95,45 @@ class TestGitea:
 
         with patch.object(client, "session", mock_session), pytest.raises(Exception, match="404 Client Error"):
             client._request("GET", "nonexistent")
+
+    def test_str(self, client):
+        """Test __str__ returns a helpful representation."""
+        assert str(client) == "Gitea Client(base_url=https://gitea.example.com)"
+
+    @patch("gitea.client.gitea.requests.Session")
+    def test_enter_sets_session(self, mock_session_class):
+        """Entering the context manager should create a session and return self."""
+        mock_session = Mock()
+        mock_session_class.return_value = mock_session
+        client = Gitea(token="t", base_url="https://g.example")
+
+        returned = client.__enter__()
+        assert returned is client
+        mock_session_class.assert_called_once()
+        assert client.session is mock_session
+
+        # cleanup
+        client.__exit__(None, None, None)
+
+    def test_enter_reenter_raises(self):
+        """Re-entering when a session is already open should raise."""
+        client = Gitea(token="t", base_url="https://g.example")
+        client.session = object()
+        with pytest.raises(RuntimeError, match="Gitea session already open"):
+            client.__enter__()
+
+    def test_exit_closes_session(self):
+        """Exiting should close and clear the session."""
+        client = Gitea(token="t", base_url="https://g.example")
+        mock_session = Mock()
+        client.session = mock_session
+
+        client.__exit__(None, None, None)
+        mock_session.close.assert_called_once()
+        assert client.session is None
+
+    def test_request_without_context_raises(self, client):
+        """Calling _request without entering context should raise a RuntimeError."""
+        client.session = None
+        with pytest.raises(RuntimeError, match="Gitea must be used as a context manager"):
+            client._request("GET", "users")
