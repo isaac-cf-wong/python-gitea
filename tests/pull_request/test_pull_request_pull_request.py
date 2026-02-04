@@ -41,7 +41,7 @@ class TestPullRequest:
             params={},
         )
         mock_process_response.assert_called_once_with(mock_response, default=[])
-        assert result == ([{"id": 1}], 200)
+        assert result == ([{"id": 1}], {"status_code": 200})
 
     @patch("gitea.pull_request.pull_request.process_response")
     def test_list_pull_requests_with_params(self, mock_process_response, pull_request, mock_client):
@@ -67,7 +67,7 @@ class TestPullRequest:
             params=expected_params,
         )
         mock_process_response.assert_called_once_with(mock_response, default=[])
-        assert result == ([{"id": 1}], 200)
+        assert result == ([{"id": 1}], {"status_code": 200})
 
     @patch("gitea.pull_request.pull_request.process_response")
     def test_list_pull_requests_all_params(self, mock_process_response, pull_request, mock_client):
@@ -107,4 +107,4 @@ class TestPullRequest:
             params=expected_params,
         )
         mock_process_response.assert_called_once_with(mock_response, default=[])
-        assert result == ([{"id": 1}], 200)
+        assert result == ([{"id": 1}], {"status_code": 200})
