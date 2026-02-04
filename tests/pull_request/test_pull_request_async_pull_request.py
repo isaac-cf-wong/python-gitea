@@ -42,7 +42,7 @@ class TestAsyncPullRequest:
             params={},
         )
         mock_process_response.assert_called_once_with(mock_response, default=[])
-        assert result == ([{"id": 1}], 200)
+        assert result == ([{"id": 1}], {"status_code": 200})
 
     @pytest.mark.asyncio
     @patch("gitea.pull_request.async_pull_request.process_async_response", new_callable=AsyncMock)
@@ -69,7 +69,7 @@ class TestAsyncPullRequest:
             params=expected_params,
         )
         mock_process_response.assert_called_once_with(mock_response, default=[])
-        assert result == ([{"id": 1}], 200)
+        assert result == ([{"id": 1}], {"status_code": 200})
 
     @pytest.mark.asyncio
     @patch("gitea.pull_request.async_pull_request.process_async_response", new_callable=AsyncMock)
@@ -110,4 +110,4 @@ class TestAsyncPullRequest:
             params=expected_params,
         )
         mock_process_response.assert_called_once_with(mock_response, default=[])
-        assert result == ([{"id": 1}], 200)
+        assert result == ([{"id": 1}], {"status_code": 200})
