@@ -50,7 +50,7 @@ class Repository(Resource, BaseRepository):
         page: int | None = None,
         limit: int | None = None,
         **kwargs: Any,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """List repositories for a user, organization, or authenticated user.
 
         Args:
@@ -72,4 +72,4 @@ class Repository(Resource, BaseRepository):
             **kwargs,
         )
         data, status_code = process_response(response=response, default=[])
-        return cast(list[dict[str, Any]], data), status_code
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}

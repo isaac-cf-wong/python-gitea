@@ -32,7 +32,7 @@ class TestAsyncRepository:
             mock_process.return_value = ([{"id": 1, "name": "repo1"}], 200)
             result = await async_repository.list_repositories()
             mock_client._request.assert_called_once_with(method="GET", endpoint="/user/repos", params={})
-            assert result == ([{"id": 1, "name": "repo1"}], 200)
+            assert result == ([{"id": 1, "name": "repo1"}], {"status_code": 200})
 
     @pytest.mark.asyncio
     async def test_list_repositories_by_username(self, async_repository, mock_client):
@@ -41,7 +41,7 @@ class TestAsyncRepository:
             mock_process.return_value = ([{"id": 2, "name": "other_repo"}], 200)
             result = await async_repository.list_repositories(username="testuser")
             mock_client._request.assert_called_once_with(method="GET", endpoint="/users/testuser/repos", params={})
-            assert result == ([{"id": 2, "name": "other_repo"}], 200)
+            assert result == ([{"id": 2, "name": "other_repo"}], {"status_code": 200})
 
     @pytest.mark.asyncio
     async def test_list_repositories_by_organization(self, async_repository, mock_client):
@@ -55,7 +55,7 @@ class TestAsyncRepository:
             mock_client._request.assert_called_once_with(method="GET", endpoint="/orgs/test_org/repos", params={})
             assert result == (
                 [{"id": 3, "name": "org_repo1"}, {"id": 4, "name": "org_repo2"}],
-                200,
+                {"status_code": 200},
             )
 
     @pytest.mark.asyncio
@@ -67,7 +67,7 @@ class TestAsyncRepository:
             mock_client._request.assert_called_once_with(
                 method="GET", endpoint="/user/repos", params={"page": 2, "limit": 50}
             )
-            assert result == ([{"id": 1, "name": "repo1"}], 200)
+            assert result == ([{"id": 1, "name": "repo1"}], {"status_code": 200})
 
     @pytest.mark.asyncio
     async def test_list_repositories_by_username_with_pagination(self, async_repository, mock_client):
@@ -80,7 +80,7 @@ class TestAsyncRepository:
                 endpoint="/users/testuser/repos",
                 params={"page": 1, "limit": 25},
             )
-            assert result == ([{"id": 5, "name": "paginated_repo"}], 200)
+            assert result == ([{"id": 5, "name": "paginated_repo"}], {"status_code": 200})
 
     @pytest.mark.asyncio
     async def test_list_repositories_by_organization_with_pagination(self, async_repository, mock_client):
@@ -96,7 +96,7 @@ class TestAsyncRepository:
                 endpoint="/orgs/test_org/repos",
                 params={"page": 3, "limit": 100},
             )
-            assert result == ([{"id": 6, "name": "org_paginated_repo"}], 200)
+            assert result == ([{"id": 6, "name": "org_paginated_repo"}], {"status_code": 200})
 
     @pytest.mark.asyncio
     async def test_list_repositories_empty_result(self, async_repository, mock_client):
@@ -105,7 +105,7 @@ class TestAsyncRepository:
             mock_process.return_value = ([], 200)
             result = await async_repository.list_repositories()
             mock_client._request.assert_called_once()
-            assert result == ([], 200)
+            assert result == ([], {"status_code": 200})
 
     @pytest.mark.asyncio
     async def test_list_repositories_error_response(self, async_repository, mock_client):
@@ -114,7 +114,7 @@ class TestAsyncRepository:
             mock_process.return_value = ({"error": "Not Found"}, 404)
             result = await async_repository.list_repositories(username="nonexistent")
             mock_client._request.assert_called_once()
-            assert result == ({"error": "Not Found"}, 404)
+            assert result == ({"error": "Not Found"}, {"status_code": 404})
 
     @pytest.mark.asyncio
     async def test_list_repositories_with_kwargs(self, async_repository, mock_client):
@@ -125,4 +125,4 @@ class TestAsyncRepository:
             mock_client._request.assert_called_once_with(
                 method="GET", endpoint="/user/repos", params={}, headers={"Custom": "Header"}
             )
-            assert result == ([{"id": 1, "name": "repo1"}], 200)
+            assert result == ([{"id": 1, "name": "repo1"}], {"status_code": 200})

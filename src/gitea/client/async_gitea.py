@@ -8,6 +8,7 @@ from aiohttp import ClientResponse, ClientSession, ClientTimeout
 
 from gitea.client.base import Client
 from gitea.issue.async_issue import AsyncIssue
+from gitea.pull_request.async_pull_request import AsyncPullRequest
 from gitea.repository import AsyncRepository
 from gitea.user.async_user import AsyncUser
 
@@ -28,6 +29,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
 
         # Resource handlers
         self.issue = AsyncIssue(client=self)
+        self.pull_request = AsyncPullRequest(client=self)
         self.repository = AsyncRepository(client=self)
         self.user = AsyncUser(client=self)
 

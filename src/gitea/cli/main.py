@@ -74,7 +74,7 @@ def main(
         str | None,
         typer.Option(
             "--config-path",
-            help="Path to the configuration file. If not provided, it uses the path specified by `GITEA_CONFIG_PATH`. If the environment variable is not defined, it uses the default location.",
+            help="Path to the configuration file. If not provided, it uses the path specified by `PYTHON_GITEA_CONFIG_PATH`. If the environment variable is not defined, it uses the default location.",
         ),
     ] = None,
     verbose: Annotated[
@@ -92,7 +92,7 @@ def main(
     """
     import os  # noqa: PLC0415
 
-    config_path = config_path or os.getenv("GITEA_CONFIG_PATH")
+    config_path = config_path or os.getenv("PYTHON_GITEA_CONFIG_PATH")
 
     ctx.obj = {"config_path": config_path}
     setup_logging(verbose)
@@ -102,10 +102,12 @@ def register_commands() -> None:
     """Register CLI commands."""
     from gitea.cli.config.main import config_app  # noqa: PLC0415
     from gitea.cli.issue.main import issue_app  # noqa: PLC0415
+    from gitea.cli.pull_request.main import pull_request_app  # noqa: PLC0415
     from gitea.cli.user.main import user_app  # noqa: PLC0415
 
     app.add_typer(config_app, name="config", help="Commands for managing configurations.")
     app.add_typer(issue_app, name="issue", help="Commands for managing issues.")
+    app.add_typer(pull_request_app, name="pull-request", help="Commands for managing pull requests.")
     app.add_typer(user_app, name="user", help="Commands for managing users.")
 
 

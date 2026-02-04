@@ -80,7 +80,7 @@ class AsyncPullRequest(BasePullRequest, AsyncResource):
         page: int | None = None,
         limit: int | None = None,
         **kwargs: Any,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """List pull requests in a repository.
 
         Args:
@@ -117,4 +117,4 @@ class AsyncPullRequest(BasePullRequest, AsyncResource):
             **kwargs,
         )
         data, status_code = await process_async_response(response, default=[])
-        return cast(list[dict[str, Any]], data), status_code
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
