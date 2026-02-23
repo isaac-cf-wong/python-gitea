@@ -22,7 +22,7 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: orhun/git-cliff-action@v4.7.0
+        uses: orhun/git-cliff-action@v4.7.1
         with:
           config: cliff.toml
           args: --unreleased --verbose
