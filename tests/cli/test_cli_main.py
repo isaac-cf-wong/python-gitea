@@ -90,6 +90,8 @@ class TestRegisterCommands:
             "comment": "Commands for managing comments.",
             "label": "Commands for managing labels.",
             "milestone": "Commands for managing milestones.",
+            "notification": "Commands for managing notifications.",
+            "project": "Commands for managing projects.",
         }
         calls = mock_add_typer.call_args_list
         assert len(calls) == len(expected)

@@ -379,3 +379,213 @@ class AsyncIssue(BaseIssue, AsyncResource):
         )
         data, status_code = await process_async_response(response, default={})
         return cast(dict[str, Any], data), {"status_code": status_code}
+
+    async def _list_issue_dependencies(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        page: int | None = None,
+        limit: int | None = None,
+        **kwargs: Any,
+    ) -> ClientResponse:
+        """List an issue's dependencies.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            page: The page number for pagination.
+            limit: The number of dependencies per page.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint, params = self._list_issue_dependencies_helper(
+            owner=owner,
+            repository=repository,
+            index=index,
+            page=page,
+            limit=limit,
+        )
+        return await self._get(endpoint=endpoint, params=params, **kwargs)
+
+    async def list_issue_dependencies(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        page: int | None = None,
+        limit: int | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """List an issue's dependencies.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            page: The page number for pagination.
+            limit: The number of dependencies per page.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing a list of dependency issues as dictionaries and a dictionary with metadata.
+
+        """
+        response = await self._list_issue_dependencies(
+            owner=owner,
+            repository=repository,
+            index=index,
+            page=page,
+            limit=limit,
+            **kwargs,
+        )
+        data, status_code = await process_async_response(response, default=[])
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
+
+    async def _create_issue_dependency(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        dependency_owner: str,
+        dependency_repository: str,
+        dependency_index: int,
+        **kwargs: Any,
+    ) -> ClientResponse:
+        """Make an issue depend on another issue.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the target issue.
+            dependency_owner: The owner of the dependency issue's repository.
+            dependency_repository: The name of the dependency issue's repository.
+            dependency_index: The index of the dependency issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint, payload = self._create_issue_dependency_helper(
+            owner=owner,
+            repository=repository,
+            index=index,
+            dependency_owner=dependency_owner,
+            dependency_repository=dependency_repository,
+            dependency_index=dependency_index,
+        )
+        return await self._post(endpoint=endpoint, json=payload, **kwargs)
+
+    async def create_issue_dependency(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        dependency_owner: str,
+        dependency_repository: str,
+        dependency_index: int,
+        **kwargs: Any,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Make an issue depend on another issue.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the target issue.
+            dependency_owner: The owner of the dependency issue's repository.
+            dependency_repository: The name of the dependency issue's repository.
+            dependency_index: The index of the dependency issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing the target issue as a dictionary and a dictionary with metadata.
+
+        """
+        response = await self._create_issue_dependency(
+            owner=owner,
+            repository=repository,
+            index=index,
+            dependency_owner=dependency_owner,
+            dependency_repository=dependency_repository,
+            dependency_index=dependency_index,
+            **kwargs,
+        )
+        data, status_code = await process_async_response(response, default={})
+        return cast(dict[str, Any], data), {"status_code": status_code}
+
+    async def _remove_issue_dependency(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        dependency_owner: str,
+        dependency_repository: str,
+        dependency_index: int,
+        **kwargs: Any,
+    ) -> ClientResponse:
+        """Remove an issue dependency.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the target issue.
+            dependency_owner: The owner of the dependency issue's repository.
+            dependency_repository: The name of the dependency issue's repository.
+            dependency_index: The index of the dependency issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint, payload = self._remove_issue_dependency_helper(
+            owner=owner,
+            repository=repository,
+            index=index,
+            dependency_owner=dependency_owner,
+            dependency_repository=dependency_repository,
+            dependency_index=dependency_index,
+        )
+        return await self._delete(endpoint=endpoint, json=payload, **kwargs)
+
+    async def remove_issue_dependency(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        dependency_owner: str,
+        dependency_repository: str,
+        dependency_index: int,
+        **kwargs: Any,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Remove an issue dependency.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the target issue.
+            dependency_owner: The owner of the dependency issue's repository.
+            dependency_repository: The name of the dependency issue's repository.
+            dependency_index: The index of the dependency issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing the target issue as a dictionary and a dictionary with metadata.
+
+        """
+        response = await self._remove_issue_dependency(
+            owner=owner,
+            repository=repository,
+            index=index,
+            dependency_owner=dependency_owner,
+            dependency_repository=dependency_repository,
+            dependency_index=dependency_index,
+            **kwargs,
+        )
+        data, status_code = await process_async_response(response, default={})
+        return cast(dict[str, Any], data), {"status_code": status_code}
