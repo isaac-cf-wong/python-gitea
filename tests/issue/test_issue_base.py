@@ -148,3 +148,17 @@ class TestBaseIssue:
         base = BaseIssue()
         _, payload = base._create_issue_helper("owner", "repo", title="New Issue")
         assert payload == {"title": "New Issue"}
+
+    def test_create_issue_helper_full_options(self):
+        """Test _create_issue_helper with closed and ref options."""
+        base = BaseIssue()
+        endpoint, payload = base._create_issue_helper(
+            "owner",
+            "repo",
+            title="New Issue",
+            assignee="alice",
+            closed=True,
+            ref="main",
+        )
+        assert endpoint == "/repos/owner/repo/issues"
+        assert payload == {"title": "New Issue", "assignee": "alice", "closed": True, "ref": "main"}

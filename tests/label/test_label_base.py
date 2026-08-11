@@ -42,3 +42,18 @@ class TestBaseLabel:
         """Test _delete_label_helper builds the endpoint."""
         base = BaseLabel()
         assert base._delete_label_helper("owner", "repo", 5) == "/repos/owner/repo/labels/5"
+
+    def test_create_label_helper_exclusive_omitted(self):
+        """Test _create_label_helper omits exclusive by default."""
+        base = BaseLabel()
+        _, payload = base._create_label_helper("owner", "repo", name="bug", color="#e11d21")
+        assert "exclusive" not in payload
+
+    def test_edit_label_helper_description(self):
+        """Test _edit_label_helper with description."""
+        base = BaseLabel()
+        endpoint, payload = base._edit_label_helper(
+            "owner", "repo", label_id=5, name="bug", color="#e11d21", description="A bug"
+        )
+        assert endpoint == "/repos/owner/repo/labels/5"
+        assert payload == {"name": "bug", "color": "#e11d21", "description": "A bug"}
