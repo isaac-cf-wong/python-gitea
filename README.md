@@ -1,6 +1,6 @@
 # python-gitea
 
-[![Python CI](https://github.com/isaac-cf-wong/python-gitea/actions/workflows/CI.yml/badge.svg)](https://github.com/isaac-cf-wong/python-gitea/actions/workflows/CI.yml)
+[![Python CI](https://github.com/isaac-cf-wong/python-gitea/actions/workflows/ci.yml/badge.svg)](https://github.com/isaac-cf-wong/python-gitea/actions/workflows/ci.yml)
 [![pre-commit.ci status](https://results.pre-commit.ci/badge/github/isaac-cf-wong/python-gitea/main.svg)](https://results.pre-commit.ci/latest/github/isaac-cf-wong/python-gitea/main)
 [![Documentation Status](https://github.com/isaac-cf-wong/python-gitea/actions/workflows/documentation.yml/badge.svg)](https://isaac-cf-wong.github.io/python-gitea/)
 [![codecov](https://codecov.io/gh/isaac-cf-wong/python-gitea/graph/badge.svg?token=COF8341N60)](https://codecov.io/gh/isaac-cf-wong/python-gitea)
