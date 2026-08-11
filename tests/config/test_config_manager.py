@@ -56,7 +56,7 @@ class TestConfigManagerInitialization:
         """Test that initialization creates parent directories."""
         with tempfile.TemporaryDirectory() as tmpdir:
             nested_path = Path(tmpdir) / "nested" / "dir" / "config.yaml"
-            _manager = ConfigManager(filename=nested_path)
+            ConfigManager(filename=nested_path)
             assert nested_path.parent.exists()
 
     def test_config_is_none_on_init(self, config_manager: ConfigManager) -> None:
