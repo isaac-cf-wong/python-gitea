@@ -10,7 +10,8 @@ class TestMain:
     def test_main_calls_setup_logger(self, mock_setup_logger):
         """Test that running __main__.py calls setup_logger with print_version=True."""
         # Execute the __main__.py code as if run as main
-        exec(open("src/gitea/__main__.py").read(), {"__name__": "__main__"})  # noqa: SIM115
+        with open("src/gitea/__main__.py") as main_file:
+            exec(main_file.read(), {"__name__": "__main__"})
 
         # Verify setup_logger was called with print_version=True
         mock_setup_logger.assert_called_once_with(print_version=True)
