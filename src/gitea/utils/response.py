@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, cast
 
@@ -26,11 +27,14 @@ def process_response[T](response: Response, default: T | None = None) -> tuple[A
     if status_code == 204:  # noqa: PLR2004
         data = default
     elif 200 <= status_code < 300:  # noqa: PLR2004
-        try:
-            data = response.json()
-        except ValueError as e:
-            logger.error("Failed to parse JSON response: %s", e)
+        if not response.content:
             data = default
+        else:
+            try:
+                data = response.json()
+            except ValueError as e:
+                logger.error("Failed to parse JSON response: %s", e)
+                data = default
     else:
         data = default
     return data, cast(int, status_code)
@@ -51,11 +55,15 @@ async def process_async_response[T](response: ClientResponse, default: T | None 
     if status_code == 204:  # noqa: PLR2004
         data = default
     elif 200 <= status_code < 300:  # noqa: PLR2004
-        try:
-            data = await response.json()
-        except ValueError as e:
-            logger.error("Failed to parse JSON response: %s", e)
+        body = await response.read()
+        if not body:
             data = default
+        else:
+            try:
+                data = json.loads(body)
+            except (ValueError, UnicodeDecodeError) as e:
+                logger.error("Failed to parse JSON response: %s", e)
+                data = default
     else:
         data = default
     return data, status_code

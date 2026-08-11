@@ -25,6 +25,8 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         from gitea.issue.issue import Issue  # noqa: PLC0415
         from gitea.label.label import Label  # noqa: PLC0415
         from gitea.milestone.milestone import Milestone  # noqa: PLC0415
+        from gitea.notification.notification import Notification  # noqa: PLC0415
+        from gitea.project.project import Project  # noqa: PLC0415
         from gitea.pull_request.pull_request import PullRequest  # noqa: PLC0415
         from gitea.repository.repository import Repository  # noqa: PLC0415
         from gitea.user.user import User  # noqa: PLC0415
@@ -40,6 +42,8 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         self.comment = Comment(client=self)
         self.label = Label(client=self)
         self.milestone = Milestone(client=self)
+        self.notification = Notification(client=self)
+        self.project = Project(client=self)
 
     def __str__(self) -> str:
         """Return a string representation of the Gitea client.

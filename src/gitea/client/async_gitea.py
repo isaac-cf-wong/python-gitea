@@ -24,6 +24,8 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         from gitea.issue.async_issue import AsyncIssue  # noqa: PLC0415
         from gitea.label.async_label import AsyncLabel  # noqa: PLC0415
         from gitea.milestone.async_milestone import AsyncMilestone  # noqa: PLC0415
+        from gitea.notification.async_notification import AsyncNotification  # noqa: PLC0415
+        from gitea.project.async_project import AsyncProject  # noqa: PLC0415
         from gitea.pull_request.async_pull_request import AsyncPullRequest  # noqa: PLC0415
         from gitea.repository import AsyncRepository  # noqa: PLC0415
         from gitea.user.async_user import AsyncUser  # noqa: PLC0415
@@ -39,6 +41,8 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         self.comment = AsyncComment(client=self)
         self.label = AsyncLabel(client=self)
         self.milestone = AsyncMilestone(client=self)
+        self.notification = AsyncNotification(client=self)
+        self.project = AsyncProject(client=self)
 
     def __str__(self) -> str:
         """Return a string representation of the AsyncGitea client.

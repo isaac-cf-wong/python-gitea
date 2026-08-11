@@ -41,6 +41,17 @@ class TestProcessResponse:
         assert result == ({}, 404)
         mock_response.json.assert_not_called()
 
+    def test_process_response_empty_body(self):
+        """Test processing a 2xx response with an empty body."""
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.content = b""
+
+        result = process_response(mock_response, default={})
+
+        assert result == ({}, 201)
+        mock_response.json.assert_not_called()
+
     def test_process_response_invalid_json(self):
         """Test processing a response with invalid JSON."""
         value_error = ValueError("Invalid JSON")
@@ -63,12 +74,12 @@ class TestProcessAsyncResponse:
         """Test processing a successful async response with JSON data."""
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.json = AsyncMock(return_value={"key": "value"})
+        mock_response.read = AsyncMock(return_value=b'{"key": "value"}')
 
         result = await process_async_response(mock_response)
 
         assert result == ({"key": "value"}, 200)
-        mock_response.json.assert_called_once()
+        mock_response.read.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_process_async_response_no_content(self):
@@ -79,7 +90,19 @@ class TestProcessAsyncResponse:
         result = await process_async_response(mock_response, default={})
 
         assert result == ({}, 204)
-        mock_response.json.assert_not_called()
+        mock_response.read.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_process_async_response_empty_body(self):
+        """Test processing a 2xx async response with an empty body."""
+        mock_response = MagicMock()
+        mock_response.status = 201
+        mock_response.read = AsyncMock(return_value=b"")
+
+        result = await process_async_response(mock_response, default={})
+
+        assert result == ({}, 201)
+        mock_response.read.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_process_async_response_error_status(self):
@@ -90,18 +113,18 @@ class TestProcessAsyncResponse:
         result = await process_async_response(mock_response, default={})
 
         assert result == ({}, 404)
-        mock_response.json.assert_not_called()
+        mock_response.read.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_process_async_response_invalid_json(self):
         """Test processing an async response with invalid JSON."""
-        value_error = ValueError("Invalid JSON")
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.json = AsyncMock(side_effect=value_error)
+        mock_response.read = AsyncMock(return_value=b"not json")
 
         with patch("gitea.utils.response.logger") as mock_logger:
             result = await process_async_response(mock_response, default={})
 
         assert result == ({}, 200)
-        mock_logger.error.assert_called_once_with("Failed to parse JSON response: %s", value_error)
+        mock_logger.error.assert_called_once()
+        assert mock_logger.error.call_args[0][0] == "Failed to parse JSON response: %s"

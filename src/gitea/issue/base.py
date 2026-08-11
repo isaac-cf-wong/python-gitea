@@ -213,6 +213,117 @@ class BaseIssue:
         """
         return f"/repos/{owner}/{repository}/issues"
 
+    def _issue_dependencies_endpoint(self, owner: str, repository: str, index: int) -> str:
+        """Construct the endpoint URL for issue dependencies in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+
+        Returns:
+            The endpoint URL for issue dependencies.
+
+        """
+        return f"/repos/{owner}/{repository}/issues/{index}/dependencies"
+
+    def _list_issue_dependencies_helper(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        page: int | None = None,
+        limit: int | None = None,
+    ) -> tuple[str, dict[str, Any]]:
+        """Get the endpoint and parameters for listing an issue's dependencies.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            page: The page number for pagination.
+            limit: The number of dependencies per page.
+
+        Returns:
+            A tuple containing the endpoint and the request arguments.
+
+        """
+        endpoint = self._issue_dependencies_endpoint(owner=owner, repository=repository, index=index)
+
+        params = {}
+        if page is not None:
+            params["page"] = page
+        if limit is not None:
+            params["limit"] = limit
+
+        return endpoint, params
+
+    def _create_issue_dependency_helper(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        dependency_owner: str,
+        dependency_repository: str,
+        dependency_index: int,
+    ) -> tuple[str, dict[str, Any]]:
+        """Get the endpoint and payload for making an issue depend on another issue.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the target issue.
+            dependency_owner: The owner of the dependency issue's repository.
+            dependency_repository: The name of the dependency issue's repository.
+            dependency_index: The index of the dependency issue.
+
+        Returns:
+            A tuple containing the endpoint and the request payload.
+
+        """
+        endpoint = self._issue_dependencies_endpoint(owner=owner, repository=repository, index=index)
+
+        payload = {
+            "owner": dependency_owner,
+            "repo": dependency_repository,
+            "index": dependency_index,
+        }
+
+        return endpoint, payload
+
+    def _remove_issue_dependency_helper(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        dependency_owner: str,
+        dependency_repository: str,
+        dependency_index: int,
+    ) -> tuple[str, dict[str, Any]]:
+        """Get the endpoint and payload for removing an issue dependency.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the target issue.
+            dependency_owner: The owner of the dependency issue's repository.
+            dependency_repository: The name of the dependency issue's repository.
+            dependency_index: The index of the dependency issue.
+
+        Returns:
+            A tuple containing the endpoint and the request payload.
+
+        """
+        endpoint = self._issue_dependencies_endpoint(owner=owner, repository=repository, index=index)
+
+        payload = {
+            "owner": dependency_owner,
+            "repo": dependency_repository,
+            "index": dependency_index,
+        }
+
+        return endpoint, payload
+
     def _create_issue_helper(
         self,
         owner: str,
