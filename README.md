@@ -10,36 +10,42 @@
 [![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 [![DOI](https://zenodo.org/badge/1129170965.svg)](https://doi.org/10.5281/zenodo.18211496)
 
-**Note:** This project is still in progress. The promised features are not fully ready yet, and APIs are subject to change.
+**Note:** This project is still in progress. The promised features are not fully
+ready yet, and APIs are subject to change.
 
-A Python package for interacting with the Gitea API.
-This package provides a simple and intuitive interface to access Gitea repositories, users, organizations, issues, and more,
-enabling seamless integration with Gitea instances for automation, data retrieval, and management tasks.
+A Python package for interacting with the Gitea API. This package provides a
+simple and intuitive interface to access Gitea repositories, users,
+organizations, issues, and more, enabling seamless integration with Gitea
+instances for automation, data retrieval, and management tasks.
 
 ## Features
 
-Full API Coverage: Access to repositories, users, organizations, issues, pull requests, and more.
+Full API Coverage: Access to repositories, users, organizations, issues, pull
+requests, and more.
 
 - Easy Authentication: Support for token-based authentication.
 - Asynchronous Support: Built with async/await for non-blocking operations.
 - Type Hints: Full type annotations for better IDE support and code reliability.
 - Comprehensive Documentation: Detailed guides and API reference.
-- Command-Line Interface: Interact with the Gitea API directly from the terminal for
-  quick, scriptable operations without writing code.
+- Command-Line Interface: Interact with the Gitea API directly from the terminal
+  for quick, scriptable operations without writing code.
 
 ## Installation
 
-We recommend using `uv` to manage virtual environments for installing `python-gitea`.
+We recommend using `uv` to manage virtual environments for installing
+`python-gitea`.
 
-If you don't have `uv` installed, you can install it with pip. See the project pages for more details:
+If you don't have `uv` installed, you can install it with pip. See the project
+pages for more details:
 
 - Install via pip: `pip install --upgrade pip && pip install uv`
-- Project pages: [uv on PyPI](https://pypi.org/project/uv/) | [uv on GitHub](https://github.com/astral-sh/uv)
+- Project pages: [uv on PyPI](https://pypi.org/project/uv/) |
+  [uv on GitHub](https://github.com/astral-sh/uv)
 - Full documentation and usage guide: [uv docs](https://docs.astral.sh/uv/)
 
 ### Requirements
 
-- Python 3.10 or higher
+- Python 3.12 or higher
 - Operating System: Linux, macOS, or Windows
 
 ### Install from PyPI
@@ -48,7 +54,7 @@ The recommended way to install `python-gitea` is from PyPI:
 
 ```bash
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.10
+uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install python-gitea
 ```
@@ -76,7 +82,7 @@ For the latest development version:
 git clone git@github.com:isaac-cf-wong/python-gitea.git
 cd python-gitea
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.10
+uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install .
 ```
@@ -90,7 +96,7 @@ git clone git@github.com:isaac-cf-wong/python-gitea.git
 cd python-gitea
 
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.10
+uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install ".[dev]"
 
@@ -116,16 +122,20 @@ python -c "import gitea; print(gitea.__version__)"
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
+for details.
 
 ## Support
 
 For questions, issues, or contributions, please:
 
 - Check the [documentation](https://isaac-cf-wong.github.io/python-gitea/)
-- Open an issue on [GitHub](https://github.com/isaac-cf-wong/python-gitea/issues)
-- Join our [discussions](https://github.com/isaac-cf-wong/python-gitea/discussions)
+- Open an issue on
+  [GitHub](https://github.com/isaac-cf-wong/python-gitea/issues)
+- Join our
+  [discussions](https://github.com/isaac-cf-wong/python-gitea/discussions)
 
 ## Changelog
 
-See [Release Notes](https://github.com/isaac-cf-wong/python-gitea/releases) for version history.
+See [Release Notes](https://github.com/isaac-cf-wong/python-gitea/releases) for
+version history.

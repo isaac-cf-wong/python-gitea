@@ -39,8 +39,8 @@ def test_execute_api_command_exception(monkeypatch):
     exit_code = getattr(exc_info.value, "exit_code", getattr(exc_info.value, "code", None))
     assert exit_code == 1
 
-    # Logger.exception should have been called with the message and the command name and exception
+    # Logger.exception should have been called with the message and the command name.
+    # The exception itself is captured via exc_info, not passed as an argument.
     mock_logger.exception.assert_called_once()
     call_args = mock_logger.exception.call_args[0]
     assert call_args[1] == "MyCmd"
-    assert isinstance(call_args[2], ValueError)

@@ -43,7 +43,7 @@ class User(BaseUser, Resource):
         data, status_code = process_response(response, default={})
         return cast(dict[str, Any], data), {"status_code": status_code}
 
-    def _update_user_settings(  # noqa: PLR0913
+    def _update_user_settings(
         self,
         diff_view_style: str | None = None,
         full_name: str | None = None,
@@ -68,7 +68,7 @@ class User(BaseUser, Resource):
         )
         return self._patch(endpoint=endpoint, json=payload, **kwargs)
 
-    def update_user_settings(  # noqa: PLR0913
+    def update_user_settings(
         self,
         diff_view_style: str | None = None,
         full_name: str | None = None,

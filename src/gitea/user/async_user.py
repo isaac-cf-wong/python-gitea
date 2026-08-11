@@ -43,7 +43,7 @@ class AsyncUser(BaseUser, AsyncResource):
         data, status_code = await process_async_response(response, default={})
         return cast(dict[str, Any], data), {"status_code": status_code}
 
-    async def _update_user_settings(  # noqa: PLR0913
+    async def _update_user_settings(
         self,
         diff_view_style: str | None = None,
         full_name: str | None = None,
@@ -85,7 +85,7 @@ class AsyncUser(BaseUser, AsyncResource):
         )
         return await self._patch(endpoint=endpoint, json=payload, **kwargs)
 
-    async def update_user_settings(  # noqa: PLR0913
+    async def update_user_settings(
         self,
         diff_view_style: str | None = None,
         full_name: str | None = None,

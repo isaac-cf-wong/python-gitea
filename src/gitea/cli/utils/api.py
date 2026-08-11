@@ -28,5 +28,5 @@ def execute_api_command(
 
         print(json.dumps({"data": response_data, "metadata": metadata}, indent=2, default=str))
     except Exception as e:
-        logger.exception("Error executing %s: %s", command_name, e)
+        logger.exception("Error executing %s", command_name)
         raise typer.Exit(1) from e

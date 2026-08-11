@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, TypeVar, cast
+from typing import Any, cast
 
 from aiohttp import ClientResponse
 from requests import Response
 
 logger = logging.getLogger("gitea")
 
-T = TypeVar("T")
 
-
-def process_response(response: Response, default: T | None = None) -> tuple[Any, int]:
+def process_response[T](response: Response, default: T | None = None) -> tuple[Any, int]:
     """Process a synchronous HTTP response.
 
     Args:
@@ -38,7 +36,7 @@ def process_response(response: Response, default: T | None = None) -> tuple[Any,
     return data, cast(int, status_code)
 
 
-async def process_async_response(response: ClientResponse, default: T | None = None) -> tuple[Any, int]:
+async def process_async_response[T](response: ClientResponse, default: T | None = None) -> tuple[Any, int]:
     """Process an asynchronous HTTP response.
 
     Args:

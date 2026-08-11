@@ -8,52 +8,46 @@ authors = [{ name = "Isaac C. F. Wong", email = "isaac.cf.wong@gmail.com" }]
 description = "A Python package for interacting with the Gitea API, offering a simple interface to access repositories, users, organizations, issues, and more for automation and data management."
 readme = "README.md"
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [
-    "typer==0.21.1",
-    "requests>=2.32.5",
-    "aiohttp==3.13.3",
-    "pydantic==2.12.5",
+  "typer>=0.21.1",
+  "requests>=2.32.5",
+  "aiohttp>=3.13.3",
+  "pydantic>=2.12.5",
+  "platformdirs>=4.3.6",
+  "pyyaml>=6.0.2",
 ]
 
-[project.optional-dependencies]
-test = [
-    "bandit[toml]==1.9.3",
-    "black==26.1.0",
-    "check-manifest==0.51",
-    "flake8-bugbear==25.11.29",
-    "flake8-docstrings",
-    "flake8-formatter_junit_xml",
-    "flake8",
-    "flake8-pyproject",
-    "pre-commit==4.5.1",
-    "pytest-cov==7.0.0",
-    "pytest-mock<3.15.2",
-    "pytest-runner",
-    "pytest==9.0.2",
-    "pytest-github-actions-annotate-failures",
-    "pytest-asyncio",
-    "shellcheck-py==0.11.0.1",
+[dependency-groups]
+dev = [
+  "ruff>=0.16.2",
+  "prek>=0.4.12",
+  "pytest-github-actions-annotate-failures>=0.4.2",
+  "pytest-cov>=7.1.0",
+  "pytest-mock>=3.15.1",
+  "pytest>=9.1.1",
+  "pytest-asyncio>=1.2.0",
 ]
-dev = ["pytest", "pre-commit", "black", "flake8"]
 docs = [
-    "mkdocs",
-    "mkdocs-material",
-    "mkdocstrings[python]",
-    "mkdocs-gen-files",
-    "mkdocs-literate-nav",
-    "mkdocs-section-index",
-    "mike",
+  "mkdocs>=1.6.1",
+  "mkdocs-material>=9.6.0",
+  "mkdocstrings[python]>=0.27.0",
+  "mkdocs-gen-files>=0.5.0",
+  "mkdocs-literate-nav>=0.6.1",
+  "mkdocs-section-index>=0.3.9",
+  "mike>=2.1.3",
 ]
+build = ["hatch>=1.17.1"]
+release = ["git-cliff>=2.13.1"]
 
 [project.scripts]
 gitea-cli = "gitea.cli.main:app"
@@ -65,21 +59,21 @@ Tracker = "https://github.com/isaac-cf-wong/python-gitea/issues"
 Home = "https://github.com/isaac-cf-wong/python-gitea"
 "Release Notes" = "https://github.com/isaac-cf-wong/python-gitea/releases"
 
+[tool.dependency-support-policy]
+# Rolling support floors (SPEC 0): runtime lower bounds are raised on a schedule
+# by the support_floor_update.yml workflow, not by Renovate. See renovate.json.
+policy = "spec0"
+groups = ["project"]
+lock = "minimal"
+# For packages with ecosystem siblings released in lockstep, exclude them here
+# and let Renovate keep them at latest, e.g.:
+# exclude = ["my-sibling-package"]
+
 [tool.hatch.version]
 source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gitea"]
-
-[tool.bandit]
-exclude_dirs = ["build", "dist", "tests", "scripts"]
-number = 4
-recursive = true
-targets = "src"
-
-[tool.black]
-line-length = 120
-fast = true
 
 [tool.coverage.run]
 branch = true
@@ -87,48 +81,18 @@ branch = true
 [tool.coverage.report]
 fail_under = 0
 
-[tool.flake8]
-max-line-length = 120
-select = "F,E,W,B,B901,B902,B903"
-exclude = [
-    ".eggs",
-    ".git",
-    ".tox",
-    "nssm",
-    "obj",
-    "out",
-    "packages",
-    "pywin32",
-    "tests",
-    "swagger_client",
-]
-ignore = ["E722", "B001", "W503", "E203"]
-
-[tool.pyright]
-include = ["src"]
-exclude = ["**/node_modules", "**/__pycache__"]
-venv = "env37"
-
-reportMissingImports = true
-reportMissingTypeStubs = false
-
-pythonVersion = "3.7"
-pythonPlatform = "Linux"
-
-executionEnvironments = [{ root = "src" }]
-
 [tool.pytest.ini_options]
-addopts = "--cov-report xml:coverage.xml --cov src --cov-append -m 'not integration'"
-pythonpath = ["src"]
+addopts = "--cov-report xml:coverage.xml --cov src --cov-append -m 'not integration' --cov-report=term-missing"
+pythonpath = ["src", "scripts"]
 testpaths = "tests"
 junit_family = "xunit2"
 markers = [
-    "integration: marks as integration test",
-    "notebooks: marks as notebook test",
-    "gpu: marks as gpu test",
-    "spark: marks tests which need Spark",
-    "slow: marks tests as slow",
-    "unit: fast offline tests",
+  "integration: marks as integration test",
+  "notebooks: marks as notebook test",
+  "gpu: marks as gpu test",
+  "spark: marks tests which need Spark",
+  "slow: marks tests as slow",
+  "unit: fast offline tests",
 ]
 
 [tool.tox]
@@ -163,29 +127,32 @@ commands =
 
 [tool.ruff]
 line-length = 120 # Matches Black's default
-target-version = "py310" # Align with CI (3.10–3.12) and requires-python (>=3.10)
+target-version = "py312" # Align with CI (3.12–3.14) and requires-python (>=3.12)
 lint.extend-select = [
-    "E",
-    "F",
-    "W",   # pycodestyle errors and warnings
-    "I",   # isort rules
-    "UP",  # pyupgrade rules
-    "C90", # McCabe complexity
-    "N",   # PEP8 naming
-    "B",   # Bugbear (opinionated checks)
-    "A",   # Flake8-builtins
-    "C4",  # Flake8-comprehensions
-    "PT",  # Flake8-pytest
-    "RUF", # Ruff-specific rules
-    "PL",  # Add pylint rules for fuller coverage
-    "SIM",  # Similarities
-    "T10",  # Debugger statements
-    "DOC", # Docstring
-    "D",   # Doc style
+  "E",
+  "F",
+  "W",   # pycodestyle errors and warnings
+  "I",   # isort rules
+  "UP",  # pyupgrade rules
+  "C90", # McCabe complexity
+  "N",   # PEP8 naming
+  "B",   # Bugbear (opinionated checks)
+  "A",   # Flake8-builtins
+  "C4",  # Flake8-comprehensions
+  "PT",  # Flake8-pytest
+  "RUF", # Ruff-specific rules
+  "PL",  # Add pylint rules for fuller coverage
+  "SIM", # Similarities
+  "T10", # Debugger statements
+  "DOC", # Docstring
+  "D",   # Doc style
+  "S",   # Security
 ]
 lint.ignore = [
-    "E501", # Line length (handled by formatter)
-    "C901", # Disable overly strict complexity checks (optional, adjust as needed)
+  "E501",    # Line length (handled by formatter)
+  "C901",    # Disable overly strict complexity checks (optional, adjust as needed)
+  "PLR0913", # Too many arguments: API-client methods mirror REST endpoint parameters
+  "PLR0917", # Too many positional arguments: CLI commands mirror Gitea API fields
 ]
 fix = true # Enable autofix
 lint.unfixable = [] # List rules that should not be autofixed, if any
@@ -194,3 +161,20 @@ lint.unfixable = [] # List rules that should not be autofixed, if any
 quote-style = "double"       # Use double quotes for strings
 indent-style = "space"       # Use spaces for indentation
 docstring-code-format = true # Format code in docstrings
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Ignore specific rules in the tests directory
+"tests/*" = [
+  "S101",    # allow assert statements
+  "S102",    # allow exec in import/version tests
+  "S105",    # allow hardcoded test tokens/passwords in fixtures
+  "S106",    # allow hardcoded test tokens/passwords in fixtures
+  "S108",    # allow hardcoded /tmp paths in tests
+  "DTZ001",  # allow naive datetimes in test fixtures
+  "ARG001",  # allow unused function arguments (common in fixtures)
+  "PLC0415", # allow import statements not at the top level
+  "PLR2004", # allow magic values in the unit tests
+]

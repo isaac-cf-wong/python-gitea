@@ -341,7 +341,7 @@ class TestConfigManagerIntegration:
         manager2 = ConfigManager(filename=config_manager.config_path)
         manager2.load_config()
 
-        assert len(manager2.config.accounts) == 2  # noqa: PLR2004
+        assert len(manager2.config.accounts) == 2
         assert manager2.config.default_account == "work"
         assert manager2.get_config(None).name == "work"
 

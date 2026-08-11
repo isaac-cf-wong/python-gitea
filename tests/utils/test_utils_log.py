@@ -51,7 +51,7 @@ class TestSetupLogger:
                 mock_path.assert_called_with("/tmp")
                 mock_outdir.mkdir.assert_called_once_with(parents=True, exist_ok=True)
                 # Verify both stream and file handlers were added
-                assert mock_logger.addHandler.call_count >= 2  # noqa: PLR2004
+                assert mock_logger.addHandler.call_count >= 2
 
     def test_setup_logger_log_level_string(self, mock_logger):
         """Test setup_logger with string log level."""

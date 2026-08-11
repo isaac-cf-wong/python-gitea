@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 import typer
 
 
-def edit_command(  # noqa: PLR0913
+def edit_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
     repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],

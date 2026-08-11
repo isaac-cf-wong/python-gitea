@@ -15,7 +15,7 @@ from gitea.utils.response import process_response
 class Issue(BaseIssue, Resource):
     """Gitea Issue resource."""
 
-    def _list_issues(  # noqa: PLR0913
+    def _list_issues(
         self,
         owner: str,
         repository: str,
@@ -74,7 +74,7 @@ class Issue(BaseIssue, Resource):
         )
         return self._get(endpoint=endpoint, params=params, **kwargs)
 
-    def list_issues(  # noqa: PLR0913
+    def list_issues(
         self,
         owner: str,
         repository: str,
@@ -170,7 +170,7 @@ class Issue(BaseIssue, Resource):
         data, status_code = process_response(response, default={})
         return cast(dict[str, Any], data), {"status_code": status_code}
 
-    def _edit_issue(  # noqa: PLR0913
+    def _edit_issue(
         self,
         owner: str,
         repository: str,
@@ -223,7 +223,7 @@ class Issue(BaseIssue, Resource):
         )
         return self._patch(endpoint=endpoint, json=payload, **kwargs)
 
-    def edit_issue(  # noqa: PLR0913
+    def edit_issue(
         self,
         owner: str,
         repository: str,

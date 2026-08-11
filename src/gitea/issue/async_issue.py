@@ -15,7 +15,7 @@ from gitea.utils.response import process_async_response
 class AsyncIssue(BaseIssue, AsyncResource):
     """Asynchronous Gitea Issue resource."""
 
-    async def _list_issues(  # noqa: PLR0913
+    async def _list_issues(
         self,
         owner: str,
         repository: str,
@@ -74,7 +74,7 @@ class AsyncIssue(BaseIssue, AsyncResource):
         )
         return await self._get(endpoint=endpoint, params=params, **kwargs)
 
-    async def list_issues(  # noqa: PLR0913
+    async def list_issues(
         self,
         owner: str,
         repository: str,
@@ -170,7 +170,7 @@ class AsyncIssue(BaseIssue, AsyncResource):
         data, status_code = await process_async_response(response, default={})
         return cast(dict[str, Any], data), {"status_code": status_code}
 
-    async def _edit_issue(  # noqa: PLR0913
+    async def _edit_issue(
         self,
         owner: str,
         repository: str,
@@ -223,7 +223,7 @@ class AsyncIssue(BaseIssue, AsyncResource):
         )
         return await self._patch(endpoint=endpoint, json=payload, **kwargs)
 
-    async def edit_issue(  # noqa: PLR0913
+    async def edit_issue(
         self,
         owner: str,
         repository: str,

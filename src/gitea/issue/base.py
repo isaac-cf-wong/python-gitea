@@ -22,7 +22,7 @@ class BaseIssue:
         """
         return f"/repos/{owner}/{repository}/issues"
 
-    def _list_issues_helper(  # noqa: PLR0913
+    def _list_issues_helper(
         self,
         owner: str,
         repository: str,
@@ -137,7 +137,7 @@ class BaseIssue:
         """
         return f"/repos/{owner}/{repository}/issues/{index}"
 
-    def _edit_issue_helper(  # noqa: PLR0913
+    def _edit_issue_helper(
         self,
         owner: str,
         repository: str,
