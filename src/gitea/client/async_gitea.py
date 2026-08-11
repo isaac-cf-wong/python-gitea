@@ -7,10 +7,6 @@ from typing import Any, Self
 from aiohttp import ClientResponse, ClientSession, ClientTimeout
 
 from gitea.client.base import Client
-from gitea.issue.async_issue import AsyncIssue
-from gitea.pull_request.async_pull_request import AsyncPullRequest
-from gitea.repository import AsyncRepository
-from gitea.user.async_user import AsyncUser
 
 
 class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
@@ -24,6 +20,14 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             base_url: The base URL of the Gitea instance.
 
         """
+        from gitea.comment.async_comment import AsyncComment  # noqa: PLC0415
+        from gitea.issue.async_issue import AsyncIssue  # noqa: PLC0415
+        from gitea.label.async_label import AsyncLabel  # noqa: PLC0415
+        from gitea.milestone.async_milestone import AsyncMilestone  # noqa: PLC0415
+        from gitea.pull_request.async_pull_request import AsyncPullRequest  # noqa: PLC0415
+        from gitea.repository import AsyncRepository  # noqa: PLC0415
+        from gitea.user.async_user import AsyncUser  # noqa: PLC0415
+
         super().__init__(token=token, base_url=base_url)
         self.session: ClientSession | None = None
 
@@ -32,6 +36,9 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         self.pull_request = AsyncPullRequest(client=self)
         self.repository = AsyncRepository(client=self)
         self.user = AsyncUser(client=self)
+        self.comment = AsyncComment(client=self)
+        self.label = AsyncLabel(client=self)
+        self.milestone = AsyncMilestone(client=self)
 
     def __str__(self) -> str:
         """Return a string representation of the AsyncGitea client.

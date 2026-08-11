@@ -78,9 +78,20 @@ class TestRegisterCommands:
     """Test cases for register_commands function."""
 
     @patch("gitea.cli.main.app.add_typer")
-    @patch("gitea.cli.user.main.user_app")
-    def test_register_commands(self, mock_user_app, mock_add_typer):
-        """Test that register_commands adds the user app."""
+    def test_register_commands(self, mock_add_typer):
+        """Test that register_commands adds all sub-applications."""
         register_commands()
 
-        mock_add_typer.assert_called_with(mock_user_app, name="user", help="Commands for managing users.")
+        expected = {
+            "config": "Commands for managing configurations.",
+            "issue": "Commands for managing issues.",
+            "pull-request": "Commands for managing pull requests.",
+            "user": "Commands for managing users.",
+            "comment": "Commands for managing comments.",
+            "label": "Commands for managing labels.",
+            "milestone": "Commands for managing milestones.",
+        }
+        calls = mock_add_typer.call_args_list
+        assert len(calls) == len(expected)
+        for name, help_text in expected.items():
+            assert any(call.kwargs.get("name") == name and call.kwargs.get("help") == help_text for call in calls)

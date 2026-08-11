@@ -8,10 +8,6 @@ import requests
 from requests import Response
 
 from gitea.client.base import Client
-from gitea.issue.issue import Issue
-from gitea.pull_request.pull_request import PullRequest
-from gitea.repository.repository import Repository
-from gitea.user.user import User
 
 
 class Gitea(Client):  # pylint: disable=too-few-public-methods
@@ -25,6 +21,14 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             base_url: The base URL of the Gitea instance.
 
         """
+        from gitea.comment.comment import Comment  # noqa: PLC0415
+        from gitea.issue.issue import Issue  # noqa: PLC0415
+        from gitea.label.label import Label  # noqa: PLC0415
+        from gitea.milestone.milestone import Milestone  # noqa: PLC0415
+        from gitea.pull_request.pull_request import PullRequest  # noqa: PLC0415
+        from gitea.repository.repository import Repository  # noqa: PLC0415
+        from gitea.user.user import User  # noqa: PLC0415
+
         super().__init__(token=token, base_url=base_url)
         self.session: requests.Session | None = None
 
@@ -33,6 +37,9 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         self.pull_request = PullRequest(client=self)
         self.repository = Repository(client=self)
         self.user = User(client=self)
+        self.comment = Comment(client=self)
+        self.label = Label(client=self)
+        self.milestone = Milestone(client=self)
 
     def __str__(self) -> str:
         """Return a string representation of the Gitea client.

@@ -115,3 +115,50 @@ class TestBaseIssue:
             "unset_due_date": True,
         }
         assert payload == expected_payload
+
+    def test_create_issue_endpoint(self):
+        """Test _create_issue_endpoint."""
+        base = BaseIssue()
+        assert base._create_issue_endpoint("owner", "repo") == "/repos/owner/repo/issues"
+
+    def test_create_issue_helper(self):
+        """Test _create_issue_helper builds the payload."""
+        base = BaseIssue()
+        due_date = datetime(2024, 12, 31)
+        endpoint, payload = base._create_issue_helper(
+            "owner",
+            "repo",
+            title="New Issue",
+            body="Body",
+            assignees=["alice"],
+            due_date=due_date,
+            labels=[1, 2],
+        )
+        assert endpoint == "/repos/owner/repo/issues"
+        assert payload == {
+            "title": "New Issue",
+            "body": "Body",
+            "assignees": ["alice"],
+            "due_date": "2024-12-31T00:00:00",
+            "labels": [1, 2],
+        }
+
+    def test_create_issue_helper_required_only(self):
+        """Test _create_issue_helper with only the required title."""
+        base = BaseIssue()
+        _, payload = base._create_issue_helper("owner", "repo", title="New Issue")
+        assert payload == {"title": "New Issue"}
+
+    def test_create_issue_helper_full_options(self):
+        """Test _create_issue_helper with closed and ref options."""
+        base = BaseIssue()
+        endpoint, payload = base._create_issue_helper(
+            "owner",
+            "repo",
+            title="New Issue",
+            assignee="alice",
+            closed=True,
+            ref="main",
+        )
+        assert endpoint == "/repos/owner/repo/issues"
+        assert payload == {"title": "New Issue", "assignee": "alice", "closed": True, "ref": "main"}

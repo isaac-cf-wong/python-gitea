@@ -199,3 +199,75 @@ class BaseIssue:
             payload["unset_due_date"] = unset_due_date
 
         return endpoint, payload
+
+    def _create_issue_endpoint(self, owner: str, repository: str) -> str:
+        """Construct the endpoint URL for creating an issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+
+        Returns:
+            The endpoint URL for creating an issue.
+
+        """
+        return f"/repos/{owner}/{repository}/issues"
+
+    def _create_issue_helper(
+        self,
+        owner: str,
+        repository: str,
+        title: str,
+        assignee: str | None = None,
+        assignees: list[str] | None = None,
+        body: str | None = None,
+        closed: bool | None = None,
+        due_date: datetime | None = None,
+        labels: list[int] | None = None,
+        milestone: int | None = None,
+        ref: str | None = None,
+    ) -> tuple[str, dict[str, Any]]:
+        """Get the endpoint and parameters for creating an issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            title: The title of the new issue.
+            assignee: The username to assign the issue to.
+            assignees: The usernames to assign the issue to.
+            body: The body of the new issue.
+            closed: Whether the issue is created closed.
+            due_date: The due date of the new issue.
+            labels: The label IDs to apply to the new issue.
+            milestone: The milestone ID to associate with the new issue.
+            ref: The reference of the new issue.
+
+        Returns:
+            A tuple containing the endpoint and the request arguments.
+
+                - The API endpoint for creating the issue.
+                - A dictionary of request arguments.
+
+        """
+        endpoint = self._create_issue_endpoint(owner=owner, repository=repository)
+
+        payload: dict[str, Any] = {"title": title}
+
+        if assignee is not None:
+            payload["assignee"] = assignee
+        if assignees is not None:
+            payload["assignees"] = assignees
+        if body is not None:
+            payload["body"] = body
+        if closed is not None:
+            payload["closed"] = closed
+        if due_date is not None:
+            payload["due_date"] = due_date.isoformat()
+        if labels is not None:
+            payload["labels"] = labels
+        if milestone is not None:
+            payload["milestone"] = milestone
+        if ref is not None:
+            payload["ref"] = ref
+
+        return endpoint, payload
