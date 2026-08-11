@@ -44,7 +44,7 @@ class BaseProject:
         """
         endpoint = self._list_projects_endpoint(owner=owner, repository=repository)
 
-        params = {}
+        params: dict[str, Any] = {}
         if state is not None:
             params["state"] = state
         if page is not None:
@@ -455,7 +455,7 @@ class BaseProject:
 
         return endpoint, params
 
-    def _add_issue_to_project_column_helper(
+    def _project_column_issue_helper(
         self,
         owner: str,
         repository: str,
@@ -463,31 +463,7 @@ class BaseProject:
         column_id: int,
         issue_id: int,
     ) -> tuple[str, dict[str, Any]]:
-        """Get the endpoint and parameters for adding an issue to a project column.
-
-        Args:
-            owner: The owner of the repository.
-            repository: The name of the repository.
-            project_id: The ID of the project.
-            column_id: The ID of the column.
-            issue_id: The ID of the issue.
-
-        Returns:
-            A tuple containing the endpoint and the request arguments.
-
-        """
-        endpoint = f"/repos/{owner}/{repository}/projects/{project_id}/columns/{column_id}/issues/{issue_id}"
-        return endpoint, {}
-
-    def _remove_issue_from_project_column_helper(
-        self,
-        owner: str,
-        repository: str,
-        project_id: int,
-        column_id: int,
-        issue_id: int,
-    ) -> tuple[str, dict[str, Any]]:
-        """Get the endpoint and parameters for removing an issue from a project column.
+        """Get the endpoint and parameters for adding or removing an issue in a project column.
 
         Args:
             owner: The owner of the repository.

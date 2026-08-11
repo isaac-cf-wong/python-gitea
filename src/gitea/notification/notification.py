@@ -219,7 +219,7 @@ class Notification(BaseNotification, Resource):
         status_types: list[str] | None = None,
         to_status: str | None = None,
         **kwargs: Any,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Mark notifications as read.
 
         Args:
@@ -230,7 +230,7 @@ class Notification(BaseNotification, Resource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing the response as a dictionary and a dictionary with metadata.
+            A tuple containing the changed notification threads as a list of dictionaries and a dictionary with metadata.
 
         """
         response = self._read_notifications(
@@ -240,8 +240,8 @@ class Notification(BaseNotification, Resource):
             to_status=to_status,
             **kwargs,
         )
-        data, status_code = process_response(response, default={})
-        return cast(dict[str, Any], data), {"status_code": status_code}
+        data, status_code = process_response(response, default=[])
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
 
     def _read_repo_notifications(
         self,
@@ -287,7 +287,7 @@ class Notification(BaseNotification, Resource):
         status_types: list[str] | None = None,
         to_status: str | None = None,
         **kwargs: Any,
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Mark a repository's notifications as read.
 
         Args:
@@ -300,7 +300,7 @@ class Notification(BaseNotification, Resource):
             **kwargs: Additional arguments for the request.
 
         Returns:
-            A tuple containing the response as a dictionary and a dictionary with metadata.
+            A tuple containing the changed notification threads as a list of dictionaries and a dictionary with metadata.
 
         """
         response = self._read_repo_notifications(
@@ -312,8 +312,8 @@ class Notification(BaseNotification, Resource):
             to_status=to_status,
             **kwargs,
         )
-        data, status_code = process_response(response, default={})
-        return cast(dict[str, Any], data), {"status_code": status_code}
+        data, status_code = process_response(response, default=[])
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
 
     def _get_notification_thread(
         self,

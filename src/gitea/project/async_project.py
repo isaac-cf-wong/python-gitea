@@ -883,7 +883,7 @@ class AsyncProject(BaseProject, AsyncResource):
             The HTTP response object.
 
         """
-        endpoint, params = self._add_issue_to_project_column_helper(
+        endpoint, params = self._project_column_issue_helper(
             owner=owner,
             repository=repository,
             project_id=project_id,
@@ -949,7 +949,7 @@ class AsyncProject(BaseProject, AsyncResource):
             The HTTP response object.
 
         """
-        endpoint, params = self._remove_issue_from_project_column_helper(
+        endpoint, params = self._project_column_issue_helper(
             owner=owner,
             repository=repository,
             project_id=project_id,

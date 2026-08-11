@@ -3,6 +3,9 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+import typer
+
 from gitea.cli.notification.list import list_command
 from gitea.cli.notification.read import read_command
 
@@ -111,7 +114,7 @@ def test_read_command_user_notifications(mock_gitea, mock_get_auth_params, mock_
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
     client = MagicMock()
-    client.notification.read_notifications.return_value = ({}, {"status_code": 204})
+    client.notification.read_notifications.return_value = ([{"id": 1}], {"status_code": 205})
     mock_gitea.return_value.__enter__.return_value = client
 
     read_command(
@@ -138,7 +141,7 @@ def test_read_command_user_notifications(mock_gitea, mock_get_auth_params, mock_
         status_types=None,
         to_status="read",
     )
-    assert result == ({}, {"status_code": 204})
+    assert result == ([{"id": 1}], {"status_code": 205})
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -150,7 +153,7 @@ def test_read_command_repo_notifications(mock_gitea, mock_get_auth_params, mock_
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
     client = MagicMock()
-    client.notification.read_repo_notifications.return_value = ({}, {"status_code": 204})
+    client.notification.read_repo_notifications.return_value = ([{"id": 2}], {"status_code": 205})
     mock_gitea.return_value.__enter__.return_value = client
 
     read_command(
@@ -177,4 +180,63 @@ def test_read_command_repo_notifications(mock_gitea, mock_get_auth_params, mock_
         status_types=None,
         to_status=None,
     )
-    assert result == ({}, {"status_code": 204})
+    assert result == ([{"id": 2}], {"status_code": 205})
+
+
+@pytest.mark.parametrize(
+    ("owner", "repository"),
+    [
+        ("owner", None),
+        (None, "repo"),
+    ],
+)
+@patch("gitea.cli.utils.auth.get_auth_params")
+def test_list_command_rejects_partial_selector(mock_get_auth_params, owner, repository):
+    """list_command should reject owner-only or repository-only selectors."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    with pytest.raises(typer.BadParameter):
+        list_command(
+            ctx=ctx,
+            owner=owner,
+            repository=repository,
+            all_notifications=None,
+            status_types=None,
+            subject_type=None,
+            since=None,
+            before=None,
+            page=None,
+            limit=None,
+            account_name="acct",
+            token=None,
+            base_url=None,
+        )
+
+
+@pytest.mark.parametrize(
+    ("owner", "repository"),
+    [
+        ("owner", None),
+        (None, "repo"),
+    ],
+)
+@patch("gitea.cli.utils.auth.get_auth_params")
+def test_read_command_rejects_partial_selector(mock_get_auth_params, owner, repository):
+    """read_command should reject owner-only or repository-only selectors."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    with pytest.raises(typer.BadParameter):
+        read_command(
+            ctx=ctx,
+            owner=owner,
+            repository=repository,
+            last_read_at=None,
+            all_notifications=None,
+            status_types=None,
+            to_status=None,
+            account_name="acct",
+            token=None,
+            base_url=None,
+        )

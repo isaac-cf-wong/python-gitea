@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -17,12 +17,12 @@ def create_command(
         typer.Option("--description", help="Description of the project."),
     ] = None,
     template_type: Annotated[
-        str | None,
-        typer.Option("--template-type", help="Template type of the project (none, basic_kanban, bug_triage)."),
+        Literal["none", "basic_kanban", "bug_triage"] | None,
+        typer.Option("--template-type", help="Template type of the project."),
     ] = None,
     card_type: Annotated[
-        str | None,
-        typer.Option("--card-type", help="Card type of the project (text_only, images_and_text)."),
+        Literal["text_only", "images_and_text"] | None,
+        typer.Option("--card-type", help="Card type of the project."),
     ] = None,
     account_name: Annotated[
         str | None,

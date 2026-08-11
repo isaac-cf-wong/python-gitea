@@ -127,4 +127,6 @@ class TestProcessAsyncResponse:
 
         assert result == ({}, 200)
         mock_logger.error.assert_called_once()
-        assert mock_logger.error.call_args[0][0] == "Failed to parse JSON response: %s"
+        args, _ = mock_logger.error.call_args
+        assert args[0] == "Failed to parse JSON response: %s"
+        assert isinstance(args[1], ValueError)

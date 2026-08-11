@@ -49,26 +49,38 @@ class TestNotification:
     def test_read_notifications(self, notification, mock_client):
         """Test read_notifications."""
         with patch("gitea.notification.notification.process_response") as mock_process:
-            mock_process.return_value = ({}, 204)
+            mock_process.return_value = ([{"id": 1}, {"id": 2}], 205)
             result = notification.read_notifications(all_notifications=True)
             mock_client._request.assert_called_once_with(
                 method="PUT",
                 endpoint="/notifications",
                 params={"all": True},
             )
-            assert result == ({}, {"status_code": 204})
+            assert result == ([{"id": 1}, {"id": 2}], {"status_code": 205})
+
+    def test_read_notifications_empty(self, notification, mock_client):
+        """Test read_notifications with an empty 205 response."""
+        with patch("gitea.notification.notification.process_response") as mock_process:
+            mock_process.return_value = ([], 205)
+            result = notification.read_notifications(all_notifications=True)
+            mock_client._request.assert_called_once_with(
+                method="PUT",
+                endpoint="/notifications",
+                params={"all": True},
+            )
+            assert result == ([], {"status_code": 205})
 
     def test_read_repo_notifications(self, notification, mock_client):
         """Test read_repo_notifications."""
         with patch("gitea.notification.notification.process_response") as mock_process:
-            mock_process.return_value = ({}, 204)
+            mock_process.return_value = ([{"id": 3}], 205)
             result = notification.read_repo_notifications(owner="o", repository="r", to_status="read")
             mock_client._request.assert_called_once_with(
                 method="PUT",
                 endpoint="/repos/o/r/notifications",
                 params={"to-status": "read"},
             )
-            assert result == ({}, {"status_code": 204})
+            assert result == ([{"id": 3}], {"status_code": 205})
 
     def test_get_notification_thread(self, notification, mock_client):
         """Test get_notification_thread."""
@@ -164,14 +176,27 @@ class TestAsyncNotification:
     async def test_read_notifications(self, notification, mock_client):
         """Test read_notifications (async)."""
         with patch("gitea.notification.async_notification.process_async_response") as mock_process:
-            mock_process.return_value = ({}, 204)
+            mock_process.return_value = ([{"id": 1}, {"id": 2}], 205)
             result = await notification.read_notifications(all_notifications=True)
             mock_client._request.assert_called_once_with(
                 method="PUT",
                 endpoint="/notifications",
                 params={"all": True},
             )
-            assert result == ({}, {"status_code": 204})
+            assert result == ([{"id": 1}, {"id": 2}], {"status_code": 205})
+
+    @pytest.mark.asyncio
+    async def test_read_notifications_empty(self, notification, mock_client):
+        """Test read_notifications with an empty 205 response (async)."""
+        with patch("gitea.notification.async_notification.process_async_response") as mock_process:
+            mock_process.return_value = ([], 205)
+            result = await notification.read_notifications(all_notifications=True)
+            mock_client._request.assert_called_once_with(
+                method="PUT",
+                endpoint="/notifications",
+                params={"all": True},
+            )
+            assert result == ([], {"status_code": 205})
 
     @pytest.mark.asyncio
     async def test_get_notification_thread(self, notification, mock_client):

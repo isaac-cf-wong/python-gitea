@@ -319,3 +319,152 @@ class TestAsyncProject:
                 json={"column_id": 6},
             )
             assert result == ({}, {"status_code": 204})
+
+    @pytest.mark.asyncio
+    async def test_get_project(self, project, mock_client):
+        """Test get_project (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ({"id": 1, "title": "Board"}, 200)
+            result = await project.get_project(owner="o", repository="r", project_id=1)
+            mock_client._request.assert_called_once_with(
+                method="GET",
+                endpoint="/repos/o/r/projects/1",
+                params={},
+            )
+            assert result == ({"id": 1, "title": "Board"}, {"status_code": 200})
+
+    @pytest.mark.asyncio
+    async def test_edit_project(self, project, mock_client):
+        """Test edit_project (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ({"id": 1, "title": "Renamed"}, 200)
+            result = await project.edit_project(
+                owner="o", repository="r", project_id=1, title="Renamed", state="closed"
+            )
+            mock_client._request.assert_called_once_with(
+                method="PATCH",
+                endpoint="/repos/o/r/projects/1",
+                json={"title": "Renamed", "state": "closed"},
+            )
+            assert result == ({"id": 1, "title": "Renamed"}, {"status_code": 200})
+
+    @pytest.mark.asyncio
+    async def test_delete_project(self, project, mock_client):
+        """Test delete_project (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ({}, 204)
+            result = await project.delete_project(owner="o", repository="r", project_id=1)
+            mock_client._request.assert_called_once_with(
+                method="DELETE",
+                endpoint="/repos/o/r/projects/1",
+                params={},
+            )
+            assert result == ({}, {"status_code": 204})
+
+    @pytest.mark.asyncio
+    async def test_list_project_columns(self, project, mock_client):
+        """Test list_project_columns (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ([{"id": 5, "title": "Todo"}], 200)
+            result = await project.list_project_columns(owner="o", repository="r", project_id=1)
+            mock_client._request.assert_called_once_with(
+                method="GET",
+                endpoint="/repos/o/r/projects/1/columns",
+                params={},
+            )
+            assert result == ([{"id": 5, "title": "Todo"}], {"status_code": 200})
+
+    @pytest.mark.asyncio
+    async def test_get_project_column(self, project, mock_client):
+        """Test get_project_column (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ({"id": 5, "title": "Todo"}, 200)
+            result = await project.get_project_column(owner="o", repository="r", project_id=1, column_id=5)
+            mock_client._request.assert_called_once_with(
+                method="GET",
+                endpoint="/repos/o/r/projects/1/columns/5",
+                params={},
+            )
+            assert result == ({"id": 5, "title": "Todo"}, {"status_code": 200})
+
+    @pytest.mark.asyncio
+    async def test_edit_project_column(self, project, mock_client):
+        """Test edit_project_column (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ({"id": 5, "title": "In Progress"}, 200)
+            result = await project.edit_project_column(
+                owner="o", repository="r", project_id=1, column_id=5, title="In Progress", sorting=2
+            )
+            mock_client._request.assert_called_once_with(
+                method="PATCH",
+                endpoint="/repos/o/r/projects/1/columns/5",
+                json={"title": "In Progress", "sorting": 2},
+            )
+            assert result == ({"id": 5, "title": "In Progress"}, {"status_code": 200})
+
+    @pytest.mark.asyncio
+    async def test_delete_project_column(self, project, mock_client):
+        """Test delete_project_column (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ({}, 204)
+            result = await project.delete_project_column(owner="o", repository="r", project_id=1, column_id=5)
+            mock_client._request.assert_called_once_with(
+                method="DELETE",
+                endpoint="/repos/o/r/projects/1/columns/5",
+                params={},
+            )
+            assert result == ({}, {"status_code": 204})
+
+    @pytest.mark.asyncio
+    async def test_set_default_project_column(self, project, mock_client):
+        """Test set_default_project_column (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ({}, 204)
+            result = await project.set_default_project_column(owner="o", repository="r", project_id=1, column_id=5)
+            mock_client._request.assert_called_once_with(
+                method="POST",
+                endpoint="/repos/o/r/projects/1/columns/5/default",
+                params={},
+            )
+            assert result == ({}, {"status_code": 204})
+
+    @pytest.mark.asyncio
+    async def test_move_project_columns(self, project, mock_client):
+        """Test move_project_columns (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ({}, 204)
+            result = await project.move_project_columns(owner="o", repository="r", project_id=1, column_ids=[5, 6])
+            mock_client._request.assert_called_once_with(
+                method="POST",
+                endpoint="/repos/o/r/projects/1/columns/move",
+                json={"column_ids": [5, 6]},
+            )
+            assert result == ({}, {"status_code": 204})
+
+    @pytest.mark.asyncio
+    async def test_list_project_column_issues(self, project, mock_client):
+        """Test list_project_column_issues (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ([{"id": 100}], 200)
+            result = await project.list_project_column_issues(owner="o", repository="r", project_id=1, column_id=5)
+            mock_client._request.assert_called_once_with(
+                method="GET",
+                endpoint="/repos/o/r/projects/1/columns/5/issues",
+                params={},
+            )
+            assert result == ([{"id": 100}], {"status_code": 200})
+
+    @pytest.mark.asyncio
+    async def test_remove_issue_from_project_column(self, project, mock_client):
+        """Test remove_issue_from_project_column (async)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ({}, 204)
+            result = await project.remove_issue_from_project_column(
+                owner="o", repository="r", project_id=1, column_id=5, issue_id=100
+            )
+            mock_client._request.assert_called_once_with(
+                method="DELETE",
+                endpoint="/repos/o/r/projects/1/columns/5/issues/100",
+                params={},
+            )
+            assert result == ({}, {"status_code": 204})

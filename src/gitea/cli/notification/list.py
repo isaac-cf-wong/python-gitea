@@ -99,6 +99,12 @@ def list_command(
         base_url=base_url,
     )
 
+    if (owner is None) != (repository is None):
+        raise typer.BadParameter(
+            "Both --owner and --repository must be provided together, or neither "
+            "to list the authenticated user's notifications."
+        )
+
     def api_call() -> tuple[dict[str, Any] | list[dict[str, Any]], dict[str, Any]]:
         """List notification information.
 
