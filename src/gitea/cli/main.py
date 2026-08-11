@@ -100,8 +100,11 @@ def main(
 
 def register_commands() -> None:
     """Register CLI commands."""
+    from gitea.cli.comment.main import comment_app  # noqa: PLC0415
     from gitea.cli.config.main import config_app  # noqa: PLC0415
     from gitea.cli.issue.main import issue_app  # noqa: PLC0415
+    from gitea.cli.label.main import label_app  # noqa: PLC0415
+    from gitea.cli.milestone.main import milestone_app  # noqa: PLC0415
     from gitea.cli.pull_request.main import pull_request_app  # noqa: PLC0415
     from gitea.cli.user.main import user_app  # noqa: PLC0415
 
@@ -109,6 +112,9 @@ def register_commands() -> None:
     app.add_typer(issue_app, name="issue", help="Commands for managing issues.")
     app.add_typer(pull_request_app, name="pull-request", help="Commands for managing pull requests.")
     app.add_typer(user_app, name="user", help="Commands for managing users.")
+    app.add_typer(comment_app, name="comment", help="Commands for managing comments.")
+    app.add_typer(label_app, name="label", help="Commands for managing labels.")
+    app.add_typer(milestone_app, name="milestone", help="Commands for managing milestones.")
 
 
 register_commands()

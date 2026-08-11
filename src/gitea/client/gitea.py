@@ -8,7 +8,10 @@ import requests
 from requests import Response
 
 from gitea.client.base import Client
+from gitea.comment.comment import Comment
 from gitea.issue.issue import Issue
+from gitea.label.label import Label
+from gitea.milestone.milestone import Milestone
 from gitea.pull_request.pull_request import PullRequest
 from gitea.repository.repository import Repository
 from gitea.user.user import User
@@ -33,6 +36,9 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         self.pull_request = PullRequest(client=self)
         self.repository = Repository(client=self)
         self.user = User(client=self)
+        self.comment = Comment(client=self)
+        self.label = Label(client=self)
+        self.milestone = Milestone(client=self)
 
     def __str__(self) -> str:
         """Return a string representation of the Gitea client.

@@ -7,7 +7,10 @@ from typing import Any, Self
 from aiohttp import ClientResponse, ClientSession, ClientTimeout
 
 from gitea.client.base import Client
+from gitea.comment.async_comment import AsyncComment
 from gitea.issue.async_issue import AsyncIssue
+from gitea.label.async_label import AsyncLabel
+from gitea.milestone.async_milestone import AsyncMilestone
 from gitea.pull_request.async_pull_request import AsyncPullRequest
 from gitea.repository import AsyncRepository
 from gitea.user.async_user import AsyncUser
@@ -32,6 +35,9 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         self.pull_request = AsyncPullRequest(client=self)
         self.repository = AsyncRepository(client=self)
         self.user = AsyncUser(client=self)
+        self.comment = AsyncComment(client=self)
+        self.label = AsyncLabel(client=self)
+        self.milestone = AsyncMilestone(client=self)
 
     def __str__(self) -> str:
         """Return a string representation of the AsyncGitea client.

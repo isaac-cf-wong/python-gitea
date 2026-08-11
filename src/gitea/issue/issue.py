@@ -277,3 +277,105 @@ class Issue(BaseIssue, Resource):
         )
         data, status_code = process_response(response, default={})
         return cast(dict[str, Any], data), {"status_code": status_code}
+
+    def _create_issue(
+        self,
+        owner: str,
+        repository: str,
+        title: str,
+        assignee: str | None = None,
+        assignees: list[str] | None = None,
+        body: str | None = None,
+        closed: bool | None = None,
+        due_date: datetime | None = None,
+        labels: list[int] | None = None,
+        milestone: int | None = None,
+        ref: str | None = None,
+        **kwargs: Any,
+    ) -> Response:
+        """Create an issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            title: The title of the new issue.
+            assignee: The username to assign the issue to.
+            assignees: The usernames to assign the issue to.
+            body: The body of the new issue.
+            closed: Whether the issue is created closed.
+            due_date: The due date of the new issue.
+            labels: The label IDs to apply to the new issue.
+            milestone: The milestone ID to associate with the new issue.
+            ref: The reference of the new issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint, payload = self._create_issue_helper(
+            owner=owner,
+            repository=repository,
+            title=title,
+            assignee=assignee,
+            assignees=assignees,
+            body=body,
+            closed=closed,
+            due_date=due_date,
+            labels=labels,
+            milestone=milestone,
+            ref=ref,
+        )
+        return self._post(endpoint=endpoint, json=payload, **kwargs)
+
+    def create_issue(
+        self,
+        owner: str,
+        repository: str,
+        title: str,
+        assignee: str | None = None,
+        assignees: list[str] | None = None,
+        body: str | None = None,
+        closed: bool | None = None,
+        due_date: datetime | None = None,
+        labels: list[int] | None = None,
+        milestone: int | None = None,
+        ref: str | None = None,
+        **kwargs: Any,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Create an issue in a repository.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            title: The title of the new issue.
+            assignee: The username to assign the issue to.
+            assignees: The usernames to assign the issue to.
+            body: The body of the new issue.
+            closed: Whether the issue is created closed.
+            due_date: The due date of the new issue.
+            labels: The label IDs to apply to the new issue.
+            milestone: The milestone ID to associate with the new issue.
+            ref: The reference of the new issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing the created issue as a dictionary and a dictionary with metadata.
+
+        """
+        response = self._create_issue(
+            owner=owner,
+            repository=repository,
+            title=title,
+            assignee=assignee,
+            assignees=assignees,
+            body=body,
+            closed=closed,
+            due_date=due_date,
+            labels=labels,
+            milestone=milestone,
+            ref=ref,
+            **kwargs,
+        )
+        data, status_code = process_response(response, default={})
+        return cast(dict[str, Any], data), {"status_code": status_code}

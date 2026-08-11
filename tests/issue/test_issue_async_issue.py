@@ -63,3 +63,28 @@ class TestAsyncIssue:
                 method="PATCH", endpoint="/repos/test_owner/test_repo/issues/123", json=expected_payload
             )
             assert result == ({"id": 123, "title": "Updated Title"}, {"status_code": 200})
+
+    @pytest.mark.asyncio
+    async def test_create_issue(self, async_issue, mock_client):
+        """Test create_issue."""
+        due_date = datetime(2024, 12, 31)
+        with patch("gitea.issue.async_issue.process_async_response") as mock_process:
+            mock_process.return_value = ({"id": 1, "title": "New Issue"}, 201)
+            result = await async_issue.create_issue(
+                owner="test_owner",
+                repository="test_repo",
+                title="New Issue",
+                assignee="alice",
+                due_date=due_date,
+            )
+            expected_payload = {
+                "title": "New Issue",
+                "assignee": "alice",
+                "due_date": "2024-12-31T00:00:00",
+            }
+            mock_client._request.assert_called_once_with(
+                method="POST",
+                endpoint="/repos/test_owner/test_repo/issues",
+                json=expected_payload,
+            )
+            assert result == ({"id": 1, "title": "New Issue"}, {"status_code": 201})
