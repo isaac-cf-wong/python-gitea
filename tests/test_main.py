@@ -19,7 +19,7 @@ class TestMain:
     def test_main_not_called_on_import(self, mock_setup_logger):
         """Test that importing __main__.py does not call setup_logger."""
         # Import the module (this sets __name__ to 'gitea.__main__')
-        import gitea.__main__  # noqa: F401, PLC0415
+        import gitea.__main__  # noqa: F401
 
         # Verify setup_logger was not called
         mock_setup_logger.assert_not_called()

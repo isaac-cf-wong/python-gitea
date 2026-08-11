@@ -21,7 +21,7 @@ class BasePullRequest:
         """
         return f"/repos/{owner}/{repository}/pulls"
 
-    def _list_pull_requests_helper(  # noqa: PLR0913
+    def _list_pull_requests_helper(
         self,
         owner: str,
         repository: str,

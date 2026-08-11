@@ -94,7 +94,7 @@ class TestListCommand:
 
         assert result.exit_code == 0
         # Use regex to match complete URLs in context
-        import re  # noqa: PLC0415
+        import re
 
         assert re.search(r"account1.*https://gitea\.com", result.stdout, re.DOTALL)
         assert re.search(r"account2.*https://gitea\.enterprise\.com", result.stdout, re.DOTALL)

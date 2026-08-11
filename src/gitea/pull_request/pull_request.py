@@ -14,7 +14,7 @@ from gitea.utils.response import process_response
 class PullRequest(BasePullRequest, Resource):
     """Synchronous Pull Request API for Gitea."""
 
-    def _list_pull_requests(  # noqa: PLR0913
+    def _list_pull_requests(
         self,
         owner: str,
         repository: str,
@@ -64,7 +64,7 @@ class PullRequest(BasePullRequest, Resource):
         )
         return self._get(endpoint=endpoint, params=params, **kwargs)
 
-    def list_pull_requests(  # noqa: PLR0913
+    def list_pull_requests(
         self,
         owner: str,
         repository: str,

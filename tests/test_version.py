@@ -16,7 +16,7 @@ class TestVersion:
             # Reimport to get the patched version
 
             importlib.reload(gitea.version)
-            from gitea.version import __version__  # noqa: PLC0415
+            from gitea.version import __version__
 
             assert __version__ == "1.0.0"
 
@@ -24,13 +24,13 @@ class TestVersion:
         """Test version fallback when package is not installed."""
         with patch("importlib.metadata.version", side_effect=PackageNotFoundError("python-gitea")):
             importlib.reload(gitea.version)
-            from gitea.version import __version__  # noqa: PLC0415
+            from gitea.version import __version__
 
             assert __version__ == "0+unknown"
 
     def test_version_not_none(self):
         """Test that version is always defined and not None."""
-        from gitea.version import __version__  # noqa: PLC0415
+        from gitea.version import __version__
 
         assert __version__ is not None
         assert isinstance(__version__, str)

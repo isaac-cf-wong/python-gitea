@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 
-def update_settings_command(  # noqa: PLR0913
+def update_settings_command(
     ctx: typer.Context,
     diff_view_style: Annotated[
         str | None, typer.Option("--diff-view-style", help="The preferred diff view style.")

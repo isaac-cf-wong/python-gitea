@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 
 import requests
 from requests import Response
@@ -43,7 +43,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         """
         return f"Gitea Client(base_url={self.base_url})"
 
-    def __enter__(self) -> Gitea:
+    def __enter__(self) -> Self:
         """Enter the context manager.
 
         Returns:

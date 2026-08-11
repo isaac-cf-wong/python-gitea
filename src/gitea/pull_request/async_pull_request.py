@@ -14,7 +14,7 @@ from gitea.utils.response import process_async_response
 class AsyncPullRequest(BasePullRequest, AsyncResource):
     """Asynchronous Pull Request API for Gitea."""
 
-    async def _list_pull_requests(  # noqa: PLR0913
+    async def _list_pull_requests(
         self,
         owner: str,
         repository: str,
@@ -64,7 +64,7 @@ class AsyncPullRequest(BasePullRequest, AsyncResource):
         )
         return await self._get(endpoint=endpoint, params=params, **kwargs)
 
-    async def list_pull_requests(  # noqa: PLR0913
+    async def list_pull_requests(
         self,
         owner: str,
         repository: str,

@@ -1,0 +1,177 @@
+name: Scheduled Release
+
+on:
+    schedule:
+        - cron: '0 0 * * 2'
+    workflow_dispatch:
+        inputs:
+            allow_major_bump:
+                description:
+                    'Let a breaking change bump 0.x.y into 1.0.0. Off by
+                    default: while the package is pre-1.0 a breaking change
+                    bumps the minor instead, because 1.x declares a stable API.
+                    Has no effect once the current major is >= 1, where a major
+                    bump is enforced anyway.'
+                required: false
+                default: false
+                type: boolean
+
+permissions:
+    contents: write
+
+jobs:
+    check_new_commits:
+        runs-on: ubuntu-latest
+        outputs:
+            has-changes: ${{ steps.check_commits.outputs.has-changes }}
+        steps:
+            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+              with:
+                  fetch-depth: 0
+
+            - name: Check for new commits
+              id: check_commits
+              uses: isaac-cf-wong/detect-git-changes-action@604bb375bf2cef3116a2505f30cc6c5965a8fcba # v0.0.18
+              with:
+                  use-latest-tag: true
+
+    ci:
+        needs: check_new_commits
+        if: ${{ needs.check_new_commits.outputs.has-changes == 'true' }}
+        uses: ./.github/workflows/ci.yml
+
+    codeql:
+        needs: check_new_commits
+        if: ${{ needs.check_new_commits.outputs.has-changes == 'true' }}
+        uses: ./.github/workflows/codeql.yml
+        permissions:
+            security-events: write
+            actions: read
+            contents: read
+
+    create_tag:
+        needs: [ci, codeql]
+        runs-on: ubuntu-latest
+        outputs:
+            new_tag: ${{ steps.tag_version.outputs.new_tag }}
+        steps:
+            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+              with:
+                  fetch-depth: 0
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+              with:
+                  python-version: '3.13'
+                  enable-cache: 'true'
+
+            - name: Install dependencies
+              run: uv sync --group release --frozen
+
+            - name: Bump version and push tag
+              id: tag_version
+              env:
+                  # The flag itself, or empty, so the shell never has to interpret a truth value.
+                  # The `inputs` context keeps a typed boolean as a boolean, so this expression is
+                  # sound; `github.event.inputs` would have handed over the *string* `false`, which is
+                  # truthy in a shell test and would have passed `--allow-major-bump` on every run that
+                  # left it off. Resolving it here rather than in `run:` keeps that distinction from
+                  # mattering. On a `schedule` event `inputs` is absent, which is falsy -- the default.
+                  ALLOW_MAJOR_BUMP:
+                      ${{ inputs.allow_major_bump && '--allow-major-bump' || ''
+                      }}
+              run: |
+                  set -euo pipefail
+                  PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+                  if [ "$PREVIOUS_TAG" = "none" ]; then
+                    NEW_TAG="v0.1.0"
+                  else
+                    # git-cliff proposes; `release_version.py` decides. Its default sends a breaking
+                    # change straight to the next major, which is right once an API has been promised
+                    # and wrong before: at v0.10.2 it answers v1.0.0, publishing a stable-API claim as
+                    # a side effect of a bug fix. While the major is 0 that is demoted to a minor bump
+                    # unless this run was dispatched with allow_major_bump. At 1.x and above the
+                    # proposal is taken unchanged.
+                    #
+                    # The `2>/dev/null` that used to be here is gone deliberately: it hid git-cliff
+                    # failing, and an empty NEW_TAG would then have been tagged as the empty string.
+                    PROPOSED_TAG=$(uv run --frozen git-cliff --bumped-version --config cliff.toml)
+                    NEW_TAG=$(uv run --frozen python scripts/release_version.py \
+                      --current "$PREVIOUS_TAG" \
+                      --proposed "$PROPOSED_TAG" \
+                      ${ALLOW_MAJOR_BUMP})
+                    echo "git-cliff proposed $PROPOSED_TAG; releasing $NEW_TAG"
+                  fi
+                  if ! git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+                    echo "Creating annotated tag $NEW_TAG"
+
+                    git config user.name "github-actions[bot]"
+                    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+                    git tag -a "$NEW_TAG" -m "Release $NEW_TAG"
+                    git push origin "$NEW_TAG"
+                  else
+                    echo "Tag $NEW_TAG already exists, skipping."
+                    exit 1
+                  fi
+                  echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+                  echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+
+            - name: Output tag information
+              run: |
+                  echo "### Tag Created :rocket:" >> $GITHUB_STEP_SUMMARY
+                  echo "- **New tag**: ${{ steps.tag_version.outputs.new_tag }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Previous tag**: ${{ steps.tag_version.outputs.previous_tag }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Changelog**: ${{ steps.tag_version.outputs.changelog }}" >> $GITHUB_STEP_SUMMARY
+
+    release:
+        needs: create_tag
+        uses: ./.github/workflows/release.yml
+        permissions:
+            contents: write
+            id-token: write
+        with:
+            tag_name: ${{ needs.create_tag.outputs.new_tag }}
+
+    publish:
+        needs: [release, create_tag]
+        runs-on: ubuntu-latest
+        # Set the repository variable PUBLISH_TO_PYPI to "true" once the
+        # 'pypi' environment and PyPI trusted publishing are configured.
+        if: vars.PUBLISH_TO_PYPI == 'true'
+        environment:
+            name: pypi
+        permissions:
+            id-token: write
+            contents: read
+        steps:
+            - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+              with:
+                  ref: ${{ needs.create_tag.outputs.new_tag }}
+                  fetch-depth: 0
+
+            - name: Output build information
+              run: |
+                  echo "### Publishing Build :package:" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Version tag**: ${{ needs.create_tag.outputs.new_tag }}" >> $GITHUB_STEP_SUMMARY
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+              with:
+                  python-version: '3.13'
+
+            - name: Build distribution
+              run: uv build
+
+            - name: Smoke test (wheel)
+              run:
+                  uv run --isolated --no-project --with dist/*.whl
+                  tests/smoke_test.py
+
+            - name: Smoke test (source distribution)
+              run:
+                  uv run --isolated --no-project --with dist/*.tar.gz
+                  tests/smoke_test.py
+
+            - name: Publish
+              run: uv publish

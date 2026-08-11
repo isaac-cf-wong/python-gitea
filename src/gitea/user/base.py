@@ -52,7 +52,7 @@ class BaseUser:
         """
         return "/user/settings"
 
-    def _update_user_settings_helper(  # noqa: PLR0913
+    def _update_user_settings_helper(
         self,
         diff_view_style: str | None = None,
         full_name: str | None = None,

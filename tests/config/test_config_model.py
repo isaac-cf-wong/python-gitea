@@ -76,7 +76,7 @@ class TestConfig:
 
         config = Config(accounts={"account1": account1, "account2": account2}, default_account="account1")
 
-        assert len(config.accounts) == 2  # noqa: PLR2004
+        assert len(config.accounts) == 2
         assert config.accounts["account1"].name == "account1"
         assert config.accounts["account2"].name == "account2"
         assert config.default_account == "account1"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 
 from aiohttp import ClientResponse, ClientSession, ClientTimeout
 
@@ -42,7 +42,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         """
         return f"AsyncGitea Client(base_url={self.base_url})"
 
-    async def __aenter__(self) -> AsyncGitea:
+    async def __aenter__(self) -> Self:
         """Enter the asynchronous context manager.
 
         Returns:
