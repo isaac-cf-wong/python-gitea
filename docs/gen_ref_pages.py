@@ -1,4 +1,4 @@
-"""Generate API reference pages automatically with improved formatting."""
+"""Generate API reference pages automatically."""
 
 from __future__ import annotations
 
@@ -6,81 +6,61 @@ from pathlib import Path
 
 import mkdocs_gen_files
 
-PACKAGE_NAME = "python-gitea"
+PACKAGE_NAME = "gitea"
 
 src = Path(__file__).parent.parent / "src"
-root_dir = Path(__file__).parent.parent
 
-# Copy CONTRIBUTING.md to docs directory
-contributing_src = root_dir / "CONTRIBUTING.md"
-contributing_dest = Path("CONTRIBUTING.md")
-if contributing_src.exists():
-    with open(contributing_src, encoding="utf-8") as src_fd:
-        content = src_fd.read()
-    with mkdocs_gen_files.open("CONTRIBUTING.md", "w") as fd:
-        fd.write(content)
-    mkdocs_gen_files.set_edit_path(Path("CONTRIBUTING.md"), contributing_src)
-
-# Copy SECURITY.md to docs directory
-security_src = root_dir / "SECURITY.md"
-security_dest = Path("SECURITY.md")
-if security_src.exists():
-    with open(security_src, encoding="utf-8") as src_fd:
-        content = src_fd.read()
-    with mkdocs_gen_files.open("SECURITY.md", "w") as fd:
-        fd.write(content)
-    mkdocs_gen_files.set_edit_path(Path("SECURITY.md"), security_src)
-
-# Generate the index page
-with mkdocs_gen_files.open("reference/index.md", "w") as fd:
-    fd.write("# API Reference\n\n")
-    fd.write("Complete API documentation for the package.\n\n")
-    fd.write("## Modules\n\n")
-
-    # Collect unique subpackages
-    modules = set()
-    package_dir = src / PACKAGE_NAME
-    if package_dir.exists():
-        for item in package_dir.iterdir():
-            if item.is_dir() and (item / "__init__.py").exists() and not item.name.startswith("_"):
-                # Skip private modules
-                modules.add(item.name)
-
-    # Generate module list
-    for module in sorted(modules):
-        fd.write(f"- [`{PACKAGE_NAME}.{module}`]({PACKAGE_NAME}/{module}/index.md)\n")
-
-# Process all Python modules
+# Collect all importable modules. The key is the dotted module path; the value
+# is the source file. Packages (directories with __init__.py) are kept in
+# `packages` so they render as an index page.
+modules: dict[tuple[str, ...], Path] = {}
+packages: set[tuple[str, ...]] = set()
 for path in sorted(src.rglob("*.py")):
     module_path = path.relative_to(src).with_suffix("")
-    doc_path = path.relative_to(src).with_suffix(".md")
-    full_doc_path = Path("reference", doc_path)
-
     parts = tuple(module_path.parts)
+
+    # Skip private modules, test files, and __main__.
+    if parts[-1] == "__main__":
+        continue
 
     if parts[-1] == "__init__":
         parts = parts[:-1]
-        doc_path = doc_path.with_name("index.md")
-        full_doc_path = full_doc_path.with_name("index.md")
-    elif parts[-1] == "__main__":
+        if not parts:
+            continue
+        packages.add(parts)
+
+    if any(part.startswith("_") for part in parts):
+        continue
+    if parts[-1].startswith("test_"):
         continue
 
-    # Skip private modules, test files, and CLI module
-    if any(part.startswith("_") and part != "__init__" for part in parts):
-        continue
-    if parts and parts[-1].startswith("test_"):
-        continue
-    if "cli" in parts:  # Skip CLI module
-        continue
+    modules[parts] = path
 
-    # Skip empty parts (from root __init__)
-    if not parts:
-        continue
+# Generate the reference index page.
+with mkdocs_gen_files.open("reference/index.md", "w") as fd:
+    fd.write("# API Reference\n\n")
+    fd.write("Complete API documentation for the `gitea` package.\n\n")
+    fd.write("## Modules\n\n")
 
-    with mkdocs_gen_files.open(full_doc_path, "w") as fd:
-        indent = ".".join(parts)
+    for parts in sorted(modules):
+        name = ".".join(parts)
+        if parts in packages:
+            fd.write(f"- [`{name}`]({name.replace('.', '/')}/index.md)\n")
+        else:
+            fd.write(f"- [`{name}`]({name.replace('.', '/')}.md)\n")
 
-        # Generate improved page content
+# Generate a page per module/package, mirroring the module tree.
+for parts in sorted(modules):
+    indent = ".".join(parts)
+
+    # Packages get an index.md; plain modules get <module>.md, mirroring the
+    # layout used by gwmock's reference documentation.
+    if parts in packages:
+        doc_path = Path("reference", *parts, "index.md")
+    else:
+        doc_path = Path("reference", *parts).with_suffix(".md")
+
+    with mkdocs_gen_files.open(doc_path, "w") as fd:
         fd.write(f"# `{indent}`\n\n")
         fd.write("::: " + indent + "\n")
         fd.write("    options:\n")
@@ -92,4 +72,14 @@ for path in sorted(src.rglob("*.py")):
         fd.write("      filters:\n")
         fd.write("        - '!^_'\n")
 
-    mkdocs_gen_files.set_edit_path(full_doc_path, path)
+        # List direct child modules so users can navigate the tree.
+        children = sorted(p for p in modules if len(p) == len(parts) + 1 and p[:-1] == parts)
+        if children:
+            fd.write("\n## Modules\n\n")
+            for child in children:
+                child_name = ".".join(child)
+                leaf = child[len(parts) :][0]
+                link = leaf + ("/index.md" if child in packages else ".md")
+                fd.write(f"- [`{child_name}`]({link})\n")
+
+    mkdocs_gen_files.set_edit_path(doc_path, modules[parts])

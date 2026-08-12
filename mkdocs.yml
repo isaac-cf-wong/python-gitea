@@ -70,7 +70,12 @@ plugins:
 
 nav:
     - Home: index.md
-    - Installation: user_guide/installation.md
+    - User Guide:
+          - Quick Start: user-guide/quickstart.md
+          - Installation: user-guide/installation.md
+          - Configuration: user-guide/configuration.md
+          - Command-Line Interface: user-guide/cli.md
+          - Python API: user-guide/python-api.md
     - API Reference:
           - Overview: reference/index.md
           - gitea:
@@ -86,6 +91,10 @@ nav:
                       - Resource: reference/gitea/resource/resource.md
                       - Async Resource:
                             reference/gitea/resource/async_resource.md
+                - Config:
+                      - Overview: reference/gitea/config/index.md
+                      - Manager: reference/gitea/config/manager.md
+                      - Model: reference/gitea/config/model.md
                 - Repository:
                       - Overview: reference/gitea/repository/index.md
                       - Repository: reference/gitea/repository/repository.md
@@ -101,20 +110,43 @@ nav:
                             reference/gitea/pull_request/pull_request.md
                       - Async Pull Request:
                             reference/gitea/pull_request/async_pull_request.md
-                - Repository:
-                      - Overview: reference/gitea/repository/index.md
-                      - Repository: reference/gitea/repository/repository.md
-                      - Async Repository:
-                            reference/gitea/repository/async_repository.md
+                - Comment:
+                      - Overview: reference/gitea/comment/index.md
+                      - Comment: reference/gitea/comment/comment.md
+                      - Async Comment: reference/gitea/comment/async_comment.md
+                - Label:
+                      - Overview: reference/gitea/label/index.md
+                      - Label: reference/gitea/label/label.md
+                      - Async Label: reference/gitea/label/async_label.md
+                - Milestone:
+                      - Overview: reference/gitea/milestone/index.md
+                      - Milestone: reference/gitea/milestone/milestone.md
+                      - Async Milestone:
+                            reference/gitea/milestone/async_milestone.md
+                - Notification:
+                      - Overview: reference/gitea/notification/index.md
+                      - Notification: reference/gitea/notification/notification.md
+                      - Async Notification:
+                            reference/gitea/notification/async_notification.md
+                - Project:
+                      - Overview: reference/gitea/project/index.md
+                      - Project: reference/gitea/project/project.md
+                      - Async Project: reference/gitea/project/async_project.md
                 - User:
                       - Overview: reference/gitea/user/index.md
                       - User: reference/gitea/user/user.md
+                      - Async User: reference/gitea/user/async_user.md
                 - Utils:
                       - Overview: reference/gitea/utils/index.md
                       - Logging: reference/gitea/utils/log.md
+                      - Response: reference/gitea/utils/response.md
+                - CLI:
+                      - Overview: reference/gitea/cli/index.md
+                      - Main: reference/gitea/cli/main.md
     - Developer Guide:
-          - Contributing: CONTRIBUTING.md
-    - Security: SECURITY.md
+          - Contributing: contributing.md
+          - Architecture: dev/architecture.md
+    - Security: security.md
     - Troubleshooting: dev/troubleshooting.md
 
 markdown_extensions:
