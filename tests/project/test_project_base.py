@@ -103,3 +103,65 @@ class TestBaseProject:
         endpoint, params = self.base._project_column_issue_helper("owner", "repo", 7, 3, 100)
         assert endpoint == "/repos/owner/repo/projects/7/columns/3/issues/100"
         assert params == {}
+
+    def test_projects_base_path_repo(self):
+        """Test the projects base path for a repository."""
+        assert self.base._projects_base_path("owner", "repo") == "/repos/owner/repo/projects"
+
+    def test_projects_base_path_org(self):
+        """Test the projects base path for an organization."""
+        assert self.base._projects_base_path("org", None) == "/orgs/org/projects"
+
+    def test_list_projects_endpoint_org(self):
+        """Test the list projects endpoint URL for an organization."""
+        assert self.base._list_projects_endpoint("org", None) == "/orgs/org/projects"
+
+    def test_get_project_endpoint_org(self):
+        """Test the get project endpoint URL for an organization."""
+        assert self.base._get_project_endpoint("org", None, 7) == "/orgs/org/projects/7"
+
+    def test_list_project_columns_endpoint_org(self):
+        """Test the list project columns endpoint URL for an organization."""
+        assert self.base._list_project_columns_endpoint("org", None, 7) == "/orgs/org/projects/7/columns"
+
+    def test_get_project_column_endpoint_org(self):
+        """Test the get project column endpoint URL for an organization."""
+        assert self.base._get_project_column_endpoint("org", None, 7, 3) == "/orgs/org/projects/7/columns/3"
+
+    def test_list_project_column_issues_endpoint_org(self):
+        """Test the list project column issues endpoint URL for an organization."""
+        assert (
+            self.base._list_project_column_issues_endpoint("org", None, 7, 3) == "/orgs/org/projects/7/columns/3/issues"
+        )
+
+    def test_create_project_helper_org(self):
+        """Test the create project helper for an organization."""
+        endpoint, payload = self.base._create_project_helper(
+            "org", None, "Board", description="desc", template_type="basic_kanban"
+        )
+        assert endpoint == "/orgs/org/projects"
+        assert payload == {"title": "Board", "description": "desc", "template_type": "basic_kanban"}
+
+    def test_move_project_issue_helper_org(self):
+        """Test the move project issue helper for an organization."""
+        endpoint, payload = self.base._move_project_issue_helper("org", None, 7, 100, 3, sorting=2)
+        assert endpoint == "/orgs/org/projects/7/issues/100/move"
+        assert payload == {"column_id": 3, "sorting": 2}
+
+    def test_project_column_issue_helper_org(self):
+        """Test the project column issue helper for an organization."""
+        endpoint, params = self.base._project_column_issue_helper("org", None, 7, 3, 100)
+        assert endpoint == "/orgs/org/projects/7/columns/3/issues/100"
+        assert params == {}
+
+    def test_set_default_project_column_helper_org(self):
+        """Test the set default project column helper for an organization."""
+        endpoint, params = self.base._set_default_project_column_helper("org", None, 7, 3)
+        assert endpoint == "/orgs/org/projects/7/columns/3/default"
+        assert params == {}
+
+    def test_move_project_columns_helper_org(self):
+        """Test the move project columns helper for an organization."""
+        endpoint, payload = self.base._move_project_columns_helper("org", None, 7, [3, 4, 5])
+        assert endpoint == "/orgs/org/projects/7/columns/move"
+        assert payload == {"column_ids": [3, 4, 5]}

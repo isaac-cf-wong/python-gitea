@@ -10,7 +10,10 @@ import typer
 def list_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
+    repository: Annotated[
+        str | None,
+        typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
+    ] = None,
     state: Annotated[
         Literal["open", "closed", "all"] | None,
         typer.Option("--state", help="Filter projects by state."),
@@ -50,7 +53,7 @@ def list_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, or None for organization projects.
         state: Filter projects by state.
         page: The page number for pagination.
         limit: The number of projects per page.

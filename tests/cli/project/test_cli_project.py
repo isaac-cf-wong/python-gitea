@@ -99,6 +99,37 @@ def test_list_command(mock_gitea, mock_get_auth_params, mock_execute):
 @patch("gitea.cli.utils.api.execute_api_command")
 @patch("gitea.cli.utils.auth.get_auth_params")
 @patch("gitea.client.gitea.Gitea")
+def test_list_command_org(mock_gitea, mock_get_auth_params, mock_execute):
+    """list_command should pass repository=None for organization projects."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.list_projects.return_value = ([{"id": 27}], {"status_code": 200})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    list_command(
+        ctx=ctx,
+        owner="org",
+        repository=None,
+        state=None,
+        page=None,
+        limit=None,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    result = mock_execute.call_args[1]["api_call"]()
+    client.project.list_projects.assert_called_once_with(
+        owner="org", repository=None, state=None, page=None, limit=None
+    )
+    assert result == ([{"id": 27}], {"status_code": 200})
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
 def test_get_command(mock_gitea, mock_get_auth_params, mock_execute):
     """get_command should wire auth and call get_project."""
     ctx = make_ctx()

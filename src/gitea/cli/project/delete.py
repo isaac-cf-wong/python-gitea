@@ -10,8 +10,11 @@ import typer
 def delete_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
     project_id: Annotated[int, typer.Option("--project-id", help="ID of the project.")],
+    repository: Annotated[
+        str | None,
+        typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
+    ] = None,
     account_name: Annotated[
         str | None,
         typer.Option(
@@ -39,7 +42,7 @@ def delete_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, or None for organization projects.
         project_id: The ID of the project.
         account_name: Name of the account to use for authentication.
         token: Token for authentication.
