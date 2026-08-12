@@ -30,7 +30,7 @@ See [Configuration](configuration.md) for how authentication is resolved.
 
 - `gitea-cli config add --name <name> --token <token> [--base-url <url>] [--default]`
 - `gitea-cli config list`
-- `gitea-cli config update --name <name> [--token] [--base-url] [--default]`
+- `gitea-cli config update --name <name> [--token <token>] [--base-url <url>] [--default]`
 - `gitea-cli config delete --name <name> [--force]`
 
 ### Issue - manage issues

@@ -30,16 +30,19 @@ with Gitea(token="TOKEN", base_url="https://gitea.example.com") as client:
     print(status["status_code"])
 ```
 
-Mutating operations such as `create_issue` return the HTTP response:
+Mutating operations return the same `(data, status)` shape. For example,
+`create_issue` returns the created issue as a dictionary plus metadata:
 
 ```python
 with Gitea(token="TOKEN", base_url="https://gitea.example.com") as client:
-    response = client.issue.create_issue(
+    issue, status = client.issue.create_issue(
         owner="my-org",
         repository="my-repo",
         title="Hello",
         body="Created with python-gitea.",
     )
+    print(issue["number"])
+    print(status["status_code"])
 ```
 
 ## Asynchronous Client

@@ -14,8 +14,10 @@ surfaces that share the same domain model:
   clients with one resource object per Gitea domain.
 - **CLI** - `gitea-cli`, a Typer application with one command group per domain.
 
-Both surfaces authenticate through the same configuration layer
-([Configuration](../user-guide/configuration.md)).
+Both surfaces authenticate to Gitea with a personal access token and base URL.
+The CLI resolves configured accounts through `cli/utils/auth.py`
+([Configuration](../user-guide/configuration.md)), while Python callers pass
+their credentials directly to the `Gitea` or `AsyncGitea` constructor.
 
 ## Package Layout
 
@@ -113,9 +115,11 @@ The `config/` module stores named accounts in a YAML file:
 - `manager.py` provides `ConfigManager` for loading, saving, and CRUD on
   accounts, including the default-account concept.
 
-The CLI and client both resolve authentication through `cli/utils/auth.py`,
-which implements the precedence rules documented in
-[Configuration](../user-guide/configuration.md).
+The CLI resolves authentication through `cli/utils/auth.py`, which implements
+the precedence rules documented in
+[Configuration](../user-guide/configuration.md). Python callers instead pass
+credentials directly to the client constructor; they can use `ConfigManager` to
+load stored accounts programmatically.
 
 ## Design Principles
 

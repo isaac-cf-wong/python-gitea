@@ -6,7 +6,7 @@
 [![codecov](https://codecov.io/gh/isaac-cf-wong/python-gitea/graph/badge.svg?token=COF8341N60)](https://codecov.io/gh/isaac-cf-wong/python-gitea)
 [![PyPI Version](https://img.shields.io/pypi/v/python-gitea)](https://pypi.org/project/python-gitea/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/python-gitea)](https://pypi.org/project/python-gitea/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/isaac-cf-wong/python-gitea/blob/main/LICENSE)
 [![Security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 [![DOI](https://zenodo.org/badge/1129170965.svg)](https://doi.org/10.5281/zenodo.18211496)
 
@@ -62,7 +62,7 @@ gitea-cli user get --username my-org
 from gitea.client.gitea import Gitea
 
 with Gitea(token="YOUR_API_TOKEN", base_url="https://gitea.example.com") as client:
-    issues = client.issue.list_issues(owner="my-org", repository="my-repo")
+    issues, _ = client.issue.list_issues(owner="my-org", repository="my-repo")
 ```
 
 For details, see the
@@ -183,7 +183,8 @@ uv run pytest
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
+This project is licensed under the MIT License - see the
+[LICENSE](https://github.com/isaac-cf-wong/python-gitea/blob/main/LICENSE) file
 for details.
 
 ## Support

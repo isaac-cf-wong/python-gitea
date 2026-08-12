@@ -2,7 +2,8 @@
 
 `python-gitea` authenticates to Gitea with a personal access token and a base
 URL. You can either store named accounts in a configuration file, or pass the
-token and base URL directly on every call.
+token and base URL directly when constructing the client or invoking a CLI
+command.
 
 ## Configuration File
 
@@ -15,8 +16,10 @@ is platform-dependent (`platformdirs.user_config_dir("gitea")`):
 | macOS    | `~/Library/Application Support/gitea/config.yaml` |
 | Windows  | `%APPDATA%\\gitea\\config.yaml`                   |
 
-You can point at a different file with the `PYTHON_GITEA_CONFIG_PATH`
-environment variable or the `--config-path` CLI option.
+You can point at a different file with the `--config-path` CLI option, or by
+setting the `PYTHON_GITEA_CONFIG_PATH` environment variable (which the CLI
+reads). When using `ConfigManager` programmatically, pass the desired path to
+its `filename` argument instead; it does not read the environment variable.
 
 ### File Format
 

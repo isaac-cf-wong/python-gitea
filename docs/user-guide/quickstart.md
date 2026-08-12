@@ -48,9 +48,10 @@ gitea-cli issue create \
     --body "Created with python-gitea."
 ```
 
-All resource commands accept `--owner`/`--repository` and the authentication
-flags `--account-name`, `--token`, and `--base-url`. When no authentication flag
-is given, the default account from the configuration file is used.
+Repository-backed commands accept `--owner`/`--repository`. Resource commands
+also accept the authentication flags `--account-name`, `--token`, and
+`--base-url`. When no authentication flag is given, the default account from the
+configuration file is used.
 
 ## 4. Use the Python API
 
