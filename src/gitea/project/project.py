@@ -17,17 +17,17 @@ class Project(BaseProject, Resource):
     def _list_projects(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         state: Literal["open", "closed", "all"] | None = None,
         page: int | None = None,
         limit: int | None = None,
         **kwargs: Any,
     ) -> Response:
-        """List projects in a repository.
+        """List projects.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             state: Filter projects by state.
             page: The page number for pagination.
             limit: The number of projects per page.
@@ -49,17 +49,17 @@ class Project(BaseProject, Resource):
     def list_projects(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         state: Literal["open", "closed", "all"] | None = None,
         page: int | None = None,
         limit: int | None = None,
         **kwargs: Any,
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        """List projects in a repository.
+        """List projects.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             state: Filter projects by state.
             page: The page number for pagination.
             limit: The number of projects per page.
@@ -83,15 +83,15 @@ class Project(BaseProject, Resource):
     def _get_project(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         **kwargs: Any,
     ) -> Response:
-        """Get a project in a repository.
+        """Get a project.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             **kwargs: Additional arguments for the request.
 
@@ -109,15 +109,15 @@ class Project(BaseProject, Resource):
     def get_project(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         **kwargs: Any,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Get a project in a repository.
+        """Get a project.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             **kwargs: Additional arguments for the request.
 
@@ -137,18 +137,18 @@ class Project(BaseProject, Resource):
     def _create_project(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         title: str,
         description: str | None = None,
         template_type: str | None = None,
         card_type: str | None = None,
         **kwargs: Any,
     ) -> Response:
-        """Create a project in a repository.
+        """Create a project.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             title: The title of the project.
             description: The description of the project.
             template_type: The template type of the project.
@@ -172,18 +172,18 @@ class Project(BaseProject, Resource):
     def create_project(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         title: str,
         description: str | None = None,
         template_type: str | None = None,
         card_type: str | None = None,
         **kwargs: Any,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Create a project in a repository.
+        """Create a project.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             title: The title of the project.
             description: The description of the project.
             template_type: The template type of the project.
@@ -209,7 +209,7 @@ class Project(BaseProject, Resource):
     def _edit_project(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         title: str | None = None,
         description: str | None = None,
@@ -217,11 +217,11 @@ class Project(BaseProject, Resource):
         state: Literal["open", "closed"] | None = None,
         **kwargs: Any,
     ) -> Response:
-        """Edit a project in a repository.
+        """Edit a project.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             title: The title of the project.
             description: The description of the project.
@@ -247,7 +247,7 @@ class Project(BaseProject, Resource):
     def edit_project(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         title: str | None = None,
         description: str | None = None,
@@ -255,11 +255,11 @@ class Project(BaseProject, Resource):
         state: Literal["open", "closed"] | None = None,
         **kwargs: Any,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Edit a project in a repository.
+        """Edit a project.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             title: The title of the project.
             description: The description of the project.
@@ -287,15 +287,15 @@ class Project(BaseProject, Resource):
     def _delete_project(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         **kwargs: Any,
     ) -> Response:
-        """Delete a project in a repository.
+        """Delete a project.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             **kwargs: Additional arguments for the request.
 
@@ -313,15 +313,15 @@ class Project(BaseProject, Resource):
     def delete_project(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         **kwargs: Any,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Delete a project in a repository.
+        """Delete a project.
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             **kwargs: Additional arguments for the request.
 
@@ -341,7 +341,7 @@ class Project(BaseProject, Resource):
     def _list_project_columns(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         page: int | None = None,
         limit: int | None = None,
@@ -351,7 +351,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             page: The page number for pagination.
             limit: The number of columns per page.
@@ -373,7 +373,7 @@ class Project(BaseProject, Resource):
     def list_project_columns(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         page: int | None = None,
         limit: int | None = None,
@@ -383,7 +383,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             page: The page number for pagination.
             limit: The number of columns per page.
@@ -407,7 +407,7 @@ class Project(BaseProject, Resource):
     def _create_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         title: str,
         color: str | None = None,
@@ -417,7 +417,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             title: The title of the column.
             color: The color of the column in 6-digit hex format.
@@ -439,7 +439,7 @@ class Project(BaseProject, Resource):
     def create_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         title: str,
         color: str | None = None,
@@ -449,7 +449,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             title: The title of the column.
             color: The color of the column in 6-digit hex format.
@@ -473,7 +473,7 @@ class Project(BaseProject, Resource):
     def _get_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         **kwargs: Any,
@@ -482,7 +482,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             **kwargs: Additional arguments for the request.
@@ -502,7 +502,7 @@ class Project(BaseProject, Resource):
     def get_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         **kwargs: Any,
@@ -511,7 +511,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             **kwargs: Additional arguments for the request.
@@ -533,7 +533,7 @@ class Project(BaseProject, Resource):
     def _edit_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         title: str | None = None,
@@ -545,7 +545,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             title: The title of the column.
@@ -571,7 +571,7 @@ class Project(BaseProject, Resource):
     def edit_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         title: str | None = None,
@@ -583,7 +583,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             title: The title of the column.
@@ -611,7 +611,7 @@ class Project(BaseProject, Resource):
     def _delete_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         **kwargs: Any,
@@ -620,7 +620,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             **kwargs: Additional arguments for the request.
@@ -640,7 +640,7 @@ class Project(BaseProject, Resource):
     def delete_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         **kwargs: Any,
@@ -649,7 +649,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             **kwargs: Additional arguments for the request.
@@ -671,7 +671,7 @@ class Project(BaseProject, Resource):
     def _set_default_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         **kwargs: Any,
@@ -680,7 +680,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             **kwargs: Additional arguments for the request.
@@ -700,7 +700,7 @@ class Project(BaseProject, Resource):
     def set_default_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         **kwargs: Any,
@@ -709,7 +709,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             **kwargs: Additional arguments for the request.
@@ -731,7 +731,7 @@ class Project(BaseProject, Resource):
     def _move_project_columns(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_ids: list[int],
         **kwargs: Any,
@@ -740,7 +740,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_ids: Every column ID of the project, in the desired left-to-right order.
             **kwargs: Additional arguments for the request.
@@ -760,7 +760,7 @@ class Project(BaseProject, Resource):
     def move_project_columns(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_ids: list[int],
         **kwargs: Any,
@@ -769,7 +769,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_ids: Every column ID of the project, in the desired left-to-right order.
             **kwargs: Additional arguments for the request.
@@ -791,7 +791,7 @@ class Project(BaseProject, Resource):
     def _list_project_column_issues(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         page: int | None = None,
@@ -802,7 +802,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             page: The page number for pagination.
@@ -826,7 +826,7 @@ class Project(BaseProject, Resource):
     def list_project_column_issues(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         page: int | None = None,
@@ -837,7 +837,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             page: The page number for pagination.
@@ -863,7 +863,7 @@ class Project(BaseProject, Resource):
     def _add_issue_to_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         issue_id: int,
@@ -873,7 +873,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             issue_id: The ID of the issue.
@@ -895,7 +895,7 @@ class Project(BaseProject, Resource):
     def add_issue_to_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         issue_id: int,
@@ -905,7 +905,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             issue_id: The ID of the issue.
@@ -929,7 +929,7 @@ class Project(BaseProject, Resource):
     def _remove_issue_from_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         issue_id: int,
@@ -939,7 +939,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             issue_id: The ID of the issue.
@@ -961,7 +961,7 @@ class Project(BaseProject, Resource):
     def remove_issue_from_project_column(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         issue_id: int,
@@ -971,7 +971,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             column_id: The ID of the column.
             issue_id: The ID of the issue.
@@ -995,7 +995,7 @@ class Project(BaseProject, Resource):
     def _move_project_issue(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         issue_id: int,
         column_id: int,
@@ -1006,7 +1006,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             issue_id: The ID of the issue.
             column_id: The target column ID.
@@ -1030,7 +1030,7 @@ class Project(BaseProject, Resource):
     def move_project_issue(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         issue_id: int,
         column_id: int,
@@ -1041,7 +1041,7 @@ class Project(BaseProject, Resource):
 
         Args:
             owner: The owner of the repository.
-            repository: The name of the repository.
+            repository: The name of the repository, or None for organization projects.
             project_id: The ID of the project.
             issue_id: The ID of the issue.
             column_id: The target column ID.

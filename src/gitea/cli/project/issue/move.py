@@ -10,13 +10,16 @@ import typer
 def move_issue_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
     project_id: Annotated[int, typer.Option("--project-id", help="ID of the project.")],
     issue_id: Annotated[int, typer.Option("--issue-id", help="ID of the issue.")],
     column_id: Annotated[int, typer.Option("--column-id", help="Target column ID.")],
     sorting: Annotated[
         int | None,
         typer.Option("--sorting", help="Position within the column, ascending."),
+    ] = None,
+    repository: Annotated[
+        str | None,
+        typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
     ] = None,
     account_name: Annotated[
         str | None,
@@ -45,7 +48,7 @@ def move_issue_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, or None for organization projects.
         project_id: The ID of the project.
         issue_id: The ID of the issue.
         column_id: The target column ID.

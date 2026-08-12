@@ -10,7 +10,6 @@ import typer
 def create_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
     title: Annotated[str, typer.Option("--title", help="Title of the project.")],
     description: Annotated[
         str | None,
@@ -23,6 +22,10 @@ def create_command(
     card_type: Annotated[
         Literal["text_only", "images_and_text"] | None,
         typer.Option("--card-type", help="Card type of the project."),
+    ] = None,
+    repository: Annotated[
+        str | None,
+        typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
     ] = None,
     account_name: Annotated[
         str | None,
@@ -51,7 +54,7 @@ def create_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, or None for organization projects.
         title: The title of the project.
         description: The description of the project.
         template_type: The template type of the project.

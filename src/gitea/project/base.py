@@ -8,28 +8,43 @@ from typing import Any, Literal
 class BaseProject:
     """Base class for Gitea Project resource."""
 
-    def _list_projects_endpoint(self, owner: str, repository: str) -> str:
-        """Construct the endpoint URL for listing projects in a repository.
+    def _projects_base_path(self, owner: str, repository: str | None) -> str:
+        """Construct the base path for projects.
 
         Args:
-            owner: The owner of the repository.
-            repository: The name of the repository.
+            owner: The owner of the repository, or the organization name.
+            repository: The name of the repository, or None for organization projects.
+
+        Returns:
+            The base path for projects (repo-scoped or org-scoped).
+
+        """
+        if repository is None:
+            return f"/orgs/{owner}/projects"
+        return f"/repos/{owner}/{repository}/projects"
+
+    def _list_projects_endpoint(self, owner: str, repository: str | None) -> str:
+        """Construct the endpoint URL for listing projects.
+
+        Args:
+            owner: The owner of the repository, or the organization name.
+            repository: The name of the repository, or None for organization projects.
 
         Returns:
             The endpoint URL for listing projects.
 
         """
-        return f"/repos/{owner}/{repository}/projects"
+        return self._projects_base_path(owner=owner, repository=repository)
 
     def _list_projects_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         state: Literal["open", "closed", "all"] | None = None,
         page: int | None = None,
         limit: int | None = None,
     ) -> tuple[str, dict[str, Any]]:
-        """Get the endpoint and parameters for listing projects in a repository.
+        """Get the endpoint and parameters for listing projects.
 
         Args:
             owner: The owner of the repository.
@@ -54,8 +69,8 @@ class BaseProject:
 
         return endpoint, params
 
-    def _get_project_endpoint(self, owner: str, repository: str, project_id: int) -> str:
-        """Construct the endpoint URL for getting a project in a repository.
+    def _get_project_endpoint(self, owner: str, repository: str | None, project_id: int) -> str:
+        """Construct the endpoint URL for getting a project.
 
         Args:
             owner: The owner of the repository.
@@ -66,10 +81,10 @@ class BaseProject:
             The endpoint URL for getting the project.
 
         """
-        return f"/repos/{owner}/{repository}/projects/{project_id}"
+        return f"{self._projects_base_path(owner=owner, repository=repository)}/{project_id}"
 
-    def _get_project_helper(self, owner: str, repository: str, project_id: int) -> tuple[str, dict[str, Any]]:
-        """Get the endpoint and parameters for getting a project in a repository.
+    def _get_project_helper(self, owner: str, repository: str | None, project_id: int) -> tuple[str, dict[str, Any]]:
+        """Get the endpoint and parameters for getting a project.
 
         Args:
             owner: The owner of the repository.
@@ -86,13 +101,13 @@ class BaseProject:
     def _create_project_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         title: str,
         description: str | None = None,
         template_type: str | None = None,
         card_type: str | None = None,
     ) -> tuple[str, dict[str, Any]]:
-        """Get the endpoint and payload for creating a project in a repository.
+        """Get the endpoint and payload for creating a project.
 
         Args:
             owner: The owner of the repository.
@@ -122,14 +137,14 @@ class BaseProject:
     def _edit_project_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         title: str | None = None,
         description: str | None = None,
         card_type: str | None = None,
         state: Literal["open", "closed"] | None = None,
     ) -> tuple[str, dict[str, Any]]:
-        """Get the endpoint and payload for editing a project in a repository.
+        """Get the endpoint and payload for editing a project.
 
         Args:
             owner: The owner of the repository.
@@ -159,8 +174,8 @@ class BaseProject:
 
         return endpoint, payload
 
-    def _delete_project_helper(self, owner: str, repository: str, project_id: int) -> tuple[str, dict[str, Any]]:
-        """Get the endpoint and parameters for deleting a project in a repository.
+    def _delete_project_helper(self, owner: str, repository: str | None, project_id: int) -> tuple[str, dict[str, Any]]:
+        """Get the endpoint and parameters for deleting a project.
 
         Args:
             owner: The owner of the repository.
@@ -174,7 +189,7 @@ class BaseProject:
         endpoint = self._get_project_endpoint(owner=owner, repository=repository, project_id=project_id)
         return endpoint, {}
 
-    def _list_project_columns_endpoint(self, owner: str, repository: str, project_id: int) -> str:
+    def _list_project_columns_endpoint(self, owner: str, repository: str | None, project_id: int) -> str:
         """Construct the endpoint URL for listing a project's columns.
 
         Args:
@@ -186,12 +201,12 @@ class BaseProject:
             The endpoint URL for listing the project's columns.
 
         """
-        return f"/repos/{owner}/{repository}/projects/{project_id}/columns"
+        return f"{self._projects_base_path(owner=owner, repository=repository)}/{project_id}/columns"
 
     def _list_project_columns_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         page: int | None = None,
         limit: int | None = None,
@@ -222,7 +237,7 @@ class BaseProject:
     def _create_project_column_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         title: str,
         color: str | None = None,
@@ -249,7 +264,7 @@ class BaseProject:
 
         return endpoint, payload
 
-    def _get_project_column_endpoint(self, owner: str, repository: str, project_id: int, column_id: int) -> str:
+    def _get_project_column_endpoint(self, owner: str, repository: str | None, project_id: int, column_id: int) -> str:
         """Construct the endpoint URL for getting a project column.
 
         Args:
@@ -262,12 +277,12 @@ class BaseProject:
             The endpoint URL for getting the project column.
 
         """
-        return f"/repos/{owner}/{repository}/projects/{project_id}/columns/{column_id}"
+        return f"{self._projects_base_path(owner=owner, repository=repository)}/{project_id}/columns/{column_id}"
 
     def _get_project_column_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
     ) -> tuple[str, dict[str, Any]]:
@@ -291,7 +306,7 @@ class BaseProject:
     def _edit_project_column_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         title: str | None = None,
@@ -331,7 +346,7 @@ class BaseProject:
     def _delete_project_column_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
     ) -> tuple[str, dict[str, Any]]:
@@ -355,7 +370,7 @@ class BaseProject:
     def _set_default_project_column_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
     ) -> tuple[str, dict[str, Any]]:
@@ -371,13 +386,15 @@ class BaseProject:
             A tuple containing the endpoint and the request arguments.
 
         """
-        endpoint = f"/repos/{owner}/{repository}/projects/{project_id}/columns/{column_id}/default"
+        endpoint = (
+            f"{self._projects_base_path(owner=owner, repository=repository)}/{project_id}/columns/{column_id}/default"
+        )
         return endpoint, {}
 
     def _move_project_columns_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_ids: list[int],
     ) -> tuple[str, dict[str, Any]]:
@@ -393,7 +410,7 @@ class BaseProject:
             A tuple containing the endpoint and the request payload.
 
         """
-        endpoint = f"/repos/{owner}/{repository}/projects/{project_id}/columns/move"
+        endpoint = f"{self._projects_base_path(owner=owner, repository=repository)}/{project_id}/columns/move"
 
         payload: dict[str, Any] = {"column_ids": column_ids}
 
@@ -402,7 +419,7 @@ class BaseProject:
     def _list_project_column_issues_endpoint(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
     ) -> str:
@@ -418,12 +435,12 @@ class BaseProject:
             The endpoint URL for listing issues in the project column.
 
         """
-        return f"/repos/{owner}/{repository}/projects/{project_id}/columns/{column_id}/issues"
+        return f"{self._projects_base_path(owner=owner, repository=repository)}/{project_id}/columns/{column_id}/issues"
 
     def _list_project_column_issues_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         page: int | None = None,
@@ -458,7 +475,7 @@ class BaseProject:
     def _project_column_issue_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         column_id: int,
         issue_id: int,
@@ -476,13 +493,16 @@ class BaseProject:
             A tuple containing the endpoint and the request arguments.
 
         """
-        endpoint = f"/repos/{owner}/{repository}/projects/{project_id}/columns/{column_id}/issues/{issue_id}"
+        endpoint = (
+            f"{self._projects_base_path(owner=owner, repository=repository)}"
+            f"/{project_id}/columns/{column_id}/issues/{issue_id}"
+        )
         return endpoint, {}
 
     def _move_project_issue_helper(
         self,
         owner: str,
-        repository: str,
+        repository: str | None,
         project_id: int,
         issue_id: int,
         column_id: int,
@@ -502,7 +522,7 @@ class BaseProject:
             A tuple containing the endpoint and the request payload.
 
         """
-        endpoint = f"/repos/{owner}/{repository}/projects/{project_id}/issues/{issue_id}/move"
+        endpoint = f"{self._projects_base_path(owner=owner, repository=repository)}/{project_id}/issues/{issue_id}/move"
 
         payload: dict[str, Any] = {"column_id": column_id}
 

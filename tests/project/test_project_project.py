@@ -33,6 +33,18 @@ class TestProject:
             )
             assert result == ([{"id": 1, "title": "Board"}], {"status_code": 200})
 
+    def test_list_projects_org(self, project, mock_client):
+        """Test list_projects for an organization (repository=None)."""
+        with patch("gitea.project.project.process_response") as mock_process:
+            mock_process.return_value = ([{"id": 27, "title": "Org Board"}], 200)
+            result = project.list_projects(owner="org", repository=None, state="open")
+            mock_client._request.assert_called_once_with(
+                method="GET",
+                endpoint="/orgs/org/projects",
+                params={"state": "open"},
+            )
+            assert result == ([{"id": 27, "title": "Org Board"}], {"status_code": 200})
+
     def test_get_project(self, project, mock_client):
         """Test get_project."""
         with patch("gitea.project.project.process_response") as mock_process:
@@ -263,6 +275,19 @@ class TestAsyncProject:
                 params={"state": "open"},
             )
             assert result == ([{"id": 1, "title": "Board"}], {"status_code": 200})
+
+    @pytest.mark.asyncio
+    async def test_list_projects_org(self, project, mock_client):
+        """Test list_projects for an organization (async, repository=None)."""
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = ([{"id": 27, "title": "Org Board"}], 200)
+            result = await project.list_projects(owner="org", repository=None, state="open")
+            mock_client._request.assert_called_once_with(
+                method="GET",
+                endpoint="/orgs/org/projects",
+                params={"state": "open"},
+            )
+            assert result == ([{"id": 27, "title": "Org Board"}], {"status_code": 200})
 
     @pytest.mark.asyncio
     async def test_create_project(self, project, mock_client):

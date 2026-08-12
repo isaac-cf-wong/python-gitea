@@ -10,7 +10,6 @@ import typer
 def list_columns_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
     project_id: Annotated[int, typer.Option("--project-id", help="ID of the project.")],
     page: Annotated[
         int | None,
@@ -19,6 +18,10 @@ def list_columns_command(
     limit: Annotated[
         int | None,
         typer.Option("--limit", help="The number of columns per page."),
+    ] = None,
+    repository: Annotated[
+        str | None,
+        typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
     ] = None,
     account_name: Annotated[
         str | None,
@@ -47,7 +50,7 @@ def list_columns_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, or None for organization projects.
         project_id: The ID of the project.
         page: The page number for pagination.
         limit: The number of columns per page.

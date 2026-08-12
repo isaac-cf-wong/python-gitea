@@ -10,7 +10,6 @@ import typer
 def edit_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
     project_id: Annotated[int, typer.Option("--project-id", help="ID of the project.")],
     title: Annotated[
         str | None,
@@ -27,6 +26,10 @@ def edit_command(
     state: Annotated[
         Literal["open", "closed"] | None,
         typer.Option("--state", help="State of the project."),
+    ] = None,
+    repository: Annotated[
+        str | None,
+        typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
     ] = None,
     account_name: Annotated[
         str | None,
@@ -55,7 +58,7 @@ def edit_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, or None for organization projects.
         project_id: The ID of the project.
         title: The title of the project.
         description: The description of the project.
