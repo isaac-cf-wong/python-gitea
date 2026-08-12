@@ -140,14 +140,10 @@ cd python-gitea
 # Create a virtual environment (recommended with uv)
 uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install ".[dev]"
-
-# Install the commitlint dependencies
-npm install
+uv sync --group dev
 
 # Install pre-commit hooks
-pre-commit install
-pre-commit install --hook-type commit-msg
+uv run prek install
 ```
 
 ### Verify Installation

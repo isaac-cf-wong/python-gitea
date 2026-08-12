@@ -1,68 +1,9 @@
 # Troubleshooting
 
-This guide covers common issues you might encounter when using this package and
-how to resolve them.
+This guide covers common issues you might encounter when installing,
+configuring, or using `python-gitea`, and how to resolve them.
 
 ## Setup Issues
-
-### Pre-commit Hook Installation Fails
-
-**Problem:** `pre-commit install` returns an error or hooks don't run on commit.
-
-**Solutions:**
-
-<!-- prettier-ignore-start -->
-
-1. Ensure you're in the project root directory
-2. Verify Python virtual environment is activated
-3. Reinstall pre-commit:
-
-    ```bash
-    pip uninstall pre-commit
-    pip install pre-commit
-    pre-commit install
-    pre-commit install --hook-type commit-msg
-    ```
-
-4. Check if `.git` directory exists (must be a git repository)
-5. Try running manually: `pre-commit run --all-files`
-
-<!-- prettier-ignore-end -->
-
-### commitlint Not Running
-
-**Problem:** Commit messages aren't validated despite `npm install` being run.
-
-**Solutions:**
-
-<!-- prettier-ignore-start -->
-
-1. Verify `npm install` was successful:
-
-    ```bash
-    npm list @commitlint/config-angular
-    ```
-
-2. Re-install commitlint dependencies:
-
-    ```bash
-    npm install --save-dev @commitlint/cli @commitlint/config-angular
-    ```
-
-3. Reinstall pre-commit hooks:
-
-    ```bash
-    pre-commit install --hook-type commit-msg
-    ```
-
-4. Test manually:
-
-    ```bash
-    echo "invalid message" | commitlint
-    echo "feat: valid message" | commitlint
-    ```
-
-<!-- prettier-ignore-end -->
 
 ### Virtual Environment Issues
 
@@ -72,38 +13,39 @@ how to resolve them.
 
 <!-- prettier-ignore-start -->
 
-1. Create a fresh virtual environment:
+1. Create a fresh virtual environment with `uv`:
 
     ```bash
     rm -rf .venv
-    python -m venv .venv
+    uv venv --python 3.12
     source .venv/bin/activate  # On Windows: .venv\Scripts\activate
     ```
 
-2. Upgrade pip:
+2. Install the project and its development dependencies:
 
     ```bash
-    python -m pip install --upgrade pip
+    uv sync --group dev
     ```
 
-3. Install dependencies:
+3. Verify the installation:
 
     ```bash
-    pip install -e ".[dev,docs,test]"
+    python -c "import gitea; print(gitea.__version__)"
     ```
 
-4. Verify installation:
+4. If you installed with `pip` instead, upgrade it first:
 
     ```bash
-    python -c "import your_package; print(your_package.__version__)"
+    pip install --upgrade pip uv
     ```
 
 <!-- prettier-ignore-end -->
 
+For details, see the [Installation Guide](../user-guide/installation.md).
+
 ### Python Version Mismatch
 
-**Problem:** `python -m venv .venv` fails or tests don't run with wrong Python
-version.
+**Problem:** `uv venv` fails or tests don't run with the wrong Python version.
 
 **Solutions:**
 
@@ -115,19 +57,190 @@ version.
     python --version
     ```
 
-2. Ensure Python 3.10 or higher is installed
-3. Use specific Python version when creating venv:
+2. `python-gitea` requires Python 3.12 or later and is built and tested against
+   Python 3.12-3.14.
+3. Create the virtual environment with a supported version:
 
     ```bash
-    python3.11 -m venv .venv
-    ```
-
-4. Or use uv for version management:
-
-    ```bash
-    uv venv --python 3.11
+    uv venv --python 3.12  # 3.12, 3.13, or 3.14
     source .venv/bin/activate
     ```
+
+<!-- prettier-ignore-end -->
+
+### Pre-commit Hooks Not Installed
+
+**Problem:** Formatting and linting hooks don't run when you commit.
+
+**Solutions:**
+
+<!-- prettier-ignore-start -->
+
+1. Ensure you're in the project root directory (must be a git repository).
+2. Install the hooks with `prek`:
+
+    ```bash
+    uv run prek install
+    ```
+
+3. Run all hooks manually:
+
+    ```bash
+    uv run prek run --all-files
+    ```
+
+4. Check which hooks are configured in `.pre-commit-config.yaml`.
+
+<!-- prettier-ignore-end -->
+
+Pull request titles are validated in CI
+(`.github/workflows/semantic_pull_request.yml`), not locally.
+
+## Configuration Issues
+
+### Account Not Found
+
+**Problem:** A command fails with
+`Account 'name' does not exist in the configuration.`
+
+**Solutions:**
+
+<!-- prettier-ignore-start -->
+
+1. List your configured accounts:
+
+    ```bash
+    gitea-cli config list
+    ```
+
+2. Add the missing account:
+
+    ```bash
+    gitea-cli config add --name name --token YOUR_API_TOKEN --base-url https://gitea.example.com
+    ```
+
+3. Pass the account explicitly with `--account-name name`, or use a token and
+   base URL directly.
+
+<!-- prettier-ignore-end -->
+
+See [Configuration](../user-guide/configuration.md) for the full account
+workflow.
+
+### No Default Account Available
+
+**Problem:** A command fails with
+`No default account available for authentication.`
+
+**Solutions:**
+
+<!-- prettier-ignore-start -->
+
+1. Set a default account:
+
+    ```bash
+    gitea-cli config update --name name --default
+    ```
+
+2. Or pass credentials on the command line:
+
+    ```bash
+    gitea-cli issue list --owner my-org --repository my-repo --token YOUR_API_TOKEN --base-url https://gitea.example.com
+    ```
+
+<!-- prettier-ignore-end -->
+
+The first account added becomes the default automatically.
+
+### Duplicate Account
+
+**Problem:** Adding an account fails with
+`Account 'name' already exists in the configuration.`
+
+**Solutions:**
+
+<!-- prettier-ignore-start -->
+
+1. Update the existing account instead:
+
+    ```bash
+    gitea-cli config update --name name --token NEW_TOKEN
+    ```
+
+2. Or delete it first if you want to recreate it:
+
+    ```bash
+    gitea-cli config delete --name name
+    gitea-cli config add --name name --token YOUR_API_TOKEN
+    ```
+
+<!-- prettier-ignore-end -->
+
+### Invalid Configuration File
+
+**Problem:** Loading the config file fails with `Invalid configuration format`.
+
+**Solutions:**
+
+<!-- prettier-ignore-start -->
+
+1. Check the config file for syntax errors and that the account fields
+   (`name`, `token`, `base_url`) are valid YAML.
+2. The default location is platform-dependent (see
+   [Configuration](../user-guide/configuration.md)).
+3. Remove or rename the broken file and reconfigure:
+
+    ```bash
+    gitea-cli config add --name name --token YOUR_API_TOKEN --base-url https://gitea.example.com
+    ```
+
+<!-- prettier-ignore-end -->
+
+## API Issues
+
+### Authentication Failed (401)
+
+**Problem:** Requests return `401 Unauthorized`.
+
+**Solutions:**
+
+<!-- prettier-ignore-start -->
+
+1. Verify the token is valid for the target Gitea instance.
+2. Check the base URL points at your Gitea instance (not the repo web UI).
+3. Confirm the token has the required scopes for the operation.
+
+<!-- prettier-ignore-end -->
+
+### Resource Not Found (404)
+
+**Problem:** Requests return `404 Not Found`.
+
+**Solutions:**
+
+<!-- prettier-ignore-start -->
+
+1. Verify `--owner`/`--repository` point at an existing repository.
+2. Check issue/PR indices, label and milestone IDs, and project/column IDs
+   exist.
+3. Confirm the authenticated account has access to the resource.
+
+<!-- prettier-ignore-end -->
+
+### JSON Parsing Errors
+
+**Problem:** Logs show `Failed to parse JSON response` and methods return empty
+data.
+
+**Solutions:**
+
+<!-- prettier-ignore-start -->
+
+1. Confirm the base URL points at a Gitea API endpoint, e.g.
+   `https://gitea.example.com` (the client appends `/api/v1`).
+2. Test the endpoint with a manual request, for example by calling
+   `https://gitea.example.com/api/v1/user` with your token in the authorization
+   header.
 
 <!-- prettier-ignore-end -->
 
@@ -141,41 +254,39 @@ version.
 
 <!-- prettier-ignore-start -->
 
-1. Verify test file naming: Must be `test_*.py` or `*_test.py`
-2. Verify test function naming: Must start with `test_`
-3. Check `__init__.py` exists in test directory: `touch tests/__init__.py`
-4. Run pytest with verbose output:
+1. Verify test file naming: must be `test_*.py`.
+2. Verify test function naming: must start with `test_`.
+3. Run from the project root:
 
     ```bash
-    pytest -vv
+    uv run pytest -vv
     ```
 
-5. Check test discovery:
+4. Check test discovery:
 
     ```bash
-    pytest --collect-only
+    uv run pytest --collect-only
     ```
 
 <!-- prettier-ignore-end -->
 
 ### Import Errors in Tests
 
-**Problem:** Tests can't import your package modules.
+**Problem:** Tests can't import `gitea` modules.
 
 **Solutions:**
 
 <!-- prettier-ignore-start -->
 
-1. Install package in development mode:
+1. Ensure development dependencies are installed:
 
     ```bash
-    pip install -e ".[dev,test]"
+    uv sync --group dev
     ```
 
-2. Verify package structure (should have `src/your_package/`)
-3. Check `pyproject.toml` has correct `packages` configuration
-4. Run from project root directory
-5. Verify `__init__.py` exists in package directory
+2. Verify the `src` layout is correct (package lives in `src/gitea/`) and that
+   `[tool.pytest.ini_options].pythonpath` includes `src`.
+3. Run from the project root directory.
 
 <!-- prettier-ignore-end -->
 
@@ -190,12 +301,12 @@ version.
 1. Run pytest with coverage:
 
     ```bash
-    pytest --cov=src/your_package --cov-report=html
+    uv run pytest --cov-report=html
     ```
 
-2. Check `.coveragerc` or `pyproject.toml` coverage settings
-3. Ensure source files have proper imports
-4. Verify test files import from `src/` layout correctly
+2. Coverage is configured in `pyproject.toml` under `[tool.coverage]`; the
+   default `addopts` already enables coverage on `src`.
+3. Verify test files import from the `src/` layout correctly.
 
 <!-- prettier-ignore-end -->
 
@@ -212,23 +323,14 @@ version.
 1. Check which hooks are slow:
 
     ```bash
-    pre-commit run --all-files --verbose
+    uv run prek run --all-files --verbose
     ```
 
-2. Consider excluding large files:
-
-    ```yaml
-    exclude: |
-      (?x)^(
-        large_data_file.csv|
-        node_modules/
-      )$
-    ```
-
-3. Run specific hooks:
+2. Run specific hooks:
 
     ```bash
-    pre-commit run black --all-files  # Just black
+    uv run prek run ruff --all-files
+    uv run prek run prettier --all-files
     ```
 
 <!-- prettier-ignore-end -->
@@ -241,20 +343,16 @@ version.
 
 <!-- prettier-ignore-start -->
 
-1. This is normal behavior - review the changes
-2. Stage the new changes:
+1. This is normal behavior - review the changes.
+2. Stage the new changes and commit again:
 
     ```bash
     git add .
-    git commit -m "your message"  # Try again
+    git commit -m "your message"
     ```
 
-3. Modify tool settings if behavior is unwanted (in `pyproject.toml`)
-4. Disable specific hooks temporarily:
-
-    ```bash
-    SKIP=black,ruff pre-commit run --all-files
-    ```
+3. Modify the tool settings if the behavior is unwanted (e.g. in
+   `.pre-commit-config.yaml` or `pyproject.toml`).
 
 <!-- prettier-ignore-end -->
 
@@ -266,20 +364,18 @@ version.
 
 <!-- prettier-ignore-start -->
 
-1. This is expected - review changes:
+1. This is expected - review the changes:
 
     ```bash
     git diff
     ```
 
-2. Stage the changes:
+2. Stage and commit:
 
     ```bash
     git add .
+    git commit -m "your message"
     ```
-
-3. Try committing again
-4. Or use `git add -A` to stage all changes before commit
 
 <!-- prettier-ignore-end -->
 
@@ -289,14 +385,21 @@ If you encounter issues not listed here:
 
 <!-- prettier-ignore-start -->
 
-1. **Check existing issues**: Search GitHub Issues for your problem
-2. **Review logs carefully**: Error messages usually point to the root cause
-3. **Search documentation**: Many issues are covered in specific tool docs
-4. **Try minimal reproduction**: Isolate the problem to a single file/command
-5. **Ask for help**: Open an [issue](https://github.com/isaac-cf-wong/python-gitea/issues/new/choose) with:
-    - Your environment (Python version, OS)
-    - Steps to reproduce
-    - Full error message/logs
-    - What you've already tried
+1. **Check existing issues**: Search
+   [GitHub Issues](https://github.com/isaac-cf-wong/python-gitea/issues) for
+   your problem.
+2. **Review logs carefully**: Run with verbose logging to see request details:
+
+    ```bash
+    gitea-cli --verbose DEBUG issue list --owner my-org --repository my-repo
+    ```
+
+3. **Try a minimal reproduction**: Isolate the problem to a single command.
+4. **Ask for help**: Open an
+   [issue](https://github.com/isaac-cf-wong/python-gitea/issues/new/choose) with:
+   - Your environment (Python version, OS)
+   - Steps to reproduce
+   - Full error message/logs
+   - What you've already tried
 
 <!-- prettier-ignore-end -->
