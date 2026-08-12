@@ -13,11 +13,12 @@ configuring, or using `python-gitea`, and how to resolve them.
 
 <!-- prettier-ignore-start -->
 
-1. Create a fresh virtual environment with `uv`:
+1. Create a fresh virtual environment with `uv` (`--clear` replaces the
+   existing one and works on all platforms, removing the need for
+   `rm -rf .venv`):
 
     ```bash
-    rm -rf .venv
-    uv venv --python 3.12
+    uv venv --clear --python 3.12
     source .venv/bin/activate  # On Windows: .venv\Scripts\activate
     ```
 
@@ -167,11 +168,12 @@ The first account added becomes the default automatically.
     gitea-cli config update --name name --token NEW_TOKEN
     ```
 
-2. Or delete it first if you want to recreate it:
+2. Or delete it first if you want to recreate it. Include the original
+   `--base-url` so the account is recreated against the same Gitea instance:
 
     ```bash
     gitea-cli config delete --name name
-    gitea-cli config add --name name --token YOUR_API_TOKEN
+    gitea-cli config add --name name --token YOUR_API_TOKEN --base-url https://gitea.example.com
     ```
 
 <!-- prettier-ignore-end -->
@@ -254,8 +256,10 @@ data.
 
 <!-- prettier-ignore-start -->
 
-1. Verify test file naming: must be `test_*.py`.
-2. Verify test function naming: must start with `test_`.
+1. Verify test file naming: pytest discovers `test_*.py` and `*_test.py` by
+   default.
+2. Verify test function naming: names must start with `test` (e.g. `test_list_issues`
+   or `test_list`); this project uses `test_`-prefixed names.
 3. Run from the project root:
 
     ```bash
