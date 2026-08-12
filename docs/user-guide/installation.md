@@ -13,33 +13,23 @@ pages for more details:
 
 ## Requirements
 
-- Python 3.10 or higher
+- Python 3.12 or higher
 - Operating System: Linux, macOS, or Windows
 
-<!-- prettier-ignore-start -->
+<!-- prettier-ignore -->
 !!!note
-    The package is built and tested against Python 3.10-3.12. When creating a virtual environment with `uv`,
-    specify the Python version to ensure compatibility:
-    `uv venv --python 3.10` (replace `3.10` with your preferred version in the 3.10-3.12 range).
-    This avoids potential issues with unsupported Python versions.
-
-<!-- prettier-ignore-end -->
+    The package requires Python 3.12 or later and is built and tested against Python 3.12-3.14. When creating a
+    virtual environment with `uv`, specify the Python version to ensure compatibility: `uv venv --python 3.12`
+    (replace `3.12` with your preferred supported version: 3.12, 3.13, or 3.14). This avoids potential issues
+    with unsupported Python versions.
 
 ## Install from PyPI
-
-<!-- prettier-ignore-start -->
-
-!!!warning
-    The package is NOT published to PyPI.
-    This section is for demonstration purposes only.
-
-<!-- prettier-ignore-end -->
 
 The recommended way to install `python-gitea` is from PyPI:
 
 ```bash
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.10
+uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install python-gitea
 ```
@@ -67,9 +57,9 @@ For the latest development version:
 git clone git@github.com:isaac-cf-wong/python-gitea.git
 cd python-gitea
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.10
+uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install .
+uv sync
 ```
 
 ### Development Installation
@@ -81,16 +71,12 @@ git clone git@github.com:isaac-cf-wong/python-gitea.git
 cd python-gitea
 
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.10
+uv venv --python 3.12
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv pip install ".[dev]"
-
-# Install the commitlint dependencies
-npm install
+uv sync --group dev
 
 # Install pre-commit hooks
-pre-commit install
-pre-commit install --hook-type commit-msg
+uv run prek install
 ```
 
 ## Verify Installation
@@ -105,21 +91,12 @@ gitea-cli --help
 python -c "import gitea; print(gitea.__version__)"
 ```
 
-## Dependencies
-
-### Core Dependencies
-
-- **typer**: CLI framework
-
 ## Getting Help
 
-<!-- prettier-ignore-start -->
-
 1. Check the [troubleshooting guide](../dev/troubleshooting.md)
-2. Search existing [issues](https://github.com/isaac-cf-wong/python-gitea/issues)
+2. Search existing
+   [issues](https://github.com/isaac-cf-wong/python-gitea/issues)
 3. Create a new issue with:
     - Your operating system and Python version
     - Full error message
     - Steps to reproduce the problem
-
-<!-- prettier-ignore-end -->
