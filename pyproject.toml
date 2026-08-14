@@ -46,7 +46,7 @@ docs = [
   "mkdocs-section-index>=0.3.12",
   "mike>=2.2.0",
 ]
-build = ["hatch>=1.17.1"]
+build = ["hatch>=1.18.0"]
 release = ["git-cliff>=2.13.1"]
 
 [project.scripts]
