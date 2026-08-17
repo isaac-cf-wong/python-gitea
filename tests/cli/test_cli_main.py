@@ -2,6 +2,7 @@
 
 import importlib
 import inspect
+import re
 from pathlib import Path
 from typing import Any, Self
 from unittest.mock import MagicMock, patch
@@ -29,6 +30,27 @@ _STUB = "stub"
 # a path here together with the reason rather than weakening the assertions in
 # `test_json_mode_routes_every_subcommand_through_a_structured_path`.
 _NO_NOOP_INVOCATION: frozenset[tuple[str, ...]] = frozenset()
+
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _unrendered(text: str) -> str:
+    r"""Strip rich's styling and line breaks from help text.
+
+    Rich decides how to render the help from its environment, and two of its
+    decisions can break an option name apart:
+
+    * When it believes it is writing to a terminal - which Typer forces on
+      whenever `GITHUB_ACTIONS`, `FORCE_COLOR` or `PY_COLORS` is set - it emits
+      colour escapes, and it styles the leading dash of an option separately, so
+      `--output` reaches stdout as `\x1b[1;36m-\x1b[0m\x1b[1;36m-output\x1b[0m`.
+    * At a narrow terminal width it wraps the option column mid-word.
+
+    Neither is part of what these tests assert, so remove the escapes and all
+    whitespace. Dropping whitespace cannot manufacture an option name that the
+    help does not document, so the assertions still discriminate.
+    """
+    return "".join(_ANSI_ESCAPE.sub("", text).split())
 
 
 def _leaf_commands(command: Any, prefix: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any]]:
@@ -256,12 +278,15 @@ class TestMainCallback:
 class TestOutputOption:
     """Tests for the global `--output` option."""
 
-    def test_output_option_is_documented_on_the_root_app(self) -> None:
+    def test_output_option_is_documented_on_the_root_app(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """`--output` should be listed among the global options."""
+        # Rich drops the whole options table at very narrow widths, so pin one
+        # wide enough that the assertion cannot depend on the caller's terminal.
+        monkeypatch.setenv("COLUMNS", "200")
         result = runner.invoke(app, ["--help"])
 
         assert result.exit_code == 0
-        assert "--output" in result.stdout
+        assert "--output" in _unrendered(result.stdout)
 
     def test_output_option_accepted_by_every_subcommand(self) -> None:
         """Every leaf subcommand should be reachable through `--output json`."""
