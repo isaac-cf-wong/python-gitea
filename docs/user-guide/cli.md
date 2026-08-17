@@ -13,6 +13,7 @@ gitea-cli [OPTIONS] COMMAND [ARGS]...
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `--config-path <path>`  | Config file path; defaults to `PYTHON_GITEA_CONFIG_PATH` or platform location. |
 | `-v, --verbose <level>` | Log level; default `INFO`.                                                     |
+| `--version`             | Print the installed `python-gitea` version and exit.                           |
 
 All resource commands share authentication options:
 
@@ -42,6 +43,9 @@ See [Configuration](configuration.md) for how authentication is resolved.
     - Optional: `--state`, `--labels`, `--search-string`, `--created-by`,
       `--assigned-by`, `--since`, `--before`, `--page`, `--limit`
 - `gitea-cli issue get --owner <owner> --repository <repo> --index <index>`
+    - The `comment_count` field is the number of comments on the issue, not the
+      comments themselves; use `gitea-cli issue comment list` to read the
+      bodies.
 - `gitea-cli issue edit --owner <owner> --repository <repo> --index <index>`
     - Optional: `--title`, `--body`, `--state`, `--assignees`, `--milestone`,
       `--due-date`
@@ -65,6 +69,9 @@ See [Configuration](configuration.md) for how authentication is resolved.
 - `gitea-cli comment list --owner <owner> --repository <repo> --index <index>`
 - `gitea-cli comment edit --owner <owner> --repository <repo> --comment-id <id> --body <body>`
 - `gitea-cli comment delete --owner <owner> --repository <repo> --comment-id <id>`
+
+These commands are also available as `gitea-cli issue comment <command>`, which
+is the same implementation under a second, more discoverable name.
 
 ### Label - manage labels
 

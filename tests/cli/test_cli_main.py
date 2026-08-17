@@ -2,9 +2,12 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+import typer
 from typer.testing import CliRunner
 
-from gitea.cli.main import LoggingLevel, app, register_commands, setup_logging
+from gitea.cli.main import LoggingLevel, app, register_commands, setup_logging, version_callback
+from gitea.version import __version__
 
 runner = CliRunner()
 
@@ -72,6 +75,27 @@ class TestMainCallback:
         config_file = tmp_path / "config.yaml"
         result = runner.invoke(app, ["--config-path", str(config_file), "config", "--help"])
         assert result.exit_code == 0
+
+
+class TestVersionOption:
+    """Tests for the --version flag."""
+
+    def test_version_flag_prints_version_and_exits(self) -> None:
+        """`--version` should print the package version and exit successfully."""
+        result = runner.invoke(app, ["--version"])
+
+        assert result.exit_code == 0
+        assert result.stdout.strip() == __version__
+
+    def test_version_callback_exits_when_set(self) -> None:
+        """version_callback should raise Exit when the flag is provided."""
+        with pytest.raises(typer.Exit):
+            version_callback(True)
+
+    def test_version_callback_is_noop_when_unset(self, capsys) -> None:
+        """version_callback should print nothing when the flag is absent."""
+        assert version_callback(False) is None
+        assert capsys.readouterr().out == ""
 
 
 class TestRegisterCommands:
