@@ -139,4 +139,4 @@ def list_project_issues_command(
 
         return data, {**metadata, "column_count": len(data), "issue_count": issue_count}
 
-    execute_api_command(api_call=api_call, command_name="gitea-cli project issues")
+    execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli project issues")

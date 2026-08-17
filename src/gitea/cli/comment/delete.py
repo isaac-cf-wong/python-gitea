@@ -73,4 +73,4 @@ def delete_command(
                 comment_id=comment_id,
             )
 
-    execute_api_command(api_call=api_call, command_name="gitea-cli comment delete")
+    execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli comment delete")

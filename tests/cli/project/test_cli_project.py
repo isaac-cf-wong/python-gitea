@@ -3,6 +3,12 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+from requests import ConnectionError as RequestsConnectionError
+from requests import HTTPError
+from typer.testing import CliRunner
+
+from gitea.cli.main import app
 from gitea.cli.project.column.create import create_column_command
 from gitea.cli.project.column.list import list_columns_command
 from gitea.cli.project.create import create_command
@@ -13,11 +19,38 @@ from gitea.cli.project.issue.add import add_issue_command
 from gitea.cli.project.issue.move import move_issue_command
 from gitea.cli.project.issue.remove import remove_issue_command
 from gitea.cli.project.list import list_command
+from gitea.cli.utils.errors import CommandError
+from tests.cli.rendering import unrendered
+
+runner = CliRunner()
+
+# The three project issue commands, with the project call each one makes and
+# the keyword arguments that call takes beyond the ones they all share.
+ISSUE_COMMANDS = [
+    pytest.param(add_issue_command, "add_issue_to_project_column", {"column_id": 5}, 201, id="add"),
+    pytest.param(move_issue_command, "move_project_issue", {"column_id": 6, "sorting": None}, 204, id="move"),
+    pytest.param(remove_issue_command, "remove_issue_from_project_column", {"column_id": 5}, 204, id="remove"),
+]
 
 
 def make_ctx():
     """Create a mock context object."""
     return SimpleNamespace(obj={"config_path": "/tmp/config"})
+
+
+def make_http_error(status_code):
+    """Create the error the client raises for an unsuccessful response.
+
+    Args:
+        status_code: The status code the response carries.
+
+    Returns:
+        The HTTP error.
+
+    """
+    response = MagicMock()
+    response.status_code = status_code
+    return HTTPError(f"{status_code} Client Error", response=response)
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -307,6 +340,7 @@ def test_add_issue_command(mock_gitea, mock_get_auth_params, mock_execute):
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
     client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
     client.project.add_issue_to_project_column.return_value = ({}, {"status_code": 201})
     mock_gitea.return_value.__enter__.return_value = client
 
@@ -327,10 +361,11 @@ def test_add_issue_command(mock_gitea, mock_get_auth_params, mock_execute):
     assert call_kwargs["command_name"] == "gitea-cli project issue add"
 
     result = call_kwargs["api_call"]()
+    client.issue.get_issue.assert_called_once_with(owner="owner", repository="repo", index=100)
     client.project.add_issue_to_project_column.assert_called_once_with(
-        owner="owner", repository="repo", project_id=1, column_id=5, issue_id=100
+        owner="owner", repository="repo", project_id=1, column_id=5, issue_id=1854
     )
-    assert result == ({}, {"status_code": 201})
+    assert result == ({}, {"status_code": 201, "resolved_issue_id": 1854})
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -342,6 +377,7 @@ def test_move_issue_command(mock_gitea, mock_get_auth_params, mock_execute):
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
     client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
     client.project.move_project_issue.return_value = ({}, {"status_code": 204})
     mock_gitea.return_value.__enter__.return_value = client
 
@@ -363,10 +399,11 @@ def test_move_issue_command(mock_gitea, mock_get_auth_params, mock_execute):
     assert call_kwargs["command_name"] == "gitea-cli project issue move"
 
     result = call_kwargs["api_call"]()
+    client.issue.get_issue.assert_called_once_with(owner="owner", repository="repo", index=100)
     client.project.move_project_issue.assert_called_once_with(
-        owner="owner", repository="repo", project_id=1, issue_id=100, column_id=6, sorting=1
+        owner="owner", repository="repo", project_id=1, issue_id=1854, column_id=6, sorting=1
     )
-    assert result == ({}, {"status_code": 204})
+    assert result == ({}, {"status_code": 204, "resolved_issue_id": 1854})
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -378,6 +415,7 @@ def test_remove_issue_command(mock_gitea, mock_get_auth_params, mock_execute):
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
     client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
     client.project.remove_issue_from_project_column.return_value = ({}, {"status_code": 204})
     mock_gitea.return_value.__enter__.return_value = client
 
@@ -398,7 +436,361 @@ def test_remove_issue_command(mock_gitea, mock_get_auth_params, mock_execute):
     assert call_kwargs["command_name"] == "gitea-cli project issue remove"
 
     result = call_kwargs["api_call"]()
+    client.issue.get_issue.assert_called_once_with(owner="owner", repository="repo", index=100)
     client.project.remove_issue_from_project_column.assert_called_once_with(
-        owner="owner", repository="repo", project_id=1, column_id=5, issue_id=100
+        owner="owner", repository="repo", project_id=1, column_id=5, issue_id=1854
+    )
+    assert result == ({}, {"status_code": 204, "resolved_issue_id": 1854})
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_org(mock_gitea, mock_get_auth_params, mock_execute):
+    """move_issue_command should pass --issue-id through unresolved for organization projects."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.move_project_issue.return_value = ({}, {"status_code": 204})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="org",
+        repository=None,
+        project_id=1,
+        issue_id=1854,
+        column_id=6,
+        sorting=None,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    result = mock_execute.call_args[1]["api_call"]()
+    client.issue.get_issue.assert_not_called()
+    client.project.move_project_issue.assert_called_once_with(
+        owner="org", repository=None, project_id=1, issue_id=1854, column_id=6, sorting=None
     )
     assert result == ({}, {"status_code": 204})
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_add_issue_command_org(mock_gitea, mock_get_auth_params, mock_execute):
+    """add_issue_command should pass --issue-id through unresolved for organization projects."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.add_issue_to_project_column.return_value = ({}, {"status_code": 201})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    add_issue_command(
+        ctx=ctx,
+        owner="org",
+        repository=None,
+        project_id=1,
+        column_id=5,
+        issue_id=1854,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    result = mock_execute.call_args[1]["api_call"]()
+    client.issue.get_issue.assert_not_called()
+    client.project.add_issue_to_project_column.assert_called_once_with(
+        owner="org", repository=None, project_id=1, column_id=5, issue_id=1854
+    )
+    assert result == ({}, {"status_code": 201})
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_unknown_issue_number(mock_gitea, mock_get_auth_params, mock_execute):
+    """move_issue_command should fail loudly when the issue number does not exist."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.side_effect = make_http_error(404)
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        issue_id=9999,
+        column_id=6,
+        sorting=None,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError, match="owner/repo"):
+        mock_execute.call_args[1]["api_call"]()
+    client.project.move_project_issue.assert_not_called()
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_api_failure(mock_gitea, mock_get_auth_params, mock_execute):
+    """move_issue_command should surface a failing API status instead of an empty envelope."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 15}, {"status_code": 200})
+    client.project.move_project_issue.side_effect = make_http_error(404)
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        issue_id=15,
+        column_id=6,
+        sorting=None,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError, match="HTTP 404"):
+        mock_execute.call_args[1]["api_call"]()
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_remove_issue_command_api_failure(mock_gitea, mock_get_auth_params, mock_execute):
+    """remove_issue_command should surface a failing API status instead of an empty envelope."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.remove_issue_from_project_column.side_effect = make_http_error(403)
+    mock_gitea.return_value.__enter__.return_value = client
+
+    remove_issue_command(
+        ctx=ctx,
+        owner="org",
+        repository=None,
+        project_id=1,
+        column_id=5,
+        issue_id=1854,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError, match="HTTP 403"):
+        mock_execute.call_args[1]["api_call"]()
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_add_issue_command_api_failure(mock_gitea, mock_get_auth_params, mock_execute):
+    """add_issue_command should surface a failing API status instead of an empty envelope."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 15}, {"status_code": 200})
+    client.project.add_issue_to_project_column.side_effect = make_http_error(404)
+    mock_gitea.return_value.__enter__.return_value = client
+
+    add_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        column_id=5,
+        issue_id=15,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError, match="HTTP 404"):
+        mock_execute.call_args[1]["api_call"]()
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_org_with_issue_repository(mock_gitea, mock_get_auth_params, mock_execute):
+    """move_issue_command should resolve the number against --issue-repository on an organization project."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1877, "number": 38}, {"status_code": 200})
+    client.project.move_project_issue.return_value = ({}, {"status_code": 204})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="org",
+        repository=None,
+        issue_repository="repo",
+        project_id=1,
+        issue_id=38,
+        column_id=6,
+        sorting=None,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    result = mock_execute.call_args[1]["api_call"]()
+    client.issue.get_issue.assert_called_once_with(owner="org", repository="repo", index=38)
+    client.project.move_project_issue.assert_called_once_with(
+        owner="org", repository=None, project_id=1, issue_id=1877, column_id=6, sorting=None
+    )
+    assert result == ({}, {"status_code": 204, "resolved_issue_id": 1877})
+
+
+@pytest.mark.parametrize(("command", "method", "call_kwargs", "status_code"), ISSUE_COMMANDS)
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_issue_command_issue_repository_overrides_repository(
+    mock_gitea, mock_get_auth_params, mock_execute, command, method, call_kwargs, status_code
+):
+    """Each issue command should resolve against --issue-repository when it differs from --repository."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1877, "number": 38}, {"status_code": 200})
+    getattr(client.project, method).return_value = ({}, {"status_code": status_code})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    command(
+        ctx=ctx,
+        owner="owner",
+        repository="board-repo",
+        issue_repository="other-repo",
+        project_id=1,
+        issue_id=38,
+        account_name="acct",
+        token=None,
+        base_url=None,
+        **call_kwargs,
+    )
+
+    result = mock_execute.call_args[1]["api_call"]()
+    # The number is looked up in the repository holding the issue, while the
+    # project call keeps the repository holding the board.
+    client.issue.get_issue.assert_called_once_with(owner="owner", repository="other-repo", index=38)
+    getattr(client.project, method).assert_called_once_with(
+        owner="owner", repository="board-repo", project_id=1, issue_id=1877, **call_kwargs
+    )
+    assert result == ({}, {"status_code": status_code, "resolved_issue_id": 1877})
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_org_failure_suggests_issue_repository(mock_gitea, mock_get_auth_params, mock_execute):
+    """move_issue_command should point at --issue-repository when a global ID is refused."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.move_project_issue.side_effect = make_http_error(404)
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="org",
+        repository=None,
+        project_id=1,
+        issue_id=38,
+        column_id=6,
+        sorting=None,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError, match="--issue-repository REPOSITORY"):
+        mock_execute.call_args[1]["api_call"]()
+    client.issue.get_issue.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        pytest.param(make_http_error(404), ("The issue was found in", "owner/repo"), id="refused"),
+        pytest.param(
+            RequestsConnectionError("Failed to establish a new connection: [Errno 111] Connection refused"),
+            ("Could not reach the Gitea API", "https://gitea.example.com"),
+            id="unreachable",
+        ),
+    ],
+)
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_reports_failures_without_a_traceback(
+    mock_gitea, mock_get_auth_params, monkeypatch, tmp_path, error, expected
+):
+    """The command should exit 1 with the message alone, through the real logging handler."""
+    # Keep the message on one line so the layout stays the simple one, whichever
+    # width the terminal running the tests reports.
+    monkeypatch.setenv("COLUMNS", "300")
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.base_url = "https://gitea.example.com"
+    client.issue.get_issue.return_value = ({"id": 1877, "number": 38}, {"status_code": 200})
+    client.project.move_project_issue.side_effect = error
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app,
+        [
+            # Point at a path of its own so a regression cannot read the
+            # developer's own configuration instead.
+            "--config-path",
+            str(tmp_path / "config.yaml"),
+            "project",
+            "issue",
+            "move",
+            "--owner",
+            "owner",
+            "--repository",
+            "repo",
+            "--project-id",
+            "1",
+            "--issue-id",
+            "38",
+            "--column-id",
+            "6",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    # `RichHandler` renders the record for whatever terminal it believes it is
+    # writing to: it styles the URL inside the message, pads the message column
+    # and appends the emitting frame. Assert on the wording each part of the
+    # message contributes, over the unstyled text, so none of those decisions
+    # can turn a correct message into a failure.
+    message = unrendered(result.stderr)
+    for fragment in expected:
+        assert unrendered(fragment) in message
+    # The message is the whole error: no traceback, and none of the wording the
+    # unhandled-exception path would add.
+    assert "Traceback" not in result.stderr
+    assert unrendered("Error executing") not in message

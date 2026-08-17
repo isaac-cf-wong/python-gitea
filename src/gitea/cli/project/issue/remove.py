@@ -12,10 +12,23 @@ def remove_issue_command(
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
     project_id: Annotated[int, typer.Option("--project-id", help="ID of the project.")],
     column_id: Annotated[int, typer.Option("--column-id", help="ID of the column.")],
-    issue_id: Annotated[int, typer.Option("--issue-id", help="ID of the issue.")],
+    issue_id: Annotated[
+        int,
+        typer.Option(
+            "--issue-id",
+            help="Issue number shown in the web UI, or the global ID of the issue when the repository holding it is unknown.",
+        ),
+    ],
     repository: Annotated[
         str | None,
         typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
+    ] = None,
+    issue_repository: Annotated[
+        str | None,
+        typer.Option(
+            "--issue-repository",
+            help="Name of the repository holding the issue, so --issue-id can be its issue number. Defaults to --repository.",
+        ),
     ] = None,
     account_name: Annotated[
         str | None,
@@ -47,7 +60,10 @@ def remove_issue_command(
         repository: The name of the repository, or None for organization projects.
         project_id: The ID of the project.
         column_id: The ID of the column.
-        issue_id: The ID of the issue.
+        issue_id: The issue number of the repository holding the issue, or the
+            global issue ID when that repository is not known.
+        issue_repository: The name of the repository holding the issue,
+            defaulting to the repository holding the project.
         account_name: Name of the account to use for authentication.
         token: Token for authentication.
         base_url: Base URL of the Gitea platform.
@@ -57,6 +73,7 @@ def remove_issue_command(
 
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
+    from gitea.cli.utils.issue import run_project_issue_call  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -74,12 +91,20 @@ def remove_issue_command(
 
         """
         with Gitea(token=token, base_url=base_url) as client:
-            return client.project.remove_issue_from_project_column(
+            return run_project_issue_call(
+                client=client,
+                call=lambda resolved_issue_id: client.project.remove_issue_from_project_column(
+                    owner=owner,
+                    repository=repository,
+                    project_id=project_id,
+                    column_id=column_id,
+                    issue_id=resolved_issue_id,
+                ),
+                action="remove",
                 owner=owner,
-                repository=repository,
                 project_id=project_id,
-                column_id=column_id,
-                issue_id=issue_id,
+                issue_number=issue_id,
+                issue_repository=issue_repository or repository,
             )
 
-    execute_api_command(api_call=api_call, command_name="gitea-cli project issue remove")
+    execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli project issue remove")

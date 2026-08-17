@@ -145,4 +145,4 @@ def list_command(
                 limit=limit,
             )
 
-    execute_api_command(api_call=api_call, command_name="gitea-cli issue list")
+    execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli issue list")

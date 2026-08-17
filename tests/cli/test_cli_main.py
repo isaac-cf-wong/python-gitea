@@ -2,12 +2,12 @@
 
 import importlib
 import inspect
-import re
 from pathlib import Path
 from typing import Any, Self
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 import typer
 import yaml
 from typer.main import get_command
@@ -17,6 +17,7 @@ from gitea.cli.main import LoggingLevel, app, main, register_commands, setup_log
 from gitea.cli.output import OutputFormat, get_output_format
 from gitea.version import __version__
 from tests.cli.envelope import parse_envelope
+from tests.cli.rendering import unrendered
 
 runner = CliRunner()
 
@@ -30,27 +31,6 @@ _STUB = "stub"
 # a path here together with the reason rather than weakening the assertions in
 # `test_json_mode_routes_every_subcommand_through_a_structured_path`.
 _NO_NOOP_INVOCATION: frozenset[tuple[str, ...]] = frozenset()
-
-_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
-
-
-def _unrendered(text: str) -> str:
-    r"""Strip rich's styling and line breaks from help text.
-
-    Rich decides how to render the help from its environment, and two of its
-    decisions can break an option name apart:
-
-    * When it believes it is writing to a terminal - which Typer forces on
-      whenever `GITHUB_ACTIONS`, `FORCE_COLOR` or `PY_COLORS` is set - it emits
-      colour escapes, and it styles the leading dash of an option separately, so
-      `--output` reaches stdout as `\x1b[1;36m-\x1b[0m\x1b[1;36m-output\x1b[0m`.
-    * At a narrow terminal width it wraps the option column mid-word.
-
-    Neither is part of what these tests assert, so remove the escapes and all
-    whitespace. Dropping whitespace cannot manufacture an option name that the
-    help does not document, so the assertions still discriminate.
-    """
-    return "".join(_ANSI_ESCAPE.sub("", text).split())
 
 
 def _leaf_commands(command: Any, prefix: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any]]:
@@ -210,6 +190,40 @@ class _StubGitea:
         return False
 
 
+class _UnreachableGitea(_StubGitea):
+    """Stand-in for the API client of an instance that cannot be reached.
+
+    The base URL is kept as a real attribute rather than left to `__getattr__`,
+    because the helpers that build the unreachable message read it off the
+    client, and a stub standing in for it would hide the host under test.
+    """
+
+    def __init__(self, *args: Any, base_url: str | None = None, **kwargs: Any) -> None:
+        """Record the base URL the command passed and ignore the credentials.
+
+        Args:
+            *args: Ignored.
+            base_url: The base URL the command resolved, kept for the message.
+            **kwargs: Ignored.
+
+        """
+        super().__init__(*args, **kwargs)
+        self.base_url = base_url
+
+    def __call__(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Fail as an endpoint does when the connection cannot be established.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Raises:
+            ConnectionError: Always, in the form the HTTP layer raises it.
+
+        """
+        raise requests.ConnectionError("Failed to establish a new connection: [Errno 111] Connection refused")
+
+
 class TestLoggingLevel:
     """Test cases for LoggingLevel enum."""
 
@@ -286,7 +300,7 @@ class TestOutputOption:
         result = runner.invoke(app, ["--help"])
 
         assert result.exit_code == 0
-        assert "--output" in _unrendered(result.stdout)
+        assert "--output" in unrendered(result.stdout)
 
     def test_output_option_accepted_by_every_subcommand(self) -> None:
         """Every leaf subcommand should be reachable through `--output json`."""
@@ -475,6 +489,52 @@ class TestOutputOption:
         main(ctx, config_path=None, verbose=LoggingLevel.INFO, output=OutputFormat.TEXT, version=False)
 
         assert ctx.obj == {"config_path": None, "output": OutputFormat.TEXT}
+
+
+class TestUnreachableInstance:
+    """Tests for how the CLI reports an instance it could not reach."""
+
+    def test_every_api_subcommand_names_the_base_url_when_unreachable(self, tmp_path: Path) -> None:
+        """Every command reaching the API should name the host it tried.
+
+        `execute_api_command` is handed a callable, not the client, so it can
+        only name the host if the command passes it: a call site that omits the
+        base URL leaves the user with a message that never says which instance
+        was tried. Checking the helper alone would not catch that, so the walk
+        runs each leaf command for real against a client that refuses to
+        connect. Commands that never reach the API - the `config` ones - are
+        skipped by looking for the helper in their module source.
+        """
+        leaves = [
+            (path, command)
+            for path, command in _leaf_commands(get_command(app))
+            if path not in _NO_NOOP_INVOCATION
+            and "execute_api_command" in inspect.getsource(importlib.import_module(command.callback.__module__))
+        ]
+
+        # Guard against the filter silently leaving nothing to run.
+        assert len(leaves) > 1
+        assert ("issue", "get") in [path for path, _ in leaves]
+
+        config_path = tmp_path / "config.yaml"
+        _write_stub_config(config_path, with_stub_account=True)
+
+        for path, command in leaves:
+            with (
+                patch("gitea.client.gitea.Gitea", _UnreachableGitea),
+                patch("gitea.cli.utils.api.logger") as mock_logger,
+            ):
+                result = runner.invoke(
+                    app,
+                    ["--config-path", str(config_path), *path, *_noop_invocation(command)],
+                )
+
+            assert result.exit_code == 1, f"{path}: {result.output}"
+            # A traceback says no more than the message here, so none is logged.
+            assert mock_logger.exception.call_count == 0, f"{path}: logged a traceback"
+            assert mock_logger.error.call_count == 1, f"{path}: {mock_logger.error.call_args_list}"
+            message = str(mock_logger.error.call_args[0][1])
+            assert "Could not reach the Gitea API at https://gitea.invalid" in message, f"{path}: {message}"
 
 
 class TestVersionOption:
