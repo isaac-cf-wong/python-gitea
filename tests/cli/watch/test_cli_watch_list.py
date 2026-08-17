@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 
 from gitea.cli.main import app
 from gitea.cli.watch.list import build_scopes
+from gitea.utils.pagination import PAGE_SIZE
 from gitea.watch.changes import comment_hash
 from gitea.watch.state import STATE_FILE_ENV
 from tests.cli.envelope import parse_envelope
@@ -648,6 +649,36 @@ class TestProjectScope:
             for call in client.comment.list_comments.call_args_list
         } == {("my-org", "my-repo", 15), ("other-org", "other-repo", 16)}
 
+    def test_a_card_naming_half_a_repository_names_none(self, tmp_path: Path) -> None:
+        """Half a repository is not one, and must not be listed against.
+
+        Taking the half that is there would build a request against an owner of
+        `None`, which is worse than not reading the comments at all.
+        """
+        client = make_client(
+            columns=[{"id": 5, "title": "Todo"}],
+            column_issues={5: [{**ISSUE, "repository": {"name": "other-repo"}}]},
+        )
+
+        result = run(
+            "--output",
+            "json",
+            "watch",
+            "list",
+            "--owner",
+            "my-org",
+            "--project-id",
+            "29",
+            "--state-file",
+            str(tmp_path / "watch-state.json"),
+            *AUTH,
+            client=client,
+        )
+
+        assert result.exit_code == 0
+        assert parse_envelope(result.stdout)["metadata"]["issue_count"] == 1
+        assert client.comment.list_comments.call_count == 0
+
     def test_a_card_of_an_unnamed_repository_is_still_watched(self, tmp_path: Path) -> None:
         """A payload that names no repository costs the comments, not the issue."""
         client = make_client(
@@ -734,13 +765,72 @@ class TestRequests:
         assert result.exit_code == 0, result.output
         assert session.requests == [("GET", "https://gitea.invalid/api/v1/orgs/my-org/projects/29/columns")]
 
-    def test_only_open_issues_are_watched(self, tmp_path: Path) -> None:
+    def test_a_repository_scope_lists_its_open_issues_and_their_comments(self, tmp_path: Path) -> None:
         """Watching every issue ever closed would make the listing grow forever."""
-        client = make_client([ISSUE])
+        client = make_client([ISSUE], comments={15: [COMMENT]})
 
         run(*watch(tmp_path / "watch-state.json"), client=client)
 
-        assert client.issue.list_issues.call_args_list[0].kwargs["state"] == "open"
+        assert client.issue.list_issues.call_args_list[0].kwargs == {
+            "owner": "my-org",
+            "repository": "my-repo",
+            "state": "open",
+            "page": 1,
+            "limit": PAGE_SIZE,
+        }
+        assert client.comment.list_comments.call_args_list[0].kwargs == {
+            "owner": "my-org",
+            "repository": "my-repo",
+            "index": 15,
+            "page": 1,
+            "limit": PAGE_SIZE,
+        }
+
+    def test_a_project_scope_lists_its_columns_and_their_issues(self, tmp_path: Path) -> None:
+        """Every listing a board is walked through asks for a full page of it."""
+        client = make_client(columns=[{"id": 5, "title": "Todo"}], column_issues={5: [ISSUE]})
+
+        run(
+            "watch",
+            "list",
+            "--owner",
+            "my-org",
+            "--project-id",
+            "29",
+            "--state-file",
+            str(tmp_path / "watch-state.json"),
+            *AUTH,
+            client=client,
+        )
+
+        assert client.project.list_project_columns.call_args_list[0].kwargs == {
+            "owner": "my-org",
+            "repository": None,
+            "project_id": 29,
+            "page": 1,
+            "limit": PAGE_SIZE,
+        }
+        assert client.project.list_project_column_issues.call_args_list[0].kwargs == {
+            "owner": "my-org",
+            "repository": None,
+            "project_id": 29,
+            "column_id": 5,
+            "page": 1,
+            "limit": PAGE_SIZE,
+        }
+
+    def test_a_malformed_entry_does_not_end_the_walk(self, tmp_path: Path) -> None:
+        """One unusable issue must not take the issues listed after it with it.
+
+        Dropping the rest of the scope would report every one of them as gone on
+        this run and as new on the next.
+        """
+        client = make_client(["not an issue", {"number": 15}, ISSUE, OTHER_ISSUE])
+
+        result = run(*watch(tmp_path / "watch-state.json", output="json"), client=client)
+
+        assert result.exit_code == 0
+        assert parse_envelope(result.stdout)["metadata"]["issue_count"] == 2
 
     def test_every_page_of_a_listing_is_walked(self, tmp_path: Path) -> None:
         """A scope larger than one page must not look like a scope that shrank."""

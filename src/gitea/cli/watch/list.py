@@ -1,10 +1,11 @@
 """Report the issues that changed since the last watch run.
 
-The command is built to be run from cron. On a tick where nothing changed it
-prints nothing at all, so a watchdog wrapping it has nothing to forward, nothing
-to page and nothing to charge for; on a tick where something did, it prints one
-line per change, and `--output json` gives the same changes as the envelope
-every other command emits.
+The command is built to be run on a schedule. On a tick where nothing changed it
+prints nothing at all, so whatever wraps it - a cron entry mailing its output, a
+script deciding whether to notify anyone - has nothing to forward and nothing to
+act on. On a tick where something did, it prints one line per change, and
+`--output json` gives the same changes as the envelope every other command
+emits.
 
 What it compares against is the cache described in `gitea.watch.state`, which it
 updates as part of the run - before the report is written, so that a failure to
