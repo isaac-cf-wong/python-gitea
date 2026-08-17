@@ -74,6 +74,22 @@ so the cost grows with the size of the board rather than of the repository. The
 `gitea-cli issue get` command does this for you.
 `resolve_async_project_column_ids` is the `await`-based twin for `AsyncGitea`.
 
+Both are best-effort, and `column_id` should be read with that in mind:
+
+- The walk is a sequence of requests, not a snapshot. `column_id` reflects the
+  board as it was while the walk ran, so a card moved during it may come back
+  under either column, or as `None`.
+- A lookup that fails - refused, timed out, or lost in transport - is logged as
+  a warning on the `gitea` logger and leaves that project's `column_id` at
+  `None`. The issue itself is returned; the exception is not re-raised, on the
+  synchronous and asynchronous paths alike. `None` therefore means "no card on
+  this project" and "could not be resolved" alike.
+- `column_id` is present on every project entry the functions return, including
+  when the issue payload carries no global ID for the columns to be matched by,
+  in which case every column is `None`.
+- The columns of a user-owned (individual) project live under endpoints this
+  library does not wrap, so such a project's `column_id` is always `None`.
+
 ## Asynchronous Client
 
 The `AsyncGitea` client has the same structure but `await`-based, and it uses

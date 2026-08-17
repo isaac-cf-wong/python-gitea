@@ -71,6 +71,12 @@ Errors are not part of the envelope: messages go to stderr and the process exits
 non-zero, so nothing is printed on stdout for a failed command. Log output also
 goes to stderr in both formats, so stdout stays parsable.
 
+One failure is deliberately not an error: the board lookup that fills in the
+`column_id` of `issue get`. A refused, timed-out or otherwise failed lookup logs
+a warning to stderr and reports that project's column as `null`, because the
+issue the command was asked for has already been retrieved and is not worth
+failing over an enrichment of it.
+
 Tokens are never included in the output of `config` commands in either format.
 
 ## Commands
@@ -100,6 +106,14 @@ Tokens are never included in the output of `config` commands in either format.
       card sits in, or `null` when the issue has no card on that project. Gitea
       does not report it on the issue itself, so it is resolved from each
       project's board, which costs a few extra requests per project.
+    - Resolution is best-effort. It reflects the board as it was during the
+      walk, not at one instant: a card moved while the columns are being read
+      may be reported under either column or as `null`. A lookup that is
+      refused, times out, or fails in transport leaves that project's
+      `column_id` at `null` and logs a warning rather than failing `issue get` -
+      so `null` means "no card here" and "could not tell" alike. The columns of
+      a user-owned (individual) project cannot be listed at all, so its
+      `column_id` is always `null`.
 - `gitea-cli issue edit --owner <owner> --repository <repo> --index <index>`
     - Optional: `--title`, `--body`, `--state`, `--assignees`, `--milestone`,
       `--due-date`
