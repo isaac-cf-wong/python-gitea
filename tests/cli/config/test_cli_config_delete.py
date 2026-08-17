@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
 
@@ -11,6 +10,7 @@ import yaml
 from typer.testing import CliRunner
 
 from gitea.cli.main import app
+from tests.cli.envelope import parse_envelope
 
 runner = CliRunner()
 
@@ -156,7 +156,7 @@ class TestDeleteCommandJsonOutput:
         )
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = parse_envelope(result.stdout)
         assert payload["data"] == {"name": "account2", "status": "deleted"}
         assert payload["metadata"] == {"config_path": str(temp_config_with_accounts)}
 
@@ -184,7 +184,10 @@ class TestDeleteCommandJsonOutput:
         assert "Are you sure" not in result.stdout
         assert "Are you sure" in result.stderr
 
-        payload = json.loads(result.stdout[result.stdout.index("{") :])
+        # `" n\n"` is CliRunner's echo of the answer typed at the prompt - the
+        # only text allowed on stdout besides the envelope. Declaring it exactly
+        # is what makes a leaked log line or rendering fail here.
+        payload = parse_envelope(result.stdout, allow_prefix=" n\n")
         assert payload["data"] == {"name": "account2", "status": "cancelled"}
         assert payload["metadata"] == {}
         assert "Deletion cancelled." not in result.stdout

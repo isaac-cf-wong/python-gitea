@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
 
@@ -11,6 +10,7 @@ import yaml
 from typer.testing import CliRunner
 
 from gitea.cli.main import app
+from tests.cli.envelope import parse_envelope
 
 runner = CliRunner()
 
@@ -203,7 +203,7 @@ class TestUpdateCommandJsonOutput:
         )
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = parse_envelope(result.stdout)
         assert payload["data"] == {
             "name": "test",
             "base_url": "https://new.gitea.com",
@@ -235,7 +235,7 @@ class TestUpdateCommandJsonOutput:
         )
 
         assert result.exit_code == 0
-        assert json.loads(result.stdout)["data"]["updated_fields"] == ["token", "base_url", "default_account"]
+        assert parse_envelope(result.stdout)["data"]["updated_fields"] == ["token", "base_url", "default_account"]
 
     def test_json_output_with_no_changes(self, temp_config_with_account: Path) -> None:
         """Should report an empty field list when nothing was changed."""
@@ -254,7 +254,7 @@ class TestUpdateCommandJsonOutput:
         )
 
         assert result.exit_code == 0
-        assert json.loads(result.stdout)["data"]["updated_fields"] == []
+        assert parse_envelope(result.stdout)["data"]["updated_fields"] == []
 
     def test_json_output_omits_the_token(self, temp_config_with_account: Path) -> None:
         """Should not echo the new token back in machine-readable output."""

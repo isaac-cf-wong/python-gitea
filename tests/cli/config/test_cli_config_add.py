@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
 
@@ -11,6 +10,7 @@ import yaml
 from typer.testing import CliRunner
 
 from gitea.cli.main import app
+from tests.cli.envelope import parse_envelope
 
 runner = CliRunner()
 
@@ -178,7 +178,7 @@ class TestAddCommandJsonOutput:
         )
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = parse_envelope(result.stdout)
         # The stored, normalized base URL is reported, not the raw argument.
         assert payload["data"] == {
             "name": "test",
@@ -212,7 +212,7 @@ class TestAddCommandJsonOutput:
         )
 
         assert result.exit_code == 0
-        assert json.loads(result.stdout)["data"]["is_default"] is False
+        assert parse_envelope(result.stdout)["data"]["is_default"] is False
 
     def test_json_output_omits_the_token(self, temp_config_file: Path) -> None:
         """Should not echo the token back in machine-readable output."""

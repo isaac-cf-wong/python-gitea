@@ -11,6 +11,7 @@ import yaml
 from typer.testing import CliRunner
 
 from gitea.cli.main import app
+from tests.cli.envelope import parse_envelope
 
 runner = CliRunner()
 
@@ -126,7 +127,7 @@ class TestListCommandJsonOutput:
         )
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = parse_envelope(result.stdout)
         assert payload["data"] == {
             "default_account": "account1",
             "accounts": [
@@ -154,7 +155,7 @@ class TestListCommandJsonOutput:
         result = runner.invoke(app, ["--config-path", str(temp_config_file), "--output", "json", "config", "list"])
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = parse_envelope(result.stdout)
         assert payload["data"] == {"default_account": None, "accounts": []}
         assert payload["metadata"]["account_count"] == 0
 

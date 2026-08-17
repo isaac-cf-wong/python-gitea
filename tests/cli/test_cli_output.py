@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock
 
 from gitea.cli.output import OutputFormat, emit, get_output_format, print_envelope
+from tests.cli.envelope import parse_envelope
 
 
 class TestOutputFormat:
@@ -49,7 +49,7 @@ class TestPrintEnvelope:
         """Should print the data/metadata envelope as JSON."""
         print_envelope(data=[{"id": 1}], metadata={"status_code": 200})
 
-        out = json.loads(capsys.readouterr().out)
+        out = parse_envelope(capsys.readouterr().out)
         assert out == {"data": [{"id": 1}], "metadata": {"status_code": 200}}
 
     def test_serializes_unknown_types_as_strings(self, capsys) -> None:
@@ -61,7 +61,7 @@ class TestPrintEnvelope:
 
         print_envelope(data={"value": Opaque()}, metadata={})
 
-        out = json.loads(capsys.readouterr().out)
+        out = parse_envelope(capsys.readouterr().out)
         assert out["data"]["value"] == "opaque"
 
 
@@ -77,7 +77,7 @@ class TestEmit:
         emit(ctx, data={"a": 1}, metadata={"b": 2}, render_text=render_text)
 
         render_text.assert_not_called()
-        out = json.loads(capsys.readouterr().out)
+        out = parse_envelope(capsys.readouterr().out)
         assert out == {"data": {"a": 1}, "metadata": {"b": 2}}
 
     def test_text_format_calls_renderer(self, capsys) -> None:
