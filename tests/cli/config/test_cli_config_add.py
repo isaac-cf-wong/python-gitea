@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 
 from gitea.cli.main import app
 from tests.cli.envelope import parse_envelope
+from tests.cli.rendering import unrendered
 
 runner = CliRunner()
 
@@ -59,7 +60,13 @@ class TestAddCommand:
         )
 
         assert result.exit_code == 0
-        assert "added successfully" in result.stderr.lower()
+        # The words of the message are asserted one by one, and with rich's
+        # styling and layout removed: `RichHandler` appends the emitting frame at
+        # the right of a record's first line, so at a narrow terminal width it
+        # lands between the words of a message that wraps.
+        message = unrendered(result.stderr).lower()
+        assert "added" in message
+        assert "successfully" in message
 
         # Verify the config file was created
         assert temp_config_file.exists()

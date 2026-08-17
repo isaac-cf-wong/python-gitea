@@ -6,11 +6,13 @@ from typing import Annotated, Literal
 
 import typer
 
+from gitea.cli.utils.options import REPOSITORY_REQUIRED_HELP
+
 
 def list_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
+    repository: Annotated[str | None, typer.Option("--repository", help=REPOSITORY_REQUIRED_HELP)] = None,
     state: Annotated[
         Literal["closed", "open", "all"] | None,
         typer.Option("--state", help="Filter milestones by state."),
@@ -54,7 +56,7 @@ def list_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, which this command requires.
         state: Filter milestones by state.
         name: Filter milestones by name.
         page: The page number for pagination.
@@ -68,6 +70,7 @@ def list_command(
 
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
+    from gitea.cli.utils.options import require_repository  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -84,10 +87,12 @@ def list_command(
             A tuple containing the milestone data and metadata.
 
         """
+        target_repository = require_repository(repository, command="gitea-cli milestone list")
+
         with Gitea(token=token, base_url=base_url) as client:
             return client.milestone.list_milestones(
                 owner=owner,
-                repository=repository,
+                repository=target_repository,
                 state=state,
                 name=name,
                 page=page,

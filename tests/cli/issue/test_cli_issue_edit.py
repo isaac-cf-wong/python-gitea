@@ -31,7 +31,7 @@ def test_edit_command_calls_execute_and_passes_params(mock_gitea, mock_get_auth_
         ctx=ctx,
         owner="owner",
         repository="repo",
-        index=3,
+        issue_id=3,
         assignee="john",
         assignees=["john", "jane"],
         body="Updated",

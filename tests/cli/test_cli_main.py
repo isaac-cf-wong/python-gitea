@@ -18,6 +18,7 @@ from gitea.cli.output import OutputFormat, get_output_format
 from gitea.version import __version__
 from tests.cli.envelope import parse_envelope
 from tests.cli.rendering import unrendered
+from tests.cli.transport import RecordingSession
 
 runner = CliRunner()
 
@@ -31,6 +32,16 @@ _STUB = "stub"
 # a path here together with the reason rather than weakening the assertions in
 # `test_json_mode_routes_every_subcommand_through_a_structured_path`.
 _NO_NOOP_INVOCATION: frozenset[tuple[str, ...]] = frozenset()
+
+# Options the CLI's naming convention declares optional at the parser level so
+# that omitting one asks for the owner-wide target, and which a command whose
+# endpoint has no owner-wide form therefore rejects at run time instead. A walk
+# that synthesized only Click-required options would invoke those commands
+# without a repository and see the rejection rather than an envelope, so these
+# are supplied whenever the leaf declares them. Passing them is harmless where
+# they really are optional: it names a repository target instead of an
+# owner-wide one.
+_SCOPE_OPTIONS = frozenset({"--owner", "--repository", "--issue-id", "--dependency-issue-id"})
 
 
 def _leaf_commands(command: Any, prefix: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any]]:
@@ -72,8 +83,10 @@ def _noop_invocation(command: Any) -> list[str]:
 
     Values are synthesized from each parameter's type rather than listed per
     command, so a newly added required option cannot silently drop its command
-    out of the walk. Confirmation flags are passed so no invocation blocks on
-    stdin.
+    out of the walk. The scope and identifier options of `_SCOPE_OPTIONS` are
+    supplied as well, since a command can require one of those at run time
+    while declaring it optional. Confirmation flags are passed so no invocation
+    blocks on stdin.
 
     Args:
         command: Leaf command to build arguments for.
@@ -91,7 +104,7 @@ def _noop_invocation(command: Any) -> list[str]:
                 args.append(flag)
             continue
 
-        if not param.required:
+        if not param.required and flag not in _SCOPE_OPTIONS:
             continue
 
         choices = getattr(param.type, "choices", None)
@@ -124,6 +137,28 @@ def _write_stub_config(path: Path, *, with_stub_account: bool) -> None:
     path.write_text(yaml.safe_dump({"default_account": "seed", "accounts": accounts}))
 
 
+def _logged_message(call: Any) -> str:
+    """Render the message of a logging call as the user reads it.
+
+    Asserting on a message through the handler that renders it makes the
+    assertion depend on the terminal: `RichHandler` lays a record out as a table
+    and appends the emitting frame - the module and line the record came from -
+    at the right of the first line, so a message long enough to wrap at the
+    running terminal's width gets that frame laid between its halves. Reading
+    the record the CLI logged instead keeps the wording under test and leaves
+    the layout out of it.
+
+    Args:
+        call: Recorded call to a `logging` method, as `mock.call_args` gives it.
+
+    Returns:
+        The logged message with its arguments interpolated.
+
+    """
+    template, *args = call.args
+    return str(template) % tuple(args)
+
+
 class _StubGitea:
     """Stand-in for the API client whose every endpoint returns an empty listing.
 
@@ -131,7 +166,11 @@ class _StubGitea:
     command without the walk having to know which resource and endpoint each one
     reaches for. The payload is an empty list because commands that page through
     a listing stop on the first short page, and a non-empty page of a fixed size
-    would page forever.
+    would page forever. `get_issue` is the exception: it is declared as a real
+    method so that it answers with a single issue, because the `project issue`
+    commands resolve `--issue-id` to a global ID by reading the `id` off it and
+    an empty listing would fail that resolution for a reason that has nothing to
+    do with the command under test.
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -167,6 +206,19 @@ class _StubGitea:
 
         """
         return [], {"status_code": 200}
+
+    def get_issue(self, *args: Any, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Return the single issue that an issue lookup is expected to return.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Returns:
+            One issue and its metadata.
+
+        """
+        return {"id": 1}, {"status_code": 200}
 
     def __enter__(self) -> Self:
         """Enter the client context manager.
@@ -222,6 +274,23 @@ class _UnreachableGitea(_StubGitea):
 
         """
         raise requests.ConnectionError("Failed to establish a new connection: [Errno 111] Connection refused")
+
+    def get_issue(self, *args: Any, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Fail as every other endpoint of an unreachable instance does.
+
+        The base stub answers issue lookups with a payload, which would let a
+        command past the lookup and leave the walk testing the endpoint after it
+        rather than the one it reached first.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Returns:
+            Never; the call always raises.
+
+        """
+        return self(*args, **kwargs)
 
 
 class TestLoggingLevel:
@@ -556,6 +625,254 @@ class TestVersionOption:
         """version_callback should print nothing when the flag is absent."""
         assert version_callback(False) is None
         assert capsys.readouterr().out == ""
+
+
+class TestOptionNaming:
+    """The naming convention every resource command follows.
+
+    One shape addresses a target in every family: `--owner` names the owner,
+    `--repository` narrows it to one repository of that owner and is optional
+    everywhere, and an entity is named by `--<entity>-id`. The assertions here
+    are over the whole command tree rather than over one family, because a
+    convention that holds in most places is what the CLI already had.
+    """
+
+    def test_no_command_requires_the_repository_at_the_parser_level(self) -> None:
+        """`--repository` should be optional wherever it is offered.
+
+        Omitting it asks for the owner's own target, so a command that declared
+        it required would answer that invocation with a usage error rather than
+        with the message naming what it needs - and would put back the
+        difference between the families that the convention removes.
+        """
+        offered = [
+            (path, param)
+            for path, command in _leaf_commands(get_command(app))
+            for param in command.params
+            if "--repository" in param.opts
+        ]
+
+        # Guard against the walk finding nothing to assert about.
+        assert len(offered) > 10
+        assert [path for path, param in offered if param.required] == []
+
+    def test_every_command_that_narrows_by_repository_also_names_an_owner(self) -> None:
+        """`--repository` should never be the only half of the scope offered."""
+        for path, command in _leaf_commands(get_command(app)):
+            flags = {opt for param in command.params for opt in param.opts}
+            if "--repository" in flags:
+                assert "--owner" in flags, path
+
+    def test_an_issue_is_named_by_issue_id_everywhere(self) -> None:
+        """No command should name an issue by a third spelling.
+
+        `--index` and `--dependency-index` are the deprecated names of
+        `--issue-id` and `--dependency-issue-id`. Any other option ending in
+        `index` would be a new spelling of the same concept, which is what this
+        convention exists to prevent.
+        """
+        deprecated = {"--index", "--dependency-index"}
+
+        for path, command in _leaf_commands(get_command(app)):
+            flags = {opt for param in command.params for opt in param.opts}
+            assert {flag for flag in flags if flag.endswith("index")} <= deprecated, path
+
+    def test_a_deprecated_issue_option_never_appears_without_its_replacement(self) -> None:
+        """A command accepting `--index` should accept `--issue-id` too."""
+        replacements = {"--index": "--issue-id", "--dependency-index": "--dependency-issue-id"}
+        seen: set[str] = set()
+
+        for path, command in _leaf_commands(get_command(app)):
+            flags = {opt for param in command.params for opt in param.opts}
+            for deprecated, replacement in replacements.items():
+                if deprecated in flags:
+                    seen.add(deprecated)
+                    assert replacement in flags, path
+
+        # Guard against the walk passing because it found no deprecated option.
+        assert seen == set(replacements)
+
+    def test_the_deprecated_issue_options_are_hidden_from_help(self) -> None:
+        """`--help` should offer one name per concept, not the retired one too."""
+        for path, command in _leaf_commands(get_command(app)):
+            for param in command.params:
+                if {"--index", "--dependency-index"} & set(param.opts):
+                    assert param.hidden, path
+
+    def test_a_command_that_needs_a_repository_says_which_option_to_pass(self, tmp_path: Path) -> None:
+        """Omitting `--repository` where the endpoint needs one should be actionable.
+
+        The point of declaring the option optional is that the message can
+        mention the organization case, so the message is what is asserted here -
+        not merely that the command failed. It is read off the record the CLI
+        logged rather than off the rendered output, so that the assertion holds
+        at every terminal width.
+        """
+        config_path = tmp_path / "config.yaml"
+        _write_stub_config(config_path, with_stub_account=True)
+
+        with (
+            patch("gitea.client.gitea.Gitea", _StubGitea),
+            patch("gitea.cli.utils.api.logger") as mock_logger,
+        ):
+            result = runner.invoke(
+                app,
+                ["--config-path", str(config_path), "issue", "get", "--owner", _STUB, "--issue-id", "1"],
+            )
+
+        assert result.exit_code == 1
+        # A failed command leaves stdout parsable, as every other error does.
+        assert result.stdout == ""
+        assert mock_logger.error.call_count == 1
+        message = _logged_message(mock_logger.error.call_args)
+        assert "'gitea-cli issue get' needs a repository: pass --repository REPOSITORY." in message
+        # The user is told why the option looked optional in the first place.
+        assert "'gitea-cli project'" in message
+
+    def test_a_command_that_needs_an_issue_says_which_option_to_pass(self, tmp_path: Path) -> None:
+        """Naming no issue should point at `--issue-id` rather than at `--index`."""
+        config_path = tmp_path / "config.yaml"
+        _write_stub_config(config_path, with_stub_account=True)
+
+        with (
+            patch("gitea.client.gitea.Gitea", _StubGitea),
+            patch("gitea.cli.utils.api.logger") as mock_logger,
+        ):
+            result = runner.invoke(
+                app,
+                ["--config-path", str(config_path), "issue", "get", "--owner", _STUB, "--repository", _STUB],
+            )
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert mock_logger.error.call_count == 1
+        assert "'gitea-cli issue get' needs an issue: pass --issue-id NUMBER." in _logged_message(
+            mock_logger.error.call_args
+        )
+
+    def test_the_deprecated_index_still_names_an_issue(self, tmp_path: Path) -> None:
+        """`--index` should keep working, so scripts written against it survive.
+
+        The invocation runs through the real logging handler, so the deprecation
+        warning it triggers is asserted to have been rendered to stderr and to
+        have stayed out of the envelope on stdout. What the warning says is
+        asserted in `test_the_deprecated_index_names_its_replacement`, which
+        reads the record rather than the layout.
+        """
+        config_path = tmp_path / "config.yaml"
+        _write_stub_config(config_path, with_stub_account=True)
+
+        with patch("gitea.client.gitea.Gitea", _StubGitea):
+            result = runner.invoke(
+                app,
+                [
+                    "--config-path",
+                    str(config_path),
+                    "--output",
+                    "json",
+                    "issue",
+                    "get",
+                    "--owner",
+                    _STUB,
+                    "--repository",
+                    _STUB,
+                    "--index",
+                    "15",
+                ],
+            )
+
+        assert result.exit_code == 0
+        # In JSON mode stdout belongs to the envelope alone, so a warning that
+        # leaked onto it fails this parse rather than reaching a consumer.
+        assert parse_envelope(result.stdout)["data"] == {"id": 1}
+        assert "deprecated" in unrendered(result.stderr)
+
+    def test_the_deprecated_index_names_its_replacement(self, tmp_path: Path) -> None:
+        """Using `--index` should say what to use instead of it."""
+        config_path = tmp_path / "config.yaml"
+        _write_stub_config(config_path, with_stub_account=True)
+
+        with (
+            patch("gitea.client.gitea.Gitea", _StubGitea),
+            patch("gitea.cli.utils.options.logger") as mock_logger,
+        ):
+            result = runner.invoke(
+                app,
+                [
+                    "--config-path",
+                    str(config_path),
+                    "issue",
+                    "get",
+                    "--owner",
+                    _STUB,
+                    "--repository",
+                    _STUB,
+                    "--index",
+                    "15",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert mock_logger.warning.call_count == 1
+        warning = _logged_message(mock_logger.warning.call_args)
+        assert "--index is deprecated" in warning
+        assert "pass --issue-id instead" in warning
+
+    def test_the_new_issue_option_warns_about_nothing(self, tmp_path: Path) -> None:
+        """`--issue-id` should not carry the deprecation warning of the name it replaces."""
+        config_path = tmp_path / "config.yaml"
+        _write_stub_config(config_path, with_stub_account=True)
+
+        with patch("gitea.client.gitea.Gitea", _StubGitea):
+            result = runner.invoke(
+                app,
+                [
+                    "--config-path",
+                    str(config_path),
+                    "issue",
+                    "get",
+                    "--owner",
+                    _STUB,
+                    "--repository",
+                    _STUB,
+                    "--issue-id",
+                    "15",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert "deprecated" not in unrendered(result.stderr)
+
+    def test_omitting_the_repository_asks_for_the_owners_own_target(self, tmp_path: Path) -> None:
+        """A command with an owner-wide endpoint should use it when `--repository` is omitted.
+
+        `project get` is the family the convention is taken from: omitting the
+        repository has to keep reaching the organization's project rather than
+        become the error the repository-scoped families report. Succeeding is not
+        enough to show that, because a command reaching the repository endpoint
+        with an empty repository in the path would succeed against a stub too, so
+        the URL each invocation asked for is what is asserted - once with the
+        repository named and once without, since the pair is what makes the
+        difference the option's optionality is for.
+        """
+        config_path = tmp_path / "config.yaml"
+        _write_stub_config(config_path, with_stub_account=True)
+        arguments = ["--config-path", str(config_path), "project", "get", "--owner", _STUB, "--project-id", "1"]
+
+        organization_session = RecordingSession(payload={"id": 1})
+        with patch("gitea.client.gitea.requests.Session", return_value=organization_session):
+            organization = runner.invoke(app, arguments)
+
+        repository_session = RecordingSession(payload={"id": 1})
+        with patch("gitea.client.gitea.requests.Session", return_value=repository_session):
+            repository = runner.invoke(app, [*arguments, "--repository", _STUB])
+
+        assert organization.exit_code == 0, organization.output
+        assert repository.exit_code == 0, repository.output
+        assert organization_session.requests == [("GET", f"https://gitea.invalid/api/v1/orgs/{_STUB}/projects/1")]
+        assert repository_session.requests == [
+            ("GET", f"https://gitea.invalid/api/v1/repos/{_STUB}/{_STUB}/projects/1")
+        ]
 
 
 class TestRegisterCommands:

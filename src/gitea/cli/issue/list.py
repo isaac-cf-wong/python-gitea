@@ -7,11 +7,13 @@ from typing import Annotated, Literal
 
 import typer
 
+from gitea.cli.utils.options import REPOSITORY_REQUIRED_HELP
+
 
 def list_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
+    repository: Annotated[str | None, typer.Option("--repository", help=REPOSITORY_REQUIRED_HELP)] = None,
     state: Annotated[
         Literal["closed", "open", "all"] | None, typer.Option("--state", help="Filter issues by state.")
     ] = None,
@@ -86,7 +88,7 @@ def list_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, which this command requires.
         state: Filter issues by state.
         labels: Filter issues by labels.
         search_string: Filter issues by search string.
@@ -109,6 +111,7 @@ def list_command(
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
     from gitea.cli.utils.convert import list_str_to_list_int_or_none  # noqa: PLC0415
+    from gitea.cli.utils.options import require_repository  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -127,10 +130,12 @@ def list_command(
             The issue information as a dictionary.
 
         """
+        target_repository = require_repository(repository, command="gitea-cli issue list")
+
         with Gitea(token=token, base_url=base_url) as client:
             return client.issue.list_issues(
                 owner=owner,
-                repository=repository,
+                repository=target_repository,
                 state=state,
                 labels=labels,
                 search_string=search_string,
