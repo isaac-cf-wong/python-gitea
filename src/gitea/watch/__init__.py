@@ -23,6 +23,8 @@ from gitea.watch.changes import (
 )
 from gitea.watch.state import (
     STATE_FILE_ENV,
+    STATE_VERSION,
+    cache_lock,
     default_state_path,
     load_state,
     record_scope,
@@ -34,6 +36,8 @@ from gitea.watch.state import (
 
 __all__ = [
     "STATE_FILE_ENV",
+    "STATE_VERSION",
+    "cache_lock",
     "comment_hash",
     "default_state_path",
     "detect_changes",

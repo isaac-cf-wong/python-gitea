@@ -361,10 +361,17 @@ Three behaviours of it are worth knowing before it surprises you:
 - **A run writes only the scopes it watched.** The cache is written by renaming
   a temporary file over it, so an interrupted run cannot leave a half-written
   one, and it is re-read immediately before that so only the scopes of this run
-  are replaced. Two runs watching different scopes therefore leave both
-  recorded. This is not a lock, so it is not concurrency-safe: a write landing
-  in the moment between that re-read and the rename is still lost, and two runs
-  watching the same scope still end with the later one's snapshots.
+  are replaced. The re-read and the write are held under a lock on a `.lock`
+  file beside the cache, so two runs that overlap - a timer shorter than a run
+  takes is enough - record both their scopes instead of the later one erasing
+  the earlier one's. The lock is released if a run is killed, so a crash cannot
+  wedge the runs after it, and a filesystem that will not lock is logged and
+  watched anyway. Two runs watching the _same_ scope still end with the later
+  one's snapshots, which is what watching one thing twice means.
+- **A cache from an older version is recorded afresh.** Upgrading to a release
+  that changed how a comment is recognised makes one run silent, rather than
+  announcing every comment on every watched issue as rewritten. It is logged,
+  and it happens once.
 
 `--dry-run` reports the changes and leaves the cache untouched, so the same
 changes come back on the next run. Everything else about the run is unchanged,

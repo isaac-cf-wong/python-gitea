@@ -3,23 +3,60 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from pathlib import Path
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import platformdirs
 import pytest
 
 from gitea.watch.state import (
     STATE_VERSION,
+    cache_lock,
     default_state_path,
     empty_state,
     load_state,
+    lock_path_for,
     record_scope,
     resolve_state_path,
     save_scopes,
     save_state,
     scope_snapshots,
 )
+
+
+def _slow_writer(delay: float = 0.05):
+    """Wrap the cache write so the window between reading and writing is wide.
+
+    The read/modify/write race is a race whichever way it is written, so a test
+    that only starts two threads at once reaches it sometimes. Holding the
+    critical section open for a while makes the interleaving the one under test
+    every time, without either thread having to know about the other.
+
+    Args:
+        delay: Seconds to wait before writing.
+
+    Returns:
+        A stand-in for `save_state` that writes what it was given, slowly.
+
+    """
+    original = save_state
+
+    def _write(path: Path | str, state: dict[str, Any]) -> None:
+        """Write the cache after a pause.
+
+        Args:
+            path: Path of the cache.
+            state: The cache document to write.
+
+        """
+        time.sleep(delay)
+        original(path, state)
+
+    return _write
+
 
 SNAPSHOT = {
     "issue_id": 1854,
@@ -237,7 +274,12 @@ class TestReadingSnapshots:
         """An unknown field in a snapshot should not be fatal to an older reader."""
         path = tmp_path / "watch-state.json"
         path.write_text(
-            json.dumps({"scopes": {"s": {"issues": {"1854": {**SNAPSHOT, "invented_later": ["a", "b"]}}}}}),
+            json.dumps(
+                {
+                    "version": STATE_VERSION,
+                    "scopes": {"s": {"issues": {"1854": {**SNAPSHOT, "invented_later": ["a", "b"]}}}},
+                }
+            ),
             encoding="utf-8",
         )
 
@@ -288,6 +330,245 @@ class TestReadingSnapshots:
         state = {"scopes": {"s": {"issues": {"1854": {"assignees": ["bob", "alice"]}}}}}
 
         assert scope_snapshots(state, "s")["1854"]["assignees"] == ["alice", "bob"]
+
+
+class TestVersion:
+    """Tests for what the version stamped in a document decides."""
+
+    def test_a_cache_written_by_an_older_version_is_recorded_afresh(self, tmp_path: Path) -> None:
+        """Version 1's comment digests were taken over something else.
+
+        Reading them would compare every recorded digest unequal and announce
+        every comment on every watched issue as removed and written again, on
+        the first run after an upgrade. One silent run costs less.
+        """
+        path = tmp_path / "watch-state.json"
+        path.write_text(
+            json.dumps({"version": 1, "scopes": {"repo:my-org/my-repo": {"issues": {"1854": SNAPSHOT}}}}),
+            encoding="utf-8",
+        )
+
+        with patch("gitea.watch.state.logger") as logger:
+            assert load_state(path) == empty_state()
+
+        assert logger.warning.call_count == 1
+
+    @pytest.mark.parametrize("version", [None, "2", 2.0, True])
+    def test_a_cache_that_declares_no_usable_version_is_recorded_afresh(self, tmp_path: Path, version: Any) -> None:
+        """A document that cannot say which digests it holds is not read.
+
+        Args:
+            tmp_path: Directory to write the cache into.
+            version: The value the document carries for the version.
+
+        """
+        path = tmp_path / "watch-state.json"
+        document: dict[str, Any] = {"scopes": {"s": {"issues": {"1854": SNAPSHOT}}}}
+        if version is not None:
+            document["version"] = version
+        path.write_text(json.dumps(document), encoding="utf-8")
+
+        assert load_state(path) == empty_state()
+
+    def test_a_cache_written_by_a_newer_version_is_still_read(self, tmp_path: Path) -> None:
+        """Reading stays lenient forwards: only an older cache is discarded."""
+        path = tmp_path / "watch-state.json"
+        path.write_text(
+            json.dumps({"version": STATE_VERSION + 97, "scopes": {"s": {"issues": {"1854": SNAPSHOT}}}}),
+            encoding="utf-8",
+        )
+
+        assert scope_snapshots(load_state(path), "s") == {"1854": SNAPSHOT}
+
+    def test_what_this_version_writes_is_what_this_version_reads(self, tmp_path: Path) -> None:
+        """The stamp and the gate have to agree, or every run re-baselines."""
+        path = tmp_path / "watch-state.json"
+
+        save_scopes(path, {"s": {"1854": SNAPSHOT}})
+
+        assert json.loads(path.read_text(encoding="utf-8"))["version"] == STATE_VERSION
+        assert scope_snapshots(load_state(path), "s") == {"1854": SNAPSHOT}
+
+
+class TestCacheLock:
+    """Tests for the lock serializing the read/modify/write of one cache."""
+
+    def test_the_lock_is_taken_beside_the_cache(self, tmp_path: Path) -> None:
+        """The lock is its own file, because a rename replaces the cache itself."""
+        path = tmp_path / "watch-state.json"
+
+        assert lock_path_for(path) == tmp_path / "watch-state.json.lock"
+
+        with cache_lock(path) as held:
+            assert held is True
+            assert lock_path_for(path).exists()
+
+    def test_the_lock_directory_is_created(self, tmp_path: Path) -> None:
+        """A first run should not fail to lock because the directory is absent."""
+        path = tmp_path / "nested" / "watch-state.json"
+
+        with cache_lock(path) as held:
+            assert held is True
+
+    def test_a_platform_without_a_locking_call_still_runs(self, tmp_path: Path) -> None:
+        """Where nothing can be locked the run proceeds, racily rather than not at all.
+
+        The caller is told the lock is not held rather than told it is: code
+        that believed a critical section was guarded when it was not would be
+        worse off than code that knows it is racing.
+        """
+        path = tmp_path / "watch-state.json"
+
+        with (
+            patch("gitea.watch.state.fcntl", None),
+            patch("gitea.watch.state.msvcrt", None),
+            patch("gitea.watch.state.logger") as logger,
+        ):
+            with cache_lock(path) as held:
+                assert held is False
+            assert logger.warning.call_count == 1
+
+            save_scopes(path, {"s": {"1854": SNAPSHOT}})
+
+        assert scope_snapshots(load_state(path), "s") == {"1854": SNAPSHOT}
+
+    def test_a_filesystem_that_refuses_the_lock_still_runs(self, tmp_path: Path) -> None:
+        """A refused lock is logged and the cache is still written."""
+        path = tmp_path / "watch-state.json"
+
+        with patch("gitea.watch.state._take_lock", side_effect=OSError("No locks available")):
+            with patch("gitea.watch.state.logger") as logger, cache_lock(path) as held:
+                assert held is False
+            assert logger.warning.call_count == 1
+
+            save_scopes(path, {"s": {"1854": SNAPSHOT}})
+
+        assert scope_snapshots(load_state(path), "s") == {"1854": SNAPSHOT}
+
+    def test_a_lock_file_that_cannot_be_opened_still_runs(self, tmp_path: Path) -> None:
+        """Nor does an unopenable lock file stop the run."""
+        path = tmp_path / "watch-state.json"
+
+        with (
+            patch("gitea.watch.state.os.open", side_effect=OSError("Permission denied")),
+            patch("gitea.watch.state.logger") as logger,
+            cache_lock(path) as held,
+        ):
+            assert held is False
+
+        assert logger.warning.call_count == 1
+
+    def test_the_lock_is_released_when_the_block_raises(self, tmp_path: Path) -> None:
+        """A failed write must not leave every later run waiting on this one.
+
+        The lock is taken again from another thread rather than from this one,
+        because taking a lock that was never released blocks forever: a test
+        doing it inline would hang the suite until the job running it times out,
+        where this one fails on its own timeout and says what happened.
+        """
+        path = tmp_path / "watch-state.json"
+
+        with pytest.raises(RuntimeError, match="while holding it"), cache_lock(path):
+            raise RuntimeError("while holding it")
+
+        retaken = threading.Event()
+
+        def retake() -> None:
+            """Take the lock again, recording that it was granted."""
+            with cache_lock(path):
+                retaken.set()
+
+        threading.Thread(target=retake, daemon=True).start()
+
+        assert retaken.wait(timeout=10), "the lock was still held after the block raised"
+
+    def test_the_windows_locking_calls_are_the_ones_windows_takes(self, tmp_path: Path) -> None:
+        """The branch taken where there is no `fcntl` should lock a byte range.
+
+        The call itself cannot be made here - this is the POSIX build - so what
+        is asserted is that the Windows branch asks `msvcrt` to lock and then to
+        unlock, from the start of the file, rather than being dead code that
+        only a Windows run would find out about.
+        """
+        path = tmp_path / "watch-state.json"
+        windows = MagicMock(LK_LOCK="lock", LK_UNLCK="unlock")
+
+        with patch("gitea.watch.state.fcntl", None), patch("gitea.watch.state.msvcrt", windows):
+            with cache_lock(path) as held:
+                assert held is True
+            assert windows.locking.call_args_list[0].args[1:] == ("lock", 1)
+            assert windows.locking.call_args_list[1].args[1:] == ("unlock", 1)
+
+
+class TestConcurrentSaves:
+    """Tests for two runs recording different scopes at the same time."""
+
+    def test_both_scopes_survive_two_concurrent_saves(self, tmp_path: Path) -> None:
+        """Two runs saving different scopes at once must both be recorded.
+
+        Re-reading the document before writing is not enough on its own: two
+        runs that both read it before either writes still end with the second
+        rename dropping what the first recorded. The two threads are lined up on
+        a barrier so they enter `save_scopes` together, and the write is slowed
+        so the window between reading and writing is wide enough that the race
+        is reached every time rather than occasionally. What closes it is the
+        lock, which makes the second thread read what the first wrote.
+        """
+        path = tmp_path / "watch-state.json"
+        entered = threading.Barrier(2, timeout=10)
+        unhurried = _slow_writer()
+
+        def record(scope: str) -> None:
+            """Record one scope, arriving with the other thread.
+
+            Args:
+                scope: Key of the scope to record.
+
+            """
+            entered.wait()
+            save_scopes(path, {scope: {scope[-1]: SNAPSHOT}})
+
+        with patch("gitea.watch.state.save_state", unhurried):
+            threads = [
+                threading.Thread(target=record, args=(scope,), daemon=True) for scope in ("repo:org/1", "repo:org/2")
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=15)
+
+        assert [thread.is_alive() for thread in threads] == [False, False]
+        recorded = json.loads(path.read_text(encoding="utf-8"))["scopes"]
+        assert set(recorded) == {"repo:org/1", "repo:org/2"}
+
+    def test_the_same_scope_saved_twice_keeps_the_later_snapshots(self, tmp_path: Path) -> None:
+        """Serializing is not merging: watching one thing twice is still last-one-wins."""
+        path = tmp_path / "watch-state.json"
+        entered = threading.Barrier(2, timeout=10)
+        results: list[None] = []
+
+        def record(issue: str) -> None:
+            """Record one issue under the scope both threads write.
+
+            Args:
+                issue: Key of the issue to record.
+
+            """
+            entered.wait()
+            save_scopes(path, {"repo:org/one": {issue: SNAPSHOT}})
+            results.append(None)
+
+        with patch("gitea.watch.state.save_state", _slow_writer()):
+            threads = [threading.Thread(target=record, args=(issue,), daemon=True) for issue in ("1", "2")]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=15)
+
+        assert len(results) == 2
+        recorded = json.loads(path.read_text(encoding="utf-8"))["scopes"]["repo:org/one"]["issues"]
+        # One of the two, not a merge of both: a scope is what one run just saw.
+        assert list(recorded) in (["1"], ["2"])
 
 
 class TestSaveScopes:

@@ -556,6 +556,45 @@ class TestSeveralScopes:
         assert payload["metadata"]["baselined_scopes"] == ["repo:my-org/other"]
         assert payload["data"] == []
 
+    def test_a_repository_named_twice_is_fetched_once(self, tmp_path: Path) -> None:
+        """Naming one repository twice must cost one listing, not two.
+
+        The unit-level check is that two names build one scope; this is that the
+        command then makes one scope's worth of requests. A second scope with
+        the same key would fetch the repository again and compare that fetch
+        against the same recorded snapshots, reporting every change on it twice.
+        """
+        state_path = tmp_path / "watch-state.json"
+        arguments = [
+            "--output",
+            "json",
+            "watch",
+            "list",
+            "--owner",
+            "my-org",
+            "--repository",
+            "my-repo",
+            "--repository",
+            "my-repo",
+            "--state-file",
+            str(state_path),
+            *AUTH,
+        ]
+
+        run(*arguments, client=make_client([ISSUE]))
+        client = make_client([ISSUE, OTHER_ISSUE])
+        result = run(*arguments, client=client)
+
+        payload = parse_envelope(result.stdout)
+        assert payload["metadata"]["scopes"] == ["repo:my-org/my-repo"]
+        assert payload["metadata"]["issue_count"] == 2
+        # One change, not one per time the repository was named.
+        assert [change["number"] for change in payload["data"]] == [16]
+        # One page of issues plus the short page ending the listing: one scope's
+        # worth of requests, where two scopes would have made four.
+        assert client.issue.list_issues.call_count == 2
+        assert [call.kwargs["page"] for call in client.issue.list_issues.call_args_list] == [1, 2]
+
     def test_a_scope_another_run_recorded_mid_flight_is_not_erased(self, tmp_path: Path) -> None:
         """Two runs watching different scopes must not undo each other.
 

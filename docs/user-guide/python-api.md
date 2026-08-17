@@ -182,8 +182,15 @@ save_scopes("watch-state.json", {SCOPE: current})
 `comment_hash` identifies a comment stably across re-fetches - by the author's
 ID rather than their login, so renaming a user does not look like every comment
 they wrote being replaced - and the state helpers read and write the cache the
-snapshots live in. `save_scopes` re-reads the cache and replaces only the scopes
-it is given, so it does not erase what another run recorded; `save_state` writes
-a whole document, for a caller that has one. Both write atomically, and reading
-tolerates a cache that is missing or unreadable. The
-[CLI documentation](cli.md#the-cache) describes what that tolerance costs.
+snapshots live in.
+
+`save_scopes` re-reads the cache and replaces only the scopes it is given, under
+a lock on a `.lock` file beside it, so a caller running concurrently with
+another does not erase what the other recorded. Prefer it to `save_state`, which
+writes a whole document unlocked and is for a caller that has one - a caller
+holding the whole cache is claiming every scope in it. Both write atomically.
+
+Reading tolerates a cache that is missing or unreadable, and discards one
+written by an older version of this library rather than comparing against
+digests taken over something else. The [CLI documentation](cli.md#the-cache)
+describes what those cost.
