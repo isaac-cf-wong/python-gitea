@@ -131,3 +131,42 @@ Each resource is implemented in a synchronous class (e.g. `gitea.issue.Issue`)
 and an async class (e.g. `gitea.issue.AsyncIssue`); some modules re-export them
 from the package `__init__` (e.g. `from gitea.issue import Issue`). See the
 [API Reference](../reference/index.md) for the full method list and signatures.
+
+## Detecting What Changed
+
+`gitea.watch` is not a resource: it holds the change detection that
+[`gitea-cli watch list`](cli.md#watch---report-what-changed-since-the-last-run)
+is built on, for a caller wanting the same comparison without the command's
+choices about scopes and output.
+
+```python
+from gitea.client.gitea import Gitea
+from gitea.watch import detect_changes, issue_snapshot, load_state, record_scope, save_state, scope_snapshots
+
+state = load_state("watch-state.json")
+
+with Gitea(token="your-token", base_url="https://gitea.example.com") as client:
+    issues, _ = client.issue.list_issues(owner="my-org", repository="my-repo", state="open")
+    current = {
+        str(issue["id"]): issue_snapshot(
+            issue,
+            client.comment.list_comments(owner="my-org", repository="my-repo", index=issue["number"])[0],
+            repository="my-org/my-repo",
+        )
+        for issue in issues
+    }
+
+# None - a scope never recorded - baselines it, so nothing is reported the
+# first time round.
+for change in detect_changes(current, scope_snapshots(state, "repo:my-org/my-repo")):
+    print(change["kind"], change["number"], change["detail"])
+
+record_scope(state, "repo:my-org/my-repo", current)
+save_state("watch-state.json", state)
+```
+
+`issue_snapshot` reduces an issue to the fields the comparison reads,
+`comment_hash` identifies a comment stably across re-fetches, and the state
+helpers read and write the cache the snapshots live in - atomically, and
+tolerating a cache that is missing or unreadable. The
+[CLI documentation](cli.md#the-cache) describes what that tolerance costs.

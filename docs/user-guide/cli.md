@@ -44,7 +44,9 @@ Two formats are supported:
 
 - `text` (default) — human-readable rendering where a command has one. Commands
   that only report an API result print the JSON envelope below in either format,
-  so `text` never loses information.
+  so `text` never loses information. One command prints nothing at all in this
+  format when it has nothing to say: see
+  [Watch](#watch---report-what-changed-since-the-last-run).
 - `json` — always the same envelope on stdout:
 
 ```json
@@ -296,6 +298,126 @@ instance is down.
     - Optional: `--full-name`, `--website`, `--location`, `--language`,
       `--theme`, `--diff-view-style`, `--hide-email`, `--hide-activity`
 
+### Watch - report what changed since the last run
+
+Every other command answers a question about the instance now. `watch` answers
+what moved since you last looked: it keeps a local cache of issue snapshots and
+reports the difference between that cache and the instance, then records the
+instance as the new baseline.
+
+The family is called `watch` because that is what it is for. `state` names the
+cache rather than the purpose, and `diff` suggests comparing two things you
+name, where this compares the present against whatever was last seen.
+
+- `gitea-cli watch list --owner <owner> [--repository <repo>] [--project-id <id>]`
+    - Optional: `--state-file`, `--dry-run`
+
+Each `--repository` watches the open issues of that repository, and each
+`--project-id` watches the cards on that board. Both may be repeated, and both
+may be given together, so one invocation reports what changed across several
+repositories and boards:
+
+```bash
+gitea-cli watch list --owner my-org --repository api --repository web --project-id 29
+```
+
+A project is resolved the way every other `project` command resolves one:
+against `--repository` when exactly one is named, and against the owner itself
+when none is. Naming projects alongside several repositories is an error,
+because there is no single scope left for them to belong to.
+
+#### What counts as a change
+
+Per issue, four things: it appeared, its assignees changed, its labels changed,
+or its comments changed. An issue that dropped out of what is being watched -
+closed, deleted, or moved off the board - is reported as `gone`. An issue that
+changed in more than one way is reported once per way.
+
+Comments are compared by a stable hash of each comment rather than by counting
+them, so a comment edited in place is reported, and a comment added while
+another was deleted is two movements rather than none.
+
+A title or body edited on its own is **not** reported. Gitea bumps an issue's
+`updated_at` for every edit, including ones there is nothing to say about, so
+comparing it would report far more than it is worth.
+
+#### The cache
+
+The cache lives in the user cache directory (`~/.cache/gitea/watch-state.json`
+on Linux) unless `--state-file` or `PYTHON_GITEA_WATCH_STATE_FILE` names
+another; the option wins over the variable. Each repository and each project is
+cached separately, so watching several of them keeps their deltas apart, and a
+scope added later does not disturb the ones already recorded.
+
+Three behaviours of it are worth knowing before it surprises you:
+
+- **The first run against a scope reports nothing.** It records what is there
+  and reports from the second run onwards, so pointing this at a repository with
+  200 open issues does not announce all 200.
+- **An unreadable cache is treated as no cache.** A missing, empty or corrupt
+  file baselines every scope again rather than failing, so a scheduled run
+  recovers by itself - at the cost of never reporting what changed while the
+  cache was gone. The recovery is logged.
+- **The cache is written atomically, and the last writer wins.** A run writes a
+  temporary file and renames it over the cache, so an interrupted run cannot
+  leave a half-written one. No lock is taken: two runs overlapping on the same
+  cache each write a complete document, and the scopes only the earlier one
+  watched are baselined again.
+
+`--dry-run` reports the changes and leaves the cache untouched, so the same
+changes come back on the next run. Everything else about the run is unchanged,
+including the requests it makes.
+
+A cache that cannot be written fails the run: the changes it reported would
+otherwise be reported again forever, which is worth an error rather than a
+silent one-line difference. As with every other failure, nothing is printed on
+stdout.
+
+#### Output
+
+In `text` - the default - the command prints one line per change and **nothing
+at all when nothing changed**:
+
+```console
+$ gitea-cli watch list --owner my-org --repository my-repo
+my-org/my-repo#15 comments: 1 new · Fix the docs
+my-org/my-repo#16 assignees: +alice -bob · Ship the release
+$ gitea-cli watch list --owner my-org --repository my-repo
+$
+```
+
+That empty tick is the point: a `cron` entry mailing its output sends nothing on
+a quiet run, and a watchdog reading its output has nothing to act on.
+
+In `json` it is the usual envelope, always present whether or not anything
+changed. `data` is the list of changes, each naming the scope it was seen in,
+what kind of change it was, and what was added and removed:
+
+```json
+{
+    "kind": "assignees",
+    "scope": "repo:my-org/my-repo",
+    "issue_id": 1900,
+    "number": 16,
+    "title": "Ship the release",
+    "repository": "my-org/my-repo",
+    "detail": "+alice -bob",
+    "added": ["alice"],
+    "removed": ["bob"]
+}
+```
+
+`metadata` names the scopes watched, the ones baselined by this run,
+`issue_count`, `change_count`, `state_file` and `dry_run`, so a run that
+reported nothing still says why.
+
+#### Cost
+
+A run lists every page of each scope, and then every page of the comments of
+every issue in it. That is one request per page of issues plus one per page of
+comments per issue, which is what makes comment edits detectable and what makes
+a large repository worth a longer interval.
+
 ## Examples
 
 List all open issues in a repository:
@@ -353,6 +475,24 @@ Show every card on a project together with the column it is in:
 
 ```bash
 gitea-cli project issues --owner my-org --project-id 1
+```
+
+Report what changed across two repositories and a board since the last run,
+quietly enough to be worth a `cron` entry:
+
+```bash
+gitea-cli watch list \
+    --owner my-org \
+    --repository api \
+    --repository web \
+    --project-id 29
+```
+
+Read the same digest from a script, listing the issues that gained a comment:
+
+```bash
+gitea-cli --output json watch list --owner my-org --repository my-repo |
+    jq -r '.data[] | select(.kind == "comments") | "\(.repository)#\(.number)"'
 ```
 
 Read a configured account's base URL from a script, with `jq` unwrapping the
