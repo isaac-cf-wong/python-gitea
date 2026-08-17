@@ -96,6 +96,10 @@ Tokens are never included in the output of `config` commands in either format.
     - The `comment_count` field is the number of comments on the issue, not the
       comments themselves; use `gitea-cli issue comment list` to read the
       bodies.
+    - Each entry of `projects` carries a `column_id`: the column the issue's
+      card sits in, or `null` when the issue has no card on that project. Gitea
+      does not report it on the issue itself, so it is resolved from each
+      project's board, which costs a few extra requests per project.
 - `gitea-cli issue edit --owner <owner> --repository <repo> --index <index>`
     - Optional: `--title`, `--body`, `--state`, `--assignees`, `--milestone`,
       `--due-date`
