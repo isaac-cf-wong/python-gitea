@@ -2,9 +2,29 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
+
+
+def rename_comment_count(issue: dict[str, Any]) -> dict[str, Any]:
+    """Rename the ``comments`` field of an issue to ``comment_count``.
+
+    The Gitea API returns ``comments`` as an integer count rather than the list of
+    comments, which misleads consumers expecting comment bodies. The value is kept
+    as-is; only the name is made unambiguous. Use ``gitea-cli issue comment list``
+    (or ``gitea-cli comment list``) to retrieve the comments themselves.
+
+    Args:
+        issue: The issue data returned by the API.
+
+    Returns:
+        The issue data with ``comments`` renamed to ``comment_count``.
+
+    """
+    if "comments" not in issue:
+        return issue
+    return {("comment_count" if key == "comments" else key): value for key, value in issue.items()}
 
 
 def get_command(
@@ -46,8 +66,6 @@ def get_command(
         base_url: Base URL of the Gitea platform. If not provided, the base URL from the specified account will be used.
 
     """
-    from typing import Any  # noqa: PLC0415
-
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
@@ -59,7 +77,7 @@ def get_command(
         base_url=base_url,
     )
 
-    def api_call() -> tuple[dict[str, Any] | list[dict[str, Any]], dict[str, Any]]:
+    def api_call() -> tuple[dict[str, Any], dict[str, Any]]:
         """Get issue information.
 
         Returns:
@@ -67,10 +85,11 @@ def get_command(
 
         """
         with Gitea(token=token, base_url=base_url) as client:
-            return client.issue.get_issue(
+            data, metadata = client.issue.get_issue(
                 owner=owner,
                 repository=repository,
                 index=index,
             )
+        return rename_comment_count(data), metadata
 
     execute_api_command(api_call=api_call, command_name="gitea-cli issue get")
