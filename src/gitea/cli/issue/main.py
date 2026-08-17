@@ -14,12 +14,14 @@ issue_app = typer.Typer(
 def register_commands() -> None:
     """Register issue-related commands to the issue_app."""
     from gitea.cli.comment.main import comment_app  # noqa: PLC0415
+    from gitea.cli.issue.close import close_command  # noqa: PLC0415
     from gitea.cli.issue.create import create_command  # noqa: PLC0415
     from gitea.cli.issue.dependency.main import dependency_app  # noqa: PLC0415
     from gitea.cli.issue.edit import edit_command  # noqa: PLC0415
     from gitea.cli.issue.get import get_command  # noqa: PLC0415
     from gitea.cli.issue.list import list_command  # noqa: PLC0415
 
+    issue_app.command("close", help="Close an issue.")(close_command)
     issue_app.command("create", help="Create an issue.")(create_command)
     issue_app.command("edit", help="Edit an issue.")(edit_command)
     issue_app.command("get", help="Get an issue.")(get_command)

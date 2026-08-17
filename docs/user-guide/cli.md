@@ -187,6 +187,13 @@ endpoint to serve it with, so they answer by naming the option to pass.
 - `gitea-cli issue edit --owner <owner> --repository <repo> --issue-id <number>`
     - Optional: `--title`, `--body`, `--state`, `--assignees`, `--milestone`,
       `--due-date`
+- `gitea-cli issue close --owner <owner> --repository <repo> --issue-id <number>`
+    - Optional: `--comment`
+    - Closes the issue, which `issue edit --state closed` also does; this is the
+      shorter way to say it and the one that takes a `--comment`.
+    - `--comment` posts that body on the issue after it is closed. The issue is
+      closed first, so a comment that is refused leaves the issue closed rather
+      than the close undone; the result is the closed issue either way.
 - `gitea-cli issue dependency add --owner <owner> --repository <repo> --issue-id <number>`
     - Required: `--dependency-owner <owner>`, `--dependency-repository <repo>`,
       `--dependency-issue-id <number>`
