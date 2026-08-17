@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 from gitea.cli.main import LoggingLevel, app, main, register_commands, setup_logging, version_callback
 from gitea.cli.output import OutputFormat, get_output_format
 from gitea.version import __version__
+from gitea.watch.state import STATE_FILE_ENV
 from tests.cli.envelope import parse_envelope
 from tests.cli.rendering import unrendered
 from tests.cli.transport import RecordingSession
@@ -42,6 +43,13 @@ _NO_NOOP_INVOCATION: frozenset[tuple[str, ...]] = frozenset()
 # they really are optional: it names a repository target instead of an
 # owner-wide one.
 _SCOPE_OPTIONS = frozenset({"--owner", "--repository", "--issue-id", "--dependency-issue-id"})
+
+# The helpers a command routes its result and its failures through. A command
+# with a human-readable rendering of its own calls `execute_api_call` and reports
+# the result itself, where one that only reports an API result calls
+# `execute_api_command` and lets it print the envelope; both share the error
+# handling the walks below assert on.
+_API_HELPERS = ("execute_api_command", "execute_api_call")
 
 
 def _leaf_commands(command: Any, prefix: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any]]:
@@ -383,18 +391,21 @@ class TestOutputOption:
             result = runner.invoke(app, ["--output", "json", *path, "--help"])
             assert result.exit_code == 0, f"{path}: {result.output}"
 
-    def test_json_mode_routes_every_subcommand_through_a_structured_path(self, tmp_path: Path) -> None:
+    def test_json_mode_routes_every_subcommand_through_a_structured_path(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Every leaf subcommand should emit the envelope, and nothing else, in JSON mode.
 
         Strategy: walk the command tree and actually run each leaf, rather than
         only asking it for `--help`. Arguments are synthesized from the leaf's
         required options, the API client is replaced by a stub, and the config
-        points at a throwaway file, so no invocation touches the network or the
-        user's configuration. Checking only that `--output json` is *accepted*
-        would pass a command that registers the option and then prints prose;
-        checking stdout only passes a command that really routed through `emit`
-        or `execute_api_command`.
+        and the watch cache point at throwaway files, so no invocation touches
+        the network or anything of the user's. Checking only that `--output
+        json` is *accepted* would pass a command that registers the option and
+        then prints prose; checking stdout only passes a command that really
+        routed through `emit` or `execute_api_command`.
         """
+        monkeypatch.setenv(STATE_FILE_ENV, str(tmp_path / "watch-state.json"))
         leaves = [
             (path, command) for path, command in _leaf_commands(get_command(app)) if path not in _NO_NOOP_INVOCATION
         ]
@@ -439,7 +450,7 @@ class TestOutputOption:
             module = importlib.import_module(command.callback.__module__)
             source = inspect.getsource(module)
 
-            assert "execute_api_command" in source or "emit(" in source, f"{path}: {module.__name__}"
+            assert any(helper in source for helper in _API_HELPERS) or "emit(" in source, f"{path}: {module.__name__}"
 
     def test_output_short_option_accepted(self) -> None:
         """`-o` should be an alias for `--output`."""
@@ -563,7 +574,9 @@ class TestOutputOption:
 class TestUnreachableInstance:
     """Tests for how the CLI reports an instance it could not reach."""
 
-    def test_every_api_subcommand_names_the_base_url_when_unreachable(self, tmp_path: Path) -> None:
+    def test_every_api_subcommand_names_the_base_url_when_unreachable(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Every command reaching the API should name the host it tried.
 
         `execute_api_command` is handed a callable, not the client, so it can
@@ -574,11 +587,16 @@ class TestUnreachableInstance:
         connect. Commands that never reach the API - the `config` ones - are
         skipped by looking for the helper in their module source.
         """
+        monkeypatch.setenv(STATE_FILE_ENV, str(tmp_path / "watch-state.json"))
+
         leaves = [
             (path, command)
             for path, command in _leaf_commands(get_command(app))
             if path not in _NO_NOOP_INVOCATION
-            and "execute_api_command" in inspect.getsource(importlib.import_module(command.callback.__module__))
+            and any(
+                helper in inspect.getsource(importlib.import_module(command.callback.__module__))
+                for helper in _API_HELPERS
+            )
         ]
 
         # Guard against the filter silently leaving nothing to run.
@@ -893,6 +911,7 @@ class TestRegisterCommands:
             "milestone": "Commands for managing milestones.",
             "notification": "Commands for managing notifications.",
             "project": "Commands for managing projects.",
+            "watch": "Commands for watching issues for changes.",
         }
         calls = mock_add_typer.call_args_list
         assert len(calls) == len(expected)

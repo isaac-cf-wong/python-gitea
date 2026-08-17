@@ -131,3 +131,66 @@ Each resource is implemented in a synchronous class (e.g. `gitea.issue.Issue`)
 and an async class (e.g. `gitea.issue.AsyncIssue`); some modules re-export them
 from the package `__init__` (e.g. `from gitea.issue import Issue`). See the
 [API Reference](../reference/index.md) for the full method list and signatures.
+
+## Detecting What Changed
+
+`gitea.watch` is not a resource: it holds the change detection that
+[`gitea-cli watch list`](cli.md#watch---report-what-changed-since-the-last-run)
+is built on, for a caller wanting the same comparison without the command's
+choices about scopes and output.
+
+Both listings below are walked with `collect_all_pages`, as the command walks
+them. A single call returns one page, so comparing against `list_issues(...)[0]`
+would report every issue past the first page as gone, and every comment past the
+first page of an issue's comments would never be seen at all.
+
+```python
+from gitea.client.gitea import Gitea
+from gitea.utils.pagination import PAGE_SIZE, collect_all_pages
+from gitea.watch import detect_changes, issue_key, issue_snapshot, load_state, save_scopes, scope_snapshots
+
+OWNER, REPOSITORY = "my-org", "my-repo"
+SCOPE = f"repo:{OWNER}/{REPOSITORY}"
+
+state = load_state("watch-state.json")
+
+with Gitea(token="your-token", base_url="https://gitea.example.com") as client:
+    issues, _ = collect_all_pages(
+        lambda page: client.issue.list_issues(
+            owner=OWNER, repository=REPOSITORY, state="open", page=page, limit=PAGE_SIZE
+        )
+    )
+
+    current = {}
+    for issue in issues:
+        comments, _ = collect_all_pages(
+            lambda page, index=issue["number"]: client.comment.list_comments(
+                owner=OWNER, repository=REPOSITORY, index=index, page=page, limit=PAGE_SIZE
+            )
+        )
+        current[issue_key(issue)] = issue_snapshot(issue, comments, repository=f"{OWNER}/{REPOSITORY}")
+
+# None - a scope never recorded - baselines it, so nothing is reported the
+# first time round.
+for change in detect_changes(current, scope_snapshots(state, SCOPE)):
+    print(change["kind"], change["number"], change["detail"])
+
+save_scopes("watch-state.json", {SCOPE: current})
+```
+
+`issue_snapshot` reduces an issue to the fields the comparison reads,
+`comment_hash` identifies a comment stably across re-fetches - by the author's
+ID rather than their login, so renaming a user does not look like every comment
+they wrote being replaced - and the state helpers read and write the cache the
+snapshots live in.
+
+`save_scopes` re-reads the cache and replaces only the scopes it is given, under
+a lock on a `.lock` file beside it, so a caller running concurrently with
+another does not erase what the other recorded. Prefer it to `save_state`, which
+writes a whole document unlocked and is for a caller that has one - a caller
+holding the whole cache is claiming every scope in it. Both write atomically.
+
+Reading tolerates a cache that is missing or unreadable, and discards one
+written by an older version of this library rather than comparing against
+digests taken over something else. The [CLI documentation](cli.md#the-cache)
+describes what those cost.
