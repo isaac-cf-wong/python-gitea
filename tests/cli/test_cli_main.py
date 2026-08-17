@@ -18,6 +18,7 @@ from gitea.cli.output import OutputFormat, get_output_format
 from gitea.version import __version__
 from tests.cli.envelope import parse_envelope
 from tests.cli.rendering import unrendered
+from tests.cli.transport import RecordingSession
 
 runner = CliRunner()
 
@@ -41,12 +42,6 @@ _NO_NOOP_INVOCATION: frozenset[tuple[str, ...]] = frozenset()
 # they really are optional: it names a repository target instead of an
 # owner-wide one.
 _SCOPE_OPTIONS = frozenset({"--owner", "--repository", "--issue-id", "--dependency-issue-id"})
-
-# Terminal width for an invocation whose whole log message is asserted on.
-# `RichHandler` lays a record out as a table and appends the emitting frame at
-# the right of the first line, so at the default width it lands in the middle of
-# a message long enough to wrap and splits the wording under test.
-_WIDE_TERMINAL = {"COLUMNS": "400"}
 
 
 def _leaf_commands(command: Any, prefix: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any]]:
@@ -140,6 +135,28 @@ def _write_stub_config(path: Path, *, with_stub_account: bool) -> None:
         accounts[_STUB] = {"name": _STUB, "base_url": "https://gitea.invalid", "token": "stub-token"}
 
     path.write_text(yaml.safe_dump({"default_account": "seed", "accounts": accounts}))
+
+
+def _logged_message(call: Any) -> str:
+    """Render the message of a logging call as the user reads it.
+
+    Asserting on a message through the handler that renders it makes the
+    assertion depend on the terminal: `RichHandler` lays a record out as a table
+    and appends the emitting frame - the module and line the record came from -
+    at the right of the first line, so a message long enough to wrap at the
+    running terminal's width gets that frame laid between its halves. Reading
+    the record the CLI logged instead keeps the wording under test and leaves
+    the layout out of it.
+
+    Args:
+        call: Recorded call to a `logging` method, as `mock.call_args` gives it.
+
+    Returns:
+        The logged message with its arguments interpolated.
+
+    """
+    template, *args = call.args
+    return str(template) % tuple(args)
 
 
 class _StubGitea:
@@ -687,41 +704,61 @@ class TestOptionNaming:
 
         The point of declaring the option optional is that the message can
         mention the organization case, so the message is what is asserted here -
-        not merely that the command failed.
+        not merely that the command failed. It is read off the record the CLI
+        logged rather than off the rendered output, so that the assertion holds
+        at every terminal width.
         """
         config_path = tmp_path / "config.yaml"
         _write_stub_config(config_path, with_stub_account=True)
 
-        with patch("gitea.client.gitea.Gitea", _StubGitea):
+        with (
+            patch("gitea.client.gitea.Gitea", _StubGitea),
+            patch("gitea.cli.utils.api.logger") as mock_logger,
+        ):
             result = runner.invoke(
                 app,
                 ["--config-path", str(config_path), "issue", "get", "--owner", _STUB, "--issue-id", "1"],
-                env=_WIDE_TERMINAL,
             )
 
         assert result.exit_code == 1
         # A failed command leaves stdout parsable, as every other error does.
         assert result.stdout == ""
-        assert "--repositoryREPOSITORY" in unrendered(result.stderr)
+        assert mock_logger.error.call_count == 1
+        message = _logged_message(mock_logger.error.call_args)
+        assert "'gitea-cli issue get' needs a repository: pass --repository REPOSITORY." in message
+        # The user is told why the option looked optional in the first place.
+        assert "'gitea-cli project'" in message
 
     def test_a_command_that_needs_an_issue_says_which_option_to_pass(self, tmp_path: Path) -> None:
         """Naming no issue should point at `--issue-id` rather than at `--index`."""
         config_path = tmp_path / "config.yaml"
         _write_stub_config(config_path, with_stub_account=True)
 
-        with patch("gitea.client.gitea.Gitea", _StubGitea):
+        with (
+            patch("gitea.client.gitea.Gitea", _StubGitea),
+            patch("gitea.cli.utils.api.logger") as mock_logger,
+        ):
             result = runner.invoke(
                 app,
                 ["--config-path", str(config_path), "issue", "get", "--owner", _STUB, "--repository", _STUB],
-                env=_WIDE_TERMINAL,
             )
 
         assert result.exit_code == 1
         assert result.stdout == ""
-        assert "pass--issue-idNUMBER" in unrendered(result.stderr)
+        assert mock_logger.error.call_count == 1
+        assert "'gitea-cli issue get' needs an issue: pass --issue-id NUMBER." in _logged_message(
+            mock_logger.error.call_args
+        )
 
     def test_the_deprecated_index_still_names_an_issue(self, tmp_path: Path) -> None:
-        """`--index` should keep working, so scripts written against it survive."""
+        """`--index` should keep working, so scripts written against it survive.
+
+        The invocation runs through the real logging handler, so the deprecation
+        warning it triggers is asserted to have been rendered to stderr and to
+        have stayed out of the envelope on stdout. What the warning says is
+        asserted in `test_the_deprecated_index_names_its_replacement`, which
+        reads the record rather than the layout.
+        """
         config_path = tmp_path / "config.yaml"
         _write_stub_config(config_path, with_stub_account=True)
 
@@ -745,14 +782,20 @@ class TestOptionNaming:
             )
 
         assert result.exit_code == 0
+        # In JSON mode stdout belongs to the envelope alone, so a warning that
+        # leaked onto it fails this parse rather than reaching a consumer.
         assert parse_envelope(result.stdout)["data"] == {"id": 1}
+        assert "deprecated" in unrendered(result.stderr)
 
     def test_the_deprecated_index_names_its_replacement(self, tmp_path: Path) -> None:
-        """Using `--index` should say what to use instead, and only on stderr."""
+        """Using `--index` should say what to use instead of it."""
         config_path = tmp_path / "config.yaml"
         _write_stub_config(config_path, with_stub_account=True)
 
-        with patch("gitea.client.gitea.Gitea", _StubGitea):
+        with (
+            patch("gitea.client.gitea.Gitea", _StubGitea),
+            patch("gitea.cli.utils.options.logger") as mock_logger,
+        ):
             result = runner.invoke(
                 app,
                 [
@@ -767,12 +810,13 @@ class TestOptionNaming:
                     "--index",
                     "15",
                 ],
-                env=_WIDE_TERMINAL,
             )
 
-        warning = unrendered(result.stderr)
-        assert "--indexisdeprecated" in warning
-        assert "pass--issue-idinstead" in warning
+        assert result.exit_code == 0
+        assert mock_logger.warning.call_count == 1
+        warning = _logged_message(mock_logger.warning.call_args)
+        assert "--index is deprecated" in warning
+        assert "pass --issue-id instead" in warning
 
     def test_the_new_issue_option_warns_about_nothing(self, tmp_path: Path) -> None:
         """`--issue-id` should not carry the deprecation warning of the name it replaces."""
@@ -804,19 +848,31 @@ class TestOptionNaming:
 
         `project get` is the family the convention is taken from: omitting the
         repository has to keep reaching the organization's project rather than
-        become the error the repository-scoped families report.
+        become the error the repository-scoped families report. Succeeding is not
+        enough to show that, because a command reaching the repository endpoint
+        with an empty repository in the path would succeed against a stub too, so
+        the URL each invocation asked for is what is asserted - once with the
+        repository named and once without, since the pair is what makes the
+        difference the option's optionality is for.
         """
         config_path = tmp_path / "config.yaml"
         _write_stub_config(config_path, with_stub_account=True)
+        arguments = ["--config-path", str(config_path), "project", "get", "--owner", _STUB, "--project-id", "1"]
 
-        with patch("gitea.client.gitea.Gitea", _StubGitea):
-            result = runner.invoke(
-                app,
-                ["--config-path", str(config_path), "project", "get", "--owner", _STUB, "--project-id", "1"],
-            )
+        organization_session = RecordingSession(payload={"id": 1})
+        with patch("gitea.client.gitea.requests.Session", return_value=organization_session):
+            organization = runner.invoke(app, arguments)
 
-        assert result.exit_code == 0
-        assert "--repository" not in unrendered(result.stderr)
+        repository_session = RecordingSession(payload={"id": 1})
+        with patch("gitea.client.gitea.requests.Session", return_value=repository_session):
+            repository = runner.invoke(app, [*arguments, "--repository", _STUB])
+
+        assert organization.exit_code == 0, organization.output
+        assert repository.exit_code == 0, repository.output
+        assert organization_session.requests == [("GET", f"https://gitea.invalid/api/v1/orgs/{_STUB}/projects/1")]
+        assert repository_session.requests == [
+            ("GET", f"https://gitea.invalid/api/v1/repos/{_STUB}/{_STUB}/projects/1")
+        ]
 
 
 class TestRegisterCommands:

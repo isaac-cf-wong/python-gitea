@@ -1,18 +1,53 @@
 """Unit tests for the notification CLI commands."""
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
+from typer.testing import CliRunner
 
+from gitea.cli.main import app
 from gitea.cli.notification.list import list_command
 from gitea.cli.notification.read import read_command
+from tests.cli.rendering import unrendered
+from tests.cli.transport import RecordingSession
+
+runner = CliRunner()
+
+# Credentials passed on the command line, so that the invocation authenticates
+# without reading a configuration file - and cannot read the developer's own.
+_BASE_URL = "https://gitea.example.com"
 
 
 def make_ctx():
     """Create a mock context object."""
     return SimpleNamespace(obj={"config_path": "/tmp/config"})
+
+
+def _invocation(tmp_path: Path, *arguments: str) -> list[str]:
+    """Build the argument list of a `notification` invocation.
+
+    Args:
+        tmp_path: Directory to point `--config-path` at, so that no
+            configuration of the machine running the tests is read.
+        *arguments: Arguments of the command under test.
+
+    Returns:
+        The full argument list to hand to the runner.
+
+    """
+    return [
+        "--config-path",
+        str(tmp_path / "config.yaml"),
+        "notification",
+        *arguments,
+        "--token",
+        "tok",
+        "--base-url",
+        _BASE_URL,
+    ]
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -240,3 +275,57 @@ def test_read_command_rejects_partial_selector(mock_get_auth_params, owner, repo
             token=None,
             base_url=None,
         )
+
+
+class TestNotificationScopeThroughTheCli:
+    """How the `--owner`/`--repository` pair of the `notification` family reads on the command line.
+
+    The tests above call the command functions directly, which leaves the options
+    themselves untested: a scope wired to the wrong parameter, or a rejection
+    Typer never turns into a usage error, would pass them. These run the
+    invocations the user types and assert the URL each one reached, recorded at
+    the session the client makes its requests through.
+    """
+
+    def test_no_scope_lists_the_authenticated_users_notifications(self, tmp_path: Path) -> None:
+        """Given neither option, `notification list` should ask for the user's own notifications."""
+        session = RecordingSession()
+
+        with patch("gitea.client.gitea.requests.Session", return_value=session):
+            result = runner.invoke(app, _invocation(tmp_path, "list"))
+
+        assert result.exit_code == 0, result.output
+        assert session.urls == [f"{_BASE_URL}/api/v1/notifications"]
+
+    def test_a_full_scope_lists_the_notifications_of_that_repository(self, tmp_path: Path) -> None:
+        """Given both options, `notification list` should ask for that repository's notifications."""
+        session = RecordingSession()
+
+        with patch("gitea.client.gitea.requests.Session", return_value=session):
+            result = runner.invoke(
+                app,
+                _invocation(tmp_path, "list", "--owner", "owner", "--repository", "repo"),
+            )
+
+        assert result.exit_code == 0, result.output
+        assert session.urls == [f"{_BASE_URL}/api/v1/repos/owner/repo/notifications"]
+
+    @pytest.mark.parametrize("command", ["list", "read"])
+    @pytest.mark.parametrize("half", [["--owner", "owner"], ["--repository", "repo"]])
+    def test_half_a_scope_is_refused_before_any_request(self, tmp_path: Path, command: str, half: list[str]) -> None:
+        """Either option alone should be refused with a message naming both, and no call made."""
+        session = RecordingSession()
+
+        with patch("gitea.client.gitea.requests.Session", return_value=session):
+            result = runner.invoke(app, _invocation(tmp_path, command, *half))
+
+        # A usage error, so that a script can tell it from the failure of a call.
+        assert result.exit_code == 2
+        assert result.stdout == ""
+        # The message is asserted by the words it is made of: the layout Rich
+        # gives a usage error depends on the terminal running the tests.
+        message = unrendered(result.stderr)
+        assert "--owner" in message
+        assert "--repository" in message
+        assert "together" in message
+        assert session.requests == []
