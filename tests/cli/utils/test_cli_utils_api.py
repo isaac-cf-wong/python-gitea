@@ -7,6 +7,7 @@ import pytest
 import typer
 
 from gitea.cli.utils.api import execute_api_command
+from gitea.cli.utils.errors import CommandError
 
 
 def test_execute_api_command_success(capsys):
@@ -44,3 +45,24 @@ def test_execute_api_command_exception(monkeypatch):
     mock_logger.exception.assert_called_once()
     call_args = mock_logger.exception.call_args[0]
     assert call_args[1] == "MyCmd"
+
+
+def test_execute_api_command_command_error(monkeypatch):
+    """Should log a CommandError as its message alone and raise typer.Exit with code 1."""
+
+    def api_call():
+        raise CommandError("No issue #15 in owner/repo")
+
+    mock_logger = MagicMock()
+    monkeypatch.setattr("gitea.cli.utils.api.logger", mock_logger)
+
+    with pytest.raises(typer.Exit) as exc_info:
+        execute_api_command(api_call, command_name="MyCmd")
+
+    exit_code = getattr(exc_info.value, "exit_code", getattr(exc_info.value, "code", None))
+    assert exit_code == 1
+
+    # The message carries the whole error, so no traceback is logged.
+    mock_logger.exception.assert_not_called()
+    mock_logger.error.assert_called_once()
+    assert str(mock_logger.error.call_args[0][1]) == "No issue #15 in owner/repo"

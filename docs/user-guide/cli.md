@@ -164,9 +164,30 @@ is the same implementation under a second, more discoverable name.
     - Optional: `--page`, `--limit`
 - `gitea-cli project issues --owner <owner> --repository <repo> --project-id <id>`
 - `gitea-cli project issue add --owner <owner> --repository <repo> --project-id <id> --column-id <id> --issue-id <id>`
+    - Optional: `--issue-repository`
 - `gitea-cli project issue move --owner <owner> --repository <repo> --project-id <id> --column-id <id> --issue-id <id>`
-    - Optional: `--sorting`
+    - Optional: `--sorting`, `--issue-repository`
 - `gitea-cli project issue remove --owner <owner> --repository <repo> --project-id <id> --column-id <id> --issue-id <id>`
+    - Optional: `--issue-repository`
+
+The project endpoints identify an issue by its global ID, which is not the
+number shown in the web UI: `my-org/my-repo#15` may well be global ID `1854`.
+The three `project issue` commands therefore take `--issue-id` as the number
+whenever they know which repository holds the issue, and look the global ID up
+for you:
+
+- On a repository project, `--repository` already names that repository, so
+  `--issue-id 15` means `#15` of it.
+- On an organization project, `--repository` is omitted and the issue may come
+  from any repository of the organization. Name it with `--issue-repository` to
+  address the issue by number; without it, `--issue-id` is read as the global
+  ID. `--issue-repository` also overrides `--repository`, for the case of a
+  repository project holding an issue from elsewhere.
+
+The global ID the command used comes back as `metadata.resolved_issue_id`. A
+number the repository does not have, and a call the project endpoint refuses,
+are both reported as errors naming the issue and what to check - never as an
+empty result.
 
 ### User - manage users
 
@@ -194,7 +215,8 @@ gitea-cli issue create \
     --milestone 3
 ```
 
-Move an issue into a project column:
+Move an issue into a project column, addressing it by the number shown in the
+web UI:
 
 ```bash
 gitea-cli project issue add \
@@ -202,6 +224,18 @@ gitea-cli project issue add \
     --repository my-repo \
     --project-id 1 \
     --column-id 2 \
+    --issue-id 42
+```
+
+Move `my-repo#42` on an organization project, where the repository holding the
+issue has to be named separately:
+
+```bash
+gitea-cli project issue move \
+    --owner my-org \
+    --project-id 1 \
+    --column-id 2 \
+    --issue-repository my-repo \
     --issue-id 42
 ```
 

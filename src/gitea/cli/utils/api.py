@@ -9,6 +9,7 @@ from typing import Any
 import typer
 
 from gitea.cli.output import print_envelope
+from gitea.cli.utils.errors import CommandError
 
 logger = logging.getLogger("gitea")
 
@@ -21,7 +22,8 @@ def execute_api_command(
 
     The result is always written as the `{"data": ..., "metadata": ...}` JSON
     envelope, so these commands already satisfy `--output json` and are
-    unaffected by `--output text`.
+    unaffected by `--output text`. A `CommandError` is reported as its message
+    alone, without a traceback, since it describes something the user can fix.
 
     Args:
         api_call: Callable that executes the API call and returns the result.
@@ -32,6 +34,10 @@ def execute_api_command(
         response_data, metadata = api_call()
 
         print_envelope(data=response_data, metadata=metadata)
+    except CommandError as e:
+        # The message is the whole error the user needs; a traceback would bury it.
+        logger.error("%s", e)
+        raise typer.Exit(1) from e
     except Exception as e:
         logger.exception("Error executing %s", command_name)
         raise typer.Exit(1) from e
