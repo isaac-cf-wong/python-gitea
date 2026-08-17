@@ -67,6 +67,25 @@ def setup_logging(level: LoggingLevel = LoggingLevel.INFO) -> None:
     logger.propagate = False
 
 
+def version_callback(value: bool) -> None:
+    """Print the package version and exit when the flag is set.
+
+    Args:
+        value: Whether the `--version` flag was provided.
+
+    Raises:
+        typer.Exit: When the version has been printed.
+
+    """
+    if not value:
+        return
+
+    from gitea.version import __version__  # noqa: PLC0415
+
+    print(__version__)
+    raise typer.Exit
+
+
 @app.callback()
 def main(
     ctx: typer.Context,
@@ -81,6 +100,15 @@ def main(
         LoggingLevel,
         typer.Option("--verbose", "-v", help="Set verbosity level."),
     ] = LoggingLevel.INFO,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            help="Show the version of python-gitea and exit.",
+            callback=version_callback,
+            is_eager=True,
+        ),
+    ] = False,
 ) -> None:
     """Enter the CLI application.
 
@@ -88,6 +116,7 @@ def main(
         ctx: Typer context.
         config_path: Path to the configuration file.
         verbose: Verbosity level for logging.
+        version: Whether to print the version and exit. Handled by `version_callback`.
 
     """
     import os  # noqa: PLC0415
