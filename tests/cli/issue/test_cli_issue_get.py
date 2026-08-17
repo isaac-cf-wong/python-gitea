@@ -99,8 +99,8 @@ def test_get_command_reports_the_column_of_every_project_the_issue_is_on(
 
     get_command(
         ctx=ctx,
-        owner="management",
-        repository="weave-workspace",
+        owner="example-org",
+        repository="example-repo",
         index=15,
         account_name="acct",
         token=None,
@@ -127,8 +127,8 @@ def test_get_command_reports_a_null_column_for_a_project_without_a_card(mock_git
 
     get_command(
         ctx=ctx,
-        owner="management",
-        repository="weave-workspace",
+        owner="example-org",
+        repository="example-repo",
         index=15,
         account_name="acct",
         token=None,
@@ -154,8 +154,8 @@ def test_get_command_leaves_an_issue_without_projects_alone(mock_gitea, mock_get
 
     get_command(
         ctx=ctx,
-        owner="management",
-        repository="weave-workspace",
+        owner="example-org",
+        repository="example-repo",
         index=15,
         account_name="acct",
         token=None,

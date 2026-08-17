@@ -27,13 +27,13 @@ def test_resolves_the_column_holding_the_card_of_an_organization_project():
     )
 
     resolved = resolve_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(ORGANIZATION_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
     )
 
     assert column_ids(resolved) == [109]
     # An organization project's columns live under the organization, not the repository.
     client.project.list_project_columns.assert_called_once_with(
-        owner="management", repository=None, project_id=29, page=1, limit=PAGE_SIZE
+        owner="example-org", repository=None, project_id=29, page=1, limit=PAGE_SIZE
     )
     assert {call.kwargs["repository"] for call in client.project.list_project_column_issues.call_args_list} == {None}
 
@@ -46,15 +46,15 @@ def test_resolves_the_column_of_a_repository_project_under_its_repository():
     )
 
     resolved = resolve_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(REPOSITORY_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(REPOSITORY_PROJECT)
     )
 
     assert column_ids(resolved) == [5]
     client.project.list_project_columns.assert_called_once_with(
-        owner="management", repository="weave-workspace", project_id=31, page=1, limit=PAGE_SIZE
+        owner="example-org", repository="example-repo", project_id=31, page=1, limit=PAGE_SIZE
     )
     client.project.list_project_column_issues.assert_called_once_with(
-        owner="management", repository="weave-workspace", project_id=31, column_id=5, page=1, limit=PAGE_SIZE
+        owner="example-org", repository="example-repo", project_id=31, column_id=5, page=1, limit=PAGE_SIZE
     )
 
 
@@ -66,7 +66,7 @@ def test_reports_no_column_when_the_issue_has_no_card_on_the_project():
     )
 
     resolved = resolve_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(ORGANIZATION_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
     )
 
     assert column_ids(resolved) == [None]
@@ -88,8 +88,8 @@ def test_resolves_every_project_the_issue_is_on():
 
     resolved = resolve_project_column_ids(
         client=client,
-        owner="management",
-        repository="weave-workspace",
+        owner="example-org",
+        repository="example-repo",
         issue=make_issue(ORGANIZATION_PROJECT, REPOSITORY_PROJECT),
     )
 
@@ -104,7 +104,7 @@ def test_stops_searching_at_the_column_holding_the_card():
     )
 
     resolved = resolve_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(ORGANIZATION_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
     )
 
     assert column_ids(resolved) == [108]
@@ -119,7 +119,7 @@ def test_finds_a_card_beyond_the_first_page_of_a_column():
     )
 
     resolved = resolve_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(ORGANIZATION_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
     )
 
     assert column_ids(resolved) == [109]
@@ -134,7 +134,7 @@ def test_finds_a_card_in_a_column_beyond_the_first_page_of_columns():
     )
 
     resolved = resolve_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(ORGANIZATION_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
     )
 
     assert column_ids(resolved) == [109]
@@ -146,7 +146,7 @@ def test_returns_the_issue_unchanged_when_it_lists_no_projects():
     client = make_client({}, {})
     issue = {"id": ISSUE_ID, "title": "No board"}
 
-    resolved = resolve_project_column_ids(client=client, owner="management", repository="weave-workspace", issue=issue)
+    resolved = resolve_project_column_ids(client=client, owner="example-org", repository="example-repo", issue=issue)
 
     assert resolved == issue
     client.project.list_project_columns.assert_not_called()
@@ -157,7 +157,7 @@ def test_returns_the_issue_unchanged_when_the_projects_field_is_null():
     client = make_client({}, {})
     issue = {"id": ISSUE_ID, "title": "No board", "projects": None}
 
-    resolved = resolve_project_column_ids(client=client, owner="management", repository="weave-workspace", issue=issue)
+    resolved = resolve_project_column_ids(client=client, owner="example-org", repository="example-repo", issue=issue)
 
     assert resolved == issue
     client.project.list_project_columns.assert_not_called()
@@ -167,7 +167,7 @@ def test_returns_a_payload_that_is_not_an_issue_object_unchanged():
     """A body that is not an issue must be handed back rather than crashed on."""
     client = make_client({}, {})
 
-    assert resolve_project_column_ids(client=client, owner="management", repository="weave-workspace", issue=[]) == []
+    assert resolve_project_column_ids(client=client, owner="example-org", repository="example-repo", issue=[]) == []
     client.project.list_project_columns.assert_not_called()
 
 
@@ -176,7 +176,7 @@ def test_returns_the_issue_unchanged_without_a_global_issue_id():
     client = make_client({}, {})
     issue = {"number": 15, "projects": [dict(ORGANIZATION_PROJECT)]}
 
-    resolved = resolve_project_column_ids(client=client, owner="management", repository="weave-workspace", issue=issue)
+    resolved = resolve_project_column_ids(client=client, owner="example-org", repository="example-repo", issue=issue)
 
     assert resolved == issue
     client.project.list_project_columns.assert_not_called()
@@ -188,8 +188,8 @@ def test_reports_no_column_for_a_project_without_a_usable_id():
 
     resolved = resolve_project_column_ids(
         client=client,
-        owner="management",
-        repository="weave-workspace",
+        owner="example-org",
+        repository="example-repo",
         issue=make_issue({"title": "Nameless board"}),
     )
 
@@ -205,7 +205,7 @@ def test_skips_a_column_without_a_usable_id():
     )
 
     resolved = resolve_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(ORGANIZATION_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
     )
 
     assert column_ids(resolved) == [109]
@@ -224,8 +224,8 @@ def test_a_refused_lookup_leaves_that_project_null_and_resolves_the_others(caplo
     with caplog.at_level(logging.WARNING, logger="gitea"):
         resolved = resolve_project_column_ids(
             client=client,
-            owner="management",
-            repository="weave-workspace",
+            owner="example-org",
+            repository="example-repo",
             issue=make_issue(ORGANIZATION_PROJECT, REPOSITORY_PROJECT),
         )
 
@@ -239,7 +239,7 @@ def test_keeps_the_rest_of_the_issue_and_of_the_projects_intact():
     client = make_client({29: [[{"id": 109}]]}, {109: [[{"id": ISSUE_ID}]]})
     issue = make_issue(ORGANIZATION_PROJECT)
 
-    resolved = resolve_project_column_ids(client=client, owner="management", repository="weave-workspace", issue=issue)
+    resolved = resolve_project_column_ids(client=client, owner="example-org", repository="example-repo", issue=issue)
 
     assert resolved == {**issue, "projects": [{**ORGANIZATION_PROJECT, "column_id": 109}]}
     # The payload handed in is not mutated.
@@ -250,10 +250,10 @@ def test_keeps_the_rest_of_the_issue_and_of_the_projects_intact():
     ("project", "expected_repository"),
     [
         ({"id": 29, "type": "organization", "repo_id": 0}, None),
-        ({"id": 31, "type": "repository", "repo_id": 4}, "weave-workspace"),
+        ({"id": 31, "type": "repository", "repo_id": 4}, "example-repo"),
         # An older instance may report the type without the repository, or the
         # repository without the type; either alone identifies the scope.
-        ({"id": 31, "repo_id": 4}, "weave-workspace"),
+        ({"id": 31, "repo_id": 4}, "example-repo"),
         ({"id": 29, "type": "organization"}, None),
         ({"id": 29}, None),
     ],
@@ -262,8 +262,6 @@ def test_scopes_the_column_listing_to_the_kind_of_project(project, expected_repo
     """The column listing should be scoped by the kind of project the card is on."""
     client = make_client({project["id"]: [[{"id": 7}]]}, {7: [[{"id": ISSUE_ID}]]})
 
-    resolve_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(project)
-    )
+    resolve_project_column_ids(client=client, owner="example-org", repository="example-repo", issue=make_issue(project))
 
     assert client.project.list_project_columns.call_args.kwargs["repository"] == expected_repository

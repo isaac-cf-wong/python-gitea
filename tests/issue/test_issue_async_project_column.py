@@ -28,12 +28,12 @@ async def test_resolves_the_column_holding_the_card():
     )
 
     resolved = await resolve_async_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(ORGANIZATION_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
     )
 
     assert column_ids(resolved) == [109]
     client.project.list_project_columns.assert_awaited_once_with(
-        owner="management", repository=None, project_id=29, page=1, limit=PAGE_SIZE
+        owner="example-org", repository=None, project_id=29, page=1, limit=PAGE_SIZE
     )
 
 
@@ -43,12 +43,12 @@ async def test_resolves_the_column_of_a_repository_project_under_its_repository(
     client = make_async_client({31: [[{"id": 5}]]}, {5: [[{"id": ISSUE_ID}]]})
 
     resolved = await resolve_async_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(REPOSITORY_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(REPOSITORY_PROJECT)
     )
 
     assert column_ids(resolved) == [5]
     client.project.list_project_columns.assert_awaited_once_with(
-        owner="management", repository="weave-workspace", project_id=31, page=1, limit=PAGE_SIZE
+        owner="example-org", repository="example-repo", project_id=31, page=1, limit=PAGE_SIZE
     )
 
 
@@ -58,7 +58,7 @@ async def test_reports_no_column_when_the_issue_has_no_card_on_the_project():
     client = make_async_client({29: [[{"id": 107}, {"id": 108}]]}, {107: [[{"id": 1857}]], 108: [[]]})
 
     resolved = await resolve_async_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(ORGANIZATION_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
     )
 
     assert column_ids(resolved) == [None]
@@ -79,7 +79,7 @@ async def test_pages_through_columns_and_their_issues():
     )
 
     resolved = await resolve_async_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=make_issue(ORGANIZATION_PROJECT)
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
     )
 
     assert column_ids(resolved) == [102]
@@ -96,8 +96,8 @@ async def test_reports_no_column_for_a_project_without_a_usable_id():
 
     resolved = await resolve_async_project_column_ids(
         client=client,
-        owner="management",
-        repository="weave-workspace",
+        owner="example-org",
+        repository="example-repo",
         issue=make_issue({"title": "Nameless board"}),
     )
 
@@ -112,7 +112,7 @@ async def test_returns_the_issue_unchanged_when_it_lists_no_projects():
     issue = {"id": ISSUE_ID, "title": "No board"}
 
     resolved = await resolve_async_project_column_ids(
-        client=client, owner="management", repository="weave-workspace", issue=issue
+        client=client, owner="example-org", repository="example-repo", issue=issue
     )
 
     assert resolved == issue
@@ -134,8 +134,8 @@ async def test_a_refused_lookup_leaves_that_project_null_and_resolves_the_others
     with caplog.at_level(logging.WARNING, logger="gitea"):
         resolved = await resolve_async_project_column_ids(
             client=client,
-            owner="management",
-            repository="weave-workspace",
+            owner="example-org",
+            repository="example-repo",
             issue=make_issue(ORGANIZATION_PROJECT, REPOSITORY_PROJECT),
         )
 
