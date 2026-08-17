@@ -25,12 +25,21 @@ def delete_command(
     """
     import logging  # noqa: PLC0415
 
+    from gitea.cli.output import OutputFormat, emit, get_output_format  # noqa: PLC0415
     from gitea.config.manager import ConfigManager  # noqa: PLC0415
 
+    as_json = get_output_format(ctx) is OutputFormat.JSON
+
     if not force:
-        confirm = typer.confirm(f"Are you sure you want to delete the account '{name}'?")
+        # Keep the prompt off stdout in JSON mode so the envelope stays parsable.
+        confirm = typer.confirm(f"Are you sure you want to delete the account '{name}'?", err=as_json)
         if not confirm:
-            typer.echo("Deletion cancelled.")
+            emit(
+                ctx,
+                data={"name": name, "status": "cancelled"},
+                metadata={},
+                render_text=lambda: typer.echo("Deletion cancelled."),
+            )
             raise typer.Exit()
 
     logger = logging.getLogger("gitea")
@@ -48,3 +57,9 @@ def delete_command(
     except ValueError as e:
         logger.error("Error deleting account: %s", e)
         raise typer.Exit(code=1) from e
+
+    emit(
+        ctx,
+        data={"name": name, "status": "deleted"},
+        metadata={"config_path": str(config_manager.config_path)},
+    )
