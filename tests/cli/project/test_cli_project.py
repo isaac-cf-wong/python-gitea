@@ -20,6 +20,7 @@ from gitea.cli.project.issue.move import move_issue_command
 from gitea.cli.project.issue.remove import remove_issue_command
 from gitea.cli.project.list import list_command
 from gitea.cli.utils.errors import CommandError
+from tests.cli.rendering import unrendered
 
 runner = CliRunner()
 
@@ -731,10 +732,10 @@ def test_move_issue_command_org_failure_suggests_issue_repository(mock_gitea, mo
 @pytest.mark.parametrize(
     ("error", "expected"),
     [
-        pytest.param(make_http_error(404), "The issue was found in owner/repo", id="refused"),
+        pytest.param(make_http_error(404), ("The issue was found in", "owner/repo"), id="refused"),
         pytest.param(
             RequestsConnectionError("Failed to establish a new connection: [Errno 111] Connection refused"),
-            "Could not reach the Gitea API at https://gitea.example.com",
+            ("Could not reach the Gitea API", "https://gitea.example.com"),
             id="unreachable",
         ),
     ],
@@ -745,7 +746,8 @@ def test_move_issue_reports_failures_without_a_traceback(
     mock_gitea, mock_get_auth_params, monkeypatch, tmp_path, error, expected
 ):
     """The command should exit 1 with the message alone, through the real logging handler."""
-    # Keep the message on one line so the assertions do not depend on wrapping.
+    # Keep the message on one line so the layout stays the simple one, whichever
+    # width the terminal running the tests reports.
     monkeypatch.setenv("COLUMNS", "300")
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
@@ -780,9 +782,15 @@ def test_move_issue_reports_failures_without_a_traceback(
 
     assert result.exit_code == 1
     assert result.stdout == ""
-    message = " ".join(result.stderr.split())
-    assert expected in message
+    # `RichHandler` renders the record for whatever terminal it believes it is
+    # writing to: it styles the URL inside the message, pads the message column
+    # and appends the emitting frame. Assert on the wording each part of the
+    # message contributes, over the unstyled text, so none of those decisions
+    # can turn a correct message into a failure.
+    message = unrendered(result.stderr)
+    for fragment in expected:
+        assert unrendered(fragment) in message
     # The message is the whole error: no traceback, and none of the wording the
     # unhandled-exception path would add.
     assert "Traceback" not in result.stderr
-    assert "Error executing" not in message
+    assert unrendered("Error executing") not in message
