@@ -107,4 +107,4 @@ def remove_issue_command(
                 issue_repository=issue_repository or repository,
             )
 
-    execute_api_command(api_call=api_call, command_name="gitea-cli project issue remove")
+    execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli project issue remove")

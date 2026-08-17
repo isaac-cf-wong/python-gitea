@@ -189,7 +189,9 @@ number the repository does not have, and a call the project endpoint refuses,
 are both reported as errors naming the issue and what to check - never as an
 empty result. An instance that cannot be reached at all, whether the connection
 fails or times out, is reported as one line naming the base URL rather than as a
-traceback.
+traceback. A request that fails before any response for another reason - a
+malformed base URL, say - is reported the same way, without claiming the
+instance is down.
 
 ### User - manage users
 

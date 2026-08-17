@@ -100,4 +100,4 @@ def edit_command(
                 state=state,
             )
 
-    execute_api_command(api_call=api_call, command_name="gitea-cli project edit")
+    execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli project edit")

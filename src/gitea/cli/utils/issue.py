@@ -16,9 +16,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from requests import HTTPError, RequestException
+from requests import ConnectionError as RequestsConnectionError
+from requests import HTTPError, RequestException, Timeout
 
-from gitea.cli.utils.errors import CommandError, unreachable_message
+from gitea.cli.utils.errors import CommandError, request_failed_message, unreachable_message
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -92,7 +93,8 @@ def resolve_issue_id(*, client: Gitea, owner: str, repository: str | None, issue
 
     Raises:
         CommandError: If the repository has no issue with that number, the
-            lookup was refused, or the instance could not be reached.
+            lookup was refused, the instance could not be reached, or the
+            request failed without reaching a response.
 
     """
     if repository is None:
@@ -107,9 +109,13 @@ def resolve_issue_id(*, client: Gitea, owner: str, repository: str | None, issue
                 f"Could not look up issue #{issue_number} in {owner}/{repository}: {_describe(status_code, e)}."
             ) from e
         raise CommandError(_unknown_issue_message(owner, repository, issue_number, status_code)) from e
-    except RequestException as e:
+    except (RequestsConnectionError, Timeout) as e:
         # No response came back, so nothing is known about the issue itself.
         raise CommandError(unreachable_message(e, client.base_url)) from e
+    except RequestException as e:
+        # Also no response, but a malformed URL or an unreadable body is not the
+        # instance being unreachable, so only the request itself is blamed.
+        raise CommandError(request_failed_message(e, client.base_url)) from e
 
     issue_id = data.get("id") if isinstance(data, dict) else None
     status_code = metadata.get("status_code", 0)
@@ -172,7 +178,8 @@ def run_project_issue_call(
 
     Raises:
         CommandError: If the issue could not be resolved, the call was refused,
-            or the instance could not be reached.
+            the instance could not be reached, or the request failed without
+            reaching a response.
 
     """
     issue_id = resolve_issue_id(client=client, owner=owner, repository=issue_repository, issue_number=issue_number)
@@ -185,10 +192,14 @@ def run_project_issue_call(
             _describe(status_code, e), action, owner, project_id, issue_number, issue_id, issue_repository
         )
         raise CommandError(message) from e
-    except RequestException as e:
+    except (RequestsConnectionError, Timeout) as e:
         # The call never reached the project, so the hints about the project
         # and the columns would only misdirect.
         raise CommandError(unreachable_message(e, client.base_url)) from e
+    except RequestException as e:
+        # The project was not reached either, but the instance may well be up:
+        # nothing here says it was the connection that failed.
+        raise CommandError(request_failed_message(e, client.base_url)) from e
 
     status_code = metadata.get("status_code", 0)
     if not _is_success(status_code):

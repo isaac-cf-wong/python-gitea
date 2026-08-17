@@ -6,10 +6,12 @@ from unittest.mock import MagicMock
 import pytest
 import typer
 from requests import ConnectionError as RequestsConnectionError
-from requests import HTTPError, Timeout
+from requests import ConnectTimeout, HTTPError, ReadTimeout, Timeout
 
 from gitea.cli.utils.api import execute_api_command
 from gitea.cli.utils.errors import CommandError
+
+BASE_URL = "https://gitea.example.com"
 
 
 def test_execute_api_command_success(capsys):
@@ -75,8 +77,10 @@ def test_execute_api_command_command_error(monkeypatch):
     [
         RequestsConnectionError("Failed to establish a new connection: [Errno 111] Connection refused"),
         Timeout("Read timed out. (read timeout=10)"),
+        ConnectTimeout("Connection to gitea.example.com timed out. (connect timeout=10)"),
+        ReadTimeout("HTTPSConnectionPool(host='gitea.example.com', port=443): Read timed out."),
     ],
-    ids=["connection", "timeout"],
+    ids=["connection", "timeout", "connect-timeout", "read-timeout"],
 )
 def test_execute_api_command_unreachable_instance(monkeypatch, error):
     """Should report a connection or timeout failure without a traceback."""
@@ -100,6 +104,35 @@ def test_execute_api_command_unreachable_instance(monkeypatch, error):
     message = str(mock_logger.error.call_args[0][1])
     assert "Could not reach the Gitea API" in message
     assert str(error) in message
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        RequestsConnectionError("Failed to establish a new connection: [Errno 111] Connection refused"),
+        Timeout("Read timed out. (read timeout=10)"),
+    ],
+    ids=["connection", "timeout"],
+)
+def test_execute_api_command_unreachable_instance_names_the_base_url(monkeypatch, error):
+    """Should name the host the command tried to reach.
+
+    The callable holds the client, so this helper cannot recover the host from
+    it: a command that does not pass the base URL leaves the user with a message
+    that never says which instance was tried.
+    """
+
+    def api_call():
+        raise error
+
+    mock_logger = MagicMock()
+    monkeypatch.setattr("gitea.cli.utils.api.logger", mock_logger)
+
+    with pytest.raises(typer.Exit):
+        execute_api_command(api_call, command_name="MyCmd", base_url=BASE_URL)
+
+    message = str(mock_logger.error.call_args[0][1])
+    assert f"Could not reach the Gitea API at {BASE_URL}" in message
 
 
 def test_execute_api_command_http_error_keeps_its_traceback(monkeypatch):

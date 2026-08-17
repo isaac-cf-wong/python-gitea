@@ -94,4 +94,4 @@ def update_settings_command(
                 website=website,
             )
 
-    execute_api_command(api_call=api_call, command_name="gitea-cli user update-settings")
+    execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli user update-settings")

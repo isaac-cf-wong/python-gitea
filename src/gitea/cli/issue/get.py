@@ -92,4 +92,4 @@ def get_command(
             )
         return rename_comment_count(data), metadata
 
-    execute_api_command(api_call=api_call, command_name="gitea-cli issue get")
+    execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli issue get")

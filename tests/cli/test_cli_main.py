@@ -8,6 +8,7 @@ from typing import Any, Self
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 import typer
 import yaml
 from typer.main import get_command
@@ -208,6 +209,40 @@ class _StubGitea:
 
         """
         return False
+
+
+class _UnreachableGitea(_StubGitea):
+    """Stand-in for the API client of an instance that cannot be reached.
+
+    The base URL is kept as a real attribute rather than left to `__getattr__`,
+    because the helpers that build the unreachable message read it off the
+    client, and a stub standing in for it would hide the host under test.
+    """
+
+    def __init__(self, *args: Any, base_url: str | None = None, **kwargs: Any) -> None:
+        """Record the base URL the command passed and ignore the credentials.
+
+        Args:
+            *args: Ignored.
+            base_url: The base URL the command resolved, kept for the message.
+            **kwargs: Ignored.
+
+        """
+        super().__init__(*args, **kwargs)
+        self.base_url = base_url
+
+    def __call__(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Fail as an endpoint does when the connection cannot be established.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Raises:
+            ConnectionError: Always, in the form the HTTP layer raises it.
+
+        """
+        raise requests.ConnectionError("Failed to establish a new connection: [Errno 111] Connection refused")
 
 
 class TestLoggingLevel:
@@ -475,6 +510,52 @@ class TestOutputOption:
         main(ctx, config_path=None, verbose=LoggingLevel.INFO, output=OutputFormat.TEXT, version=False)
 
         assert ctx.obj == {"config_path": None, "output": OutputFormat.TEXT}
+
+
+class TestUnreachableInstance:
+    """Tests for how the CLI reports an instance it could not reach."""
+
+    def test_every_api_subcommand_names_the_base_url_when_unreachable(self, tmp_path: Path) -> None:
+        """Every command reaching the API should name the host it tried.
+
+        `execute_api_command` is handed a callable, not the client, so it can
+        only name the host if the command passes it: a call site that omits the
+        base URL leaves the user with a message that never says which instance
+        was tried. Checking the helper alone would not catch that, so the walk
+        runs each leaf command for real against a client that refuses to
+        connect. Commands that never reach the API - the `config` ones - are
+        skipped by looking for the helper in their module source.
+        """
+        leaves = [
+            (path, command)
+            for path, command in _leaf_commands(get_command(app))
+            if path not in _NO_NOOP_INVOCATION
+            and "execute_api_command" in inspect.getsource(importlib.import_module(command.callback.__module__))
+        ]
+
+        # Guard against the filter silently leaving nothing to run.
+        assert len(leaves) > 1
+        assert ("issue", "get") in [path for path, _ in leaves]
+
+        config_path = tmp_path / "config.yaml"
+        _write_stub_config(config_path, with_stub_account=True)
+
+        for path, command in leaves:
+            with (
+                patch("gitea.client.gitea.Gitea", _UnreachableGitea),
+                patch("gitea.cli.utils.api.logger") as mock_logger,
+            ):
+                result = runner.invoke(
+                    app,
+                    ["--config-path", str(config_path), *path, *_noop_invocation(command)],
+                )
+
+            assert result.exit_code == 1, f"{path}: {result.output}"
+            # A traceback says no more than the message here, so none is logged.
+            assert mock_logger.exception.call_count == 0, f"{path}: logged a traceback"
+            assert mock_logger.error.call_count == 1, f"{path}: {mock_logger.error.call_args_list}"
+            message = str(mock_logger.error.call_args[0][1])
+            assert "Could not reach the Gitea API at https://gitea.invalid" in message, f"{path}: {message}"
 
 
 class TestVersionOption:

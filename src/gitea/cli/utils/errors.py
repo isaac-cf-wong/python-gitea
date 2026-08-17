@@ -31,3 +31,26 @@ def unreachable_message(error: Exception, base_url: str | None = None) -> str:
         f"Could not reach the Gitea API{where}: {error}. "
         f"Check that the instance is up, that the base URL is right and that the network allows the connection."
     )
+
+
+def request_failed_message(error: Exception, base_url: str | None = None) -> str:
+    """Build the error message for a request that failed without reaching a response.
+
+    A malformed base URL, a rejected redirect or a response body that could not
+    be read is not the instance being unreachable, so the message claims only
+    that the request did not complete. It names the error's type, since there is
+    no traceback to read it from.
+
+    Args:
+        error: The request error raised by the HTTP layer.
+        base_url: The base URL the call was made against, when it is known.
+
+    Returns:
+        The message describing the failure and how to act on it.
+
+    """
+    where = f" at {base_url}" if base_url else ""
+    return (
+        f"Could not complete the request to the Gitea API{where}: {type(error).__name__}: {error}. "
+        f"Check that the base URL is a well-formed URL of a Gitea instance."
+    )

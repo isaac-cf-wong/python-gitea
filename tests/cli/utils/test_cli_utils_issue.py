@@ -4,7 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from requests import ConnectionError as RequestsConnectionError
-from requests import HTTPError, Timeout
+from requests import ConnectTimeout, HTTPError, ReadTimeout, Timeout
+from requests.exceptions import ChunkedEncodingError, InvalidURL, MissingSchema
 
 from gitea.cli.utils.errors import CommandError
 from gitea.cli.utils.issue import resolve_issue_id, run_project_issue_call
@@ -130,8 +131,10 @@ def test_resolve_issue_id_non_dict_payload_raises():
     [
         RequestsConnectionError("Failed to establish a new connection: [Errno 111] Connection refused"),
         Timeout("Read timed out. (read timeout=10)"),
+        ConnectTimeout("Connection to gitea.example.com timed out. (connect timeout=10)"),
+        ReadTimeout("HTTPSConnectionPool(host='gitea.example.com', port=443): Read timed out."),
     ],
-    ids=["connection", "timeout"],
+    ids=["connection", "timeout", "connect-timeout", "read-timeout"],
 )
 def test_resolve_issue_id_unreachable_instance_names_the_base_url(error):
     """Should blame the instance, not the issue number, when no response came back."""
@@ -152,10 +155,73 @@ def test_resolve_issue_id_unreachable_instance_names_the_base_url(error):
 @pytest.mark.parametrize(
     "error",
     [
+        InvalidURL("Failed to parse: gitea.example.com:3000"),
+        MissingSchema("Invalid URL 'gitea.example.com': No scheme supplied."),
+        ChunkedEncodingError("Connection broken: IncompleteRead(9 bytes read)"),
+    ],
+    ids=["invalid-url", "missing-schema", "broken-body"],
+)
+def test_resolve_issue_id_request_failure_is_not_called_unreachable(error):
+    """Should blame the request, not the instance, when the failure is not a connection one.
+
+    A malformed base URL and a response that could not be read are
+    `RequestException`s as well, but neither says the instance is down, so
+    neither may be reported as one. Both must still be reported as a message
+    rather than raised on for a traceback.
+    """
+    client = make_client(get_issue_error=error)
+
+    with pytest.raises(CommandError) as exc_info:
+        resolve_issue_id(client=client, owner="example-org", repository="example-repo", issue_number=15)
+
+    message = str(exc_info.value)
+    assert f"Could not complete the request to the Gitea API at {BASE_URL}" in message
+    assert type(error).__name__ in message
+    assert str(error) in message
+    assert "Could not reach the Gitea API" not in message
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        InvalidURL("Failed to parse: gitea.example.com:3000"),
+        ChunkedEncodingError("Connection broken: IncompleteRead(9 bytes read)"),
+    ],
+    ids=["invalid-url", "broken-body"],
+)
+def test_run_project_issue_call_request_failure_is_not_called_unreachable(error):
+    """Should report a non-connection request failure as such, not as an unreachable instance."""
+    client = make_client(({"id": 1854, "number": 15}, {"status_code": 200}))
+    call = MagicMock(side_effect=error)
+
+    with pytest.raises(CommandError) as exc_info:
+        run_project_issue_call(
+            client=client,
+            call=call,
+            action="move",
+            owner="example-org",
+            project_id=5,
+            issue_number=15,
+            issue_repository="example-repo",
+        )
+
+    message = str(exc_info.value)
+    assert f"Could not complete the request to the Gitea API at {BASE_URL}" in message
+    assert type(error).__name__ in message
+    assert "Could not reach the Gitea API" not in message
+    # The call never reached the project, so the column hints would misdirect.
+    assert "--column-id" not in message
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
         RequestsConnectionError("Failed to establish a new connection: [Errno 111] Connection refused"),
         Timeout("Read timed out. (read timeout=10)"),
+        ConnectTimeout("Connection to gitea.example.com timed out. (connect timeout=10)"),
+        ReadTimeout("HTTPSConnectionPool(host='gitea.example.com', port=443): Read timed out."),
     ],
-    ids=["connection", "timeout"],
+    ids=["connection", "timeout", "connect-timeout", "read-timeout"],
 )
 def test_run_project_issue_call_unreachable_instance_names_the_base_url(error):
     """Should report an unreachable instance rather than blaming the project."""
