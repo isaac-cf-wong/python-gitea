@@ -7,6 +7,8 @@ from typing import Annotated
 
 import typer
 
+from gitea.cli.output import OutputFormat
+
 
 class LoggingLevel(enum.StrEnum):
     """Logging levels for the CLI."""
@@ -100,6 +102,15 @@ def main(
         LoggingLevel,
         typer.Option("--verbose", "-v", help="Set verbosity level."),
     ] = LoggingLevel.INFO,
+    output: Annotated[
+        OutputFormat,
+        typer.Option(
+            "--output",
+            "-o",
+            envvar="PYTHON_GITEA_OUTPUT",
+            help="Output format for command results. `json` emits the `{data, metadata}` envelope for every subcommand.",
+        ),
+    ] = OutputFormat.TEXT,
     version: Annotated[
         bool,
         typer.Option(
@@ -116,6 +127,7 @@ def main(
         ctx: Typer context.
         config_path: Path to the configuration file.
         verbose: Verbosity level for logging.
+        output: Output format shared by every subcommand.
         version: Whether to print the version and exit. Handled by `version_callback`.
 
     """
@@ -123,7 +135,7 @@ def main(
 
     config_path = config_path or os.getenv("PYTHON_GITEA_CONFIG_PATH")
 
-    ctx.obj = {"config_path": config_path}
+    ctx.obj = {"config_path": config_path, "output": output}
     setup_logging(verbose)
 
 

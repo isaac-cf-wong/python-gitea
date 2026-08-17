@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import yaml
 from typer.testing import CliRunner
 
 from gitea.cli.main import app
+from tests.cli.envelope import parse_envelope
 
 runner = CliRunner()
 
@@ -113,3 +115,64 @@ class TestListCommand:
 
         assert result.exit_code == 0
         assert "Default account: None" in result.stdout
+
+
+class TestListCommandJsonOutput:
+    """Tests for `config list` under `--output json`."""
+
+    def test_json_output_is_the_data_metadata_envelope(self, temp_config_with_accounts: Path) -> None:
+        """Should emit the accounts inside the standard envelope."""
+        result = runner.invoke(
+            app, ["--config-path", str(temp_config_with_accounts), "--output", "json", "config", "list"]
+        )
+
+        assert result.exit_code == 0
+        payload = parse_envelope(result.stdout)
+        assert payload["data"] == {
+            "default_account": "account1",
+            "accounts": [
+                {"name": "account1", "base_url": "https://gitea.com"},
+                {"name": "account2", "base_url": "https://gitea.enterprise.com"},
+            ],
+        }
+        assert payload["metadata"] == {
+            "config_path": str(temp_config_with_accounts),
+            "account_count": 2,
+        }
+
+    def test_json_output_omits_tokens(self, temp_config_with_accounts: Path) -> None:
+        """Should not leak account tokens into machine-readable output."""
+        result = runner.invoke(
+            app, ["--config-path", str(temp_config_with_accounts), "--output", "json", "config", "list"]
+        )
+
+        assert result.exit_code == 0
+        assert "token1" not in result.stdout
+        assert "token2" not in result.stdout
+
+    def test_json_output_without_accounts(self, temp_config_file: Path) -> None:
+        """Should emit an empty account list rather than text when none exist."""
+        result = runner.invoke(app, ["--config-path", str(temp_config_file), "--output", "json", "config", "list"])
+
+        assert result.exit_code == 0
+        payload = parse_envelope(result.stdout)
+        assert payload["data"] == {"default_account": None, "accounts": []}
+        assert payload["metadata"]["account_count"] == 0
+
+    def test_json_output_replaces_the_text_rendering(self, temp_config_with_accounts: Path) -> None:
+        """Should not mix the human-readable rendering into the JSON output."""
+        result = runner.invoke(
+            app, ["--config-path", str(temp_config_with_accounts), "--output", "json", "config", "list"]
+        )
+
+        assert result.exit_code == 0
+        assert "Configured accounts:" not in result.stdout
+
+    def test_text_output_remains_the_default(self, temp_config_with_accounts: Path) -> None:
+        """Should keep the human-readable rendering when no format is requested."""
+        result = runner.invoke(app, ["--config-path", str(temp_config_with_accounts), "config", "list"])
+
+        assert result.exit_code == 0
+        assert "Configured accounts:" in result.stdout
+        with pytest.raises(json.JSONDecodeError):
+            json.loads(result.stdout)

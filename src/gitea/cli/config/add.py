@@ -29,6 +29,7 @@ def add_command(
     """
     import logging  # noqa: PLC0415
 
+    from gitea.cli.output import emit  # noqa: PLC0415
     from gitea.config.manager import ConfigManager  # noqa: PLC0415
 
     logger = logging.getLogger("gitea")
@@ -46,3 +47,14 @@ def add_command(
     except ValueError as e:
         logger.error("Error adding account: %s", e)
         raise typer.Exit(code=1) from e
+
+    emit(
+        ctx,
+        data={
+            "name": name,
+            "base_url": config_manager.config.accounts[name].base_url,
+            "is_default": config_manager.config.default_account == name,
+            "status": "added",
+        },
+        metadata={"config_path": str(config_manager.config_path)},
+    )
