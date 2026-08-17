@@ -184,9 +184,11 @@ class TestDeleteCommandJsonOutput:
         assert "Are you sure" not in result.stdout
         assert "Are you sure" in result.stderr
 
-        # `" n\n"` is CliRunner's echo of the answer typed at the prompt - the
-        # only text allowed on stdout besides the envelope. Declaring it exactly
-        # is what makes a leaked log line or rendering fail here.
+        # `" n\n"` is CliRunner's echo of the answer typed at the prompt, the only
+        # text tolerated on stdout besides the envelope. Some click versions send
+        # that echo to stderr along with the prompt and others to stdout, so it is
+        # allowed rather than required; declaring it exactly is still what makes a
+        # leaked log line or rendering fail here.
         payload = parse_envelope(result.stdout, allow_prefix=" n\n")
         assert payload["data"] == {"name": "account2", "status": "cancelled"}
         assert payload["metadata"] == {}
