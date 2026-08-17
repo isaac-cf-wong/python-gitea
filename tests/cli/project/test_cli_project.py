@@ -4,8 +4,11 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError
+from typer.testing import CliRunner
 
+from gitea.cli.main import app
 from gitea.cli.project.column.create import create_column_command
 from gitea.cli.project.column.list import list_columns_command
 from gitea.cli.project.create import create_command
@@ -17,6 +20,16 @@ from gitea.cli.project.issue.move import move_issue_command
 from gitea.cli.project.issue.remove import remove_issue_command
 from gitea.cli.project.list import list_command
 from gitea.cli.utils.errors import CommandError
+
+runner = CliRunner()
+
+# The three project issue commands, with the project call each one makes and
+# the keyword arguments that call takes beyond the ones they all share.
+ISSUE_COMMANDS = [
+    pytest.param(add_issue_command, "add_issue_to_project_column", {"column_id": 5}, 201, id="add"),
+    pytest.param(move_issue_command, "move_project_issue", {"column_id": 6, "sorting": None}, 204, id="move"),
+    pytest.param(remove_issue_command, "remove_issue_from_project_column", {"column_id": 5}, 204, id="remove"),
+]
 
 
 def make_ctx():
@@ -646,38 +659,43 @@ def test_move_issue_command_org_with_issue_repository(mock_gitea, mock_get_auth_
     assert result == ({}, {"status_code": 204, "resolved_issue_id": 1877})
 
 
+@pytest.mark.parametrize(("command", "method", "call_kwargs", "status_code"), ISSUE_COMMANDS)
 @patch("gitea.cli.utils.api.execute_api_command")
 @patch("gitea.cli.utils.auth.get_auth_params")
 @patch("gitea.client.gitea.Gitea")
-def test_add_issue_command_issue_repository_overrides_repository(mock_gitea, mock_get_auth_params, mock_execute):
-    """add_issue_command should resolve against --issue-repository when it differs from --repository."""
+def test_issue_command_issue_repository_overrides_repository(
+    mock_gitea, mock_get_auth_params, mock_execute, command, method, call_kwargs, status_code
+):
+    """Each issue command should resolve against --issue-repository when it differs from --repository."""
     ctx = make_ctx()
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
     client = MagicMock()
     client.issue.get_issue.return_value = ({"id": 1877, "number": 38}, {"status_code": 200})
-    client.project.add_issue_to_project_column.return_value = ({}, {"status_code": 201})
+    getattr(client.project, method).return_value = ({}, {"status_code": status_code})
     mock_gitea.return_value.__enter__.return_value = client
 
-    add_issue_command(
+    command(
         ctx=ctx,
         owner="owner",
         repository="board-repo",
         issue_repository="other-repo",
         project_id=1,
-        column_id=5,
         issue_id=38,
         account_name="acct",
         token=None,
         base_url=None,
+        **call_kwargs,
     )
 
     result = mock_execute.call_args[1]["api_call"]()
+    # The number is looked up in the repository holding the issue, while the
+    # project call keeps the repository holding the board.
     client.issue.get_issue.assert_called_once_with(owner="owner", repository="other-repo", index=38)
-    client.project.add_issue_to_project_column.assert_called_once_with(
-        owner="owner", repository="board-repo", project_id=1, column_id=5, issue_id=1877
+    getattr(client.project, method).assert_called_once_with(
+        owner="owner", repository="board-repo", project_id=1, issue_id=1877, **call_kwargs
     )
-    assert result == ({}, {"status_code": 201, "resolved_issue_id": 1877})
+    assert result == ({}, {"status_code": status_code, "resolved_issue_id": 1877})
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -708,3 +726,63 @@ def test_move_issue_command_org_failure_suggests_issue_repository(mock_gitea, mo
     with pytest.raises(CommandError, match="--issue-repository REPOSITORY"):
         mock_execute.call_args[1]["api_call"]()
     client.issue.get_issue.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        pytest.param(make_http_error(404), "The issue was found in owner/repo", id="refused"),
+        pytest.param(
+            RequestsConnectionError("Failed to establish a new connection: [Errno 111] Connection refused"),
+            "Could not reach the Gitea API at https://gitea.example.com",
+            id="unreachable",
+        ),
+    ],
+)
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_reports_failures_without_a_traceback(
+    mock_gitea, mock_get_auth_params, monkeypatch, tmp_path, error, expected
+):
+    """The command should exit 1 with the message alone, through the real logging handler."""
+    # Keep the message on one line so the assertions do not depend on wrapping.
+    monkeypatch.setenv("COLUMNS", "300")
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.base_url = "https://gitea.example.com"
+    client.issue.get_issue.return_value = ({"id": 1877, "number": 38}, {"status_code": 200})
+    client.project.move_project_issue.side_effect = error
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app,
+        [
+            # Point at a path of its own so a regression cannot read the
+            # developer's own configuration instead.
+            "--config-path",
+            str(tmp_path / "config.yaml"),
+            "project",
+            "issue",
+            "move",
+            "--owner",
+            "owner",
+            "--repository",
+            "repo",
+            "--project-id",
+            "1",
+            "--issue-id",
+            "38",
+            "--column-id",
+            "6",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    message = " ".join(result.stderr.split())
+    assert expected in message
+    # The message is the whole error: no traceback, and none of the wording the
+    # unhandled-exception path would add.
+    assert "Traceback" not in result.stderr
+    assert "Error executing" not in message

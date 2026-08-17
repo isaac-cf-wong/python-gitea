@@ -16,9 +16,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from requests import HTTPError
+from requests import HTTPError, RequestException
 
-from gitea.cli.utils.errors import CommandError
+from gitea.cli.utils.errors import CommandError, unreachable_message
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -91,8 +91,8 @@ def resolve_issue_id(*, client: Gitea, owner: str, repository: str | None, issue
         The global issue ID that the project endpoints expect.
 
     Raises:
-        CommandError: If the repository has no issue with that number, or the
-            lookup was refused.
+        CommandError: If the repository has no issue with that number, the
+            lookup was refused, or the instance could not be reached.
 
     """
     if repository is None:
@@ -107,6 +107,9 @@ def resolve_issue_id(*, client: Gitea, owner: str, repository: str | None, issue
                 f"Could not look up issue #{issue_number} in {owner}/{repository}: {_describe(status_code, e)}."
             ) from e
         raise CommandError(_unknown_issue_message(owner, repository, issue_number, status_code)) from e
+    except RequestException as e:
+        # No response came back, so nothing is known about the issue itself.
+        raise CommandError(unreachable_message(e, client.base_url)) from e
 
     issue_id = data.get("id") if isinstance(data, dict) else None
     status_code = metadata.get("status_code", 0)
@@ -168,7 +171,8 @@ def run_project_issue_call(
         resolved global issue ID whenever the number was resolved.
 
     Raises:
-        CommandError: If the issue could not be resolved or the call was refused.
+        CommandError: If the issue could not be resolved, the call was refused,
+            or the instance could not be reached.
 
     """
     issue_id = resolve_issue_id(client=client, owner=owner, repository=issue_repository, issue_number=issue_number)
@@ -181,6 +185,10 @@ def run_project_issue_call(
             _describe(status_code, e), action, owner, project_id, issue_number, issue_id, issue_repository
         )
         raise CommandError(message) from e
+    except RequestException as e:
+        # The call never reached the project, so the hints about the project
+        # and the columns would only misdirect.
+        raise CommandError(unreachable_message(e, client.base_url)) from e
 
     status_code = metadata.get("status_code", 0)
     if not _is_success(status_code):
@@ -224,9 +232,11 @@ def _failure_message(
             f"--issue-id was read as a global issue ID, which is not the number shown in the web UI. "
             f"Pass --issue-repository REPOSITORY to give the number of that repository instead."
         )
+    # The lookup succeeded, which is all that can be claimed: the issue may
+    # have been closed, moved or deleted between the lookup and this call.
     return (
         f"Could not {action} issue #{issue_number} of {owner}/{issue_repository} (global ID {issue_id}) "
         f"on project {project_id}: {detail}. "
-        f"The issue exists, so check that it is on this project and that --project-id and --column-id "
-        f"name a column of it."
+        f"The issue was found in {owner}/{issue_repository}, but the project call failed: check that the "
+        f"issue is still there and on this project, and that --project-id and --column-id name a column of it."
     )

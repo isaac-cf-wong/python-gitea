@@ -187,7 +187,9 @@ for you:
 The global ID the command used comes back as `metadata.resolved_issue_id`. A
 number the repository does not have, and a call the project endpoint refuses,
 are both reported as errors naming the issue and what to check - never as an
-empty result.
+empty result. An instance that cannot be reached at all, whether the connection
+fails or times out, is reported as one line naming the base URL rather than as a
+traceback.
 
 ### User - manage users
 
