@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import platformdirs
 import pytest
 
+from gitea.watch import state as watch_state
 from gitea.watch.state import (
     STATE_VERSION,
     cache_lock,
@@ -25,6 +26,33 @@ from gitea.watch.state import (
     save_state,
     scope_snapshots,
 )
+
+
+def _lock_can_be_retaken(path: Path, timeout: float = 10.0) -> bool:
+    """Report whether the lock guarding a cache can be taken again.
+
+    The lock is taken from another thread rather than from the caller's,
+    because taking one that was never released blocks forever: a caller doing
+    it inline would hang the suite until the job running it timed out, where
+    waiting on a deadline fails an assertion and says what happened.
+
+    Args:
+        path: Path of the cache the lock guards.
+        timeout: Seconds to wait for the lock before giving up on it.
+
+    Returns:
+        True when the lock was granted within the deadline.
+
+    """
+    retaken = threading.Event()
+
+    def retake() -> None:
+        """Take the lock again, recording that it was granted."""
+        with cache_lock(path):
+            retaken.set()
+
+    threading.Thread(target=retake, daemon=True).start()
+    return retaken.wait(timeout=timeout)
 
 
 def _slow_writer(delay: float = 0.05):
@@ -458,29 +486,42 @@ class TestCacheLock:
 
         assert logger.warning.call_count == 1
 
-    def test_the_lock_is_released_when_the_block_raises(self, tmp_path: Path) -> None:
+    def test_the_lock_is_released_when_the_write_fails(self, tmp_path: Path) -> None:
         """A failed write must not leave every later run waiting on this one.
 
-        The lock is taken again from another thread rather than from this one,
-        because taking a lock that was never released blocks forever: a test
-        doing it inline would hang the suite until the job running it times out,
-        where this one fails on its own timeout and says what happened.
+        The failure is the one a run actually meets while holding the lock - the
+        cache write raising - rather than an exception invented inside the
+        block, so what is exercised is the path out of the critical section that
+        `save_scopes` really takes.
         """
         path = tmp_path / "watch-state.json"
 
-        with pytest.raises(RuntimeError, match="while holding it"), cache_lock(path):
-            raise RuntimeError("while holding it")
+        with (
+            patch("gitea.watch.state.save_state", side_effect=OSError("No space left on device")),
+            pytest.raises(OSError, match="No space left on device"),
+        ):
+            save_scopes(path, {"repo:my-org/my-repo": {"1854": SNAPSHOT}})
 
-        retaken = threading.Event()
+        assert _lock_can_be_retaken(path), "the lock was still held after the write failed"
 
-        def retake() -> None:
-            """Take the lock again, recording that it was granted."""
-            with cache_lock(path):
-                retaken.set()
+    def test_the_lock_is_dropped_and_not_merely_closed_when_the_write_fails(self, tmp_path: Path) -> None:
+        """The release itself runs on the failing path, not only the descriptor closing.
 
-        threading.Thread(target=retake, daemon=True).start()
+        Closing the descriptor releases the lock as well, on both platforms, so
+        the test above would pass with the explicit release taken out of the
+        `finally`. This pins the release, which is what says the exception path
+        and the ordinary one leave the lock the same way.
+        """
+        path = tmp_path / "watch-state.json"
 
-        assert retaken.wait(timeout=10), "the lock was still held after the block raised"
+        with (
+            patch("gitea.watch.state._drop_lock", wraps=watch_state._drop_lock) as drop_lock,
+            patch("gitea.watch.state.save_state", side_effect=OSError("No space left on device")),
+            pytest.raises(OSError, match="No space left on device"),
+        ):
+            save_scopes(path, {"repo:my-org/my-repo": {"1854": SNAPSHOT}})
+
+        assert drop_lock.call_count == 1
 
     def test_the_windows_locking_calls_are_the_ones_windows_takes(self, tmp_path: Path) -> None:
         """The branch taken where there is no `fcntl` should lock a byte range.
