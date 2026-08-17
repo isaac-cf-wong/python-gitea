@@ -143,6 +143,12 @@ error when they disagree.
 
 ## Commands
 
+An option written bare below has to be passed; one written `[--like this]` may
+be omitted. `--repository` is bare outside the `project` and `notification`
+families: those commands accept the invocation without it - the option is
+optional everywhere, as the convention above says - but they have no owner-wide
+endpoint to serve it with, so they answer by naming the option to pass.
+
 ### Config - manage accounts
 
 - `gitea-cli config add --name <name> --token <token> [--base-url <url>] [--default]`
@@ -230,24 +236,34 @@ is the same implementation under a second, more discoverable name.
 
 ### Project - manage projects
 
-- `gitea-cli project create --owner <owner> --repository <repo> --title <title>`
+Every command here takes `--repository` as an option rather than a requirement:
+passing it acts on that repository's project, omitting it acts on the
+organization's own project. It is written `[--repository <repo>]` below to say
+so.
+
+```bash
+gitea-cli project list --owner my-org                       # the organization's projects
+gitea-cli project list --owner my-org --repository my-repo  # that repository's projects
+```
+
+- `gitea-cli project create --owner <owner> [--repository <repo>] --title <title>`
     - Optional: `--description`, `--card-type`, `--template-type`
-- `gitea-cli project list --owner <owner> --repository <repo>`
-- `gitea-cli project get --owner <owner> --repository <repo> --project-id <id>`
-- `gitea-cli project edit --owner <owner> --repository <repo> --project-id <id>`
+- `gitea-cli project list --owner <owner> [--repository <repo>]`
+- `gitea-cli project get --owner <owner> [--repository <repo>] --project-id <id>`
+- `gitea-cli project edit --owner <owner> [--repository <repo>] --project-id <id>`
     - Optional: `--title`, `--description`, `--state`, `--card-type`
-- `gitea-cli project delete --owner <owner> --repository <repo> --project-id <id>`
-- `gitea-cli project column create --owner <owner> --repository <repo> --project-id <id> --title <title>`
+- `gitea-cli project delete --owner <owner> [--repository <repo>] --project-id <id>`
+- `gitea-cli project column create --owner <owner> [--repository <repo>] --project-id <id> --title <title>`
     - Optional: `--color`
-- `gitea-cli project column list --owner <owner> --repository <repo> --project-id <id>`
-- `gitea-cli project column issues --owner <owner> --repository <repo> --project-id <id> --column-id <id>`
+- `gitea-cli project column list --owner <owner> [--repository <repo>] --project-id <id>`
+- `gitea-cli project column issues --owner <owner> [--repository <repo>] --project-id <id> --column-id <id>`
     - Optional: `--page`, `--limit`
-- `gitea-cli project issues --owner <owner> --repository <repo> --project-id <id>`
-- `gitea-cli project issue add --owner <owner> --repository <repo> --project-id <id> --column-id <id> --issue-id <id>`
+- `gitea-cli project issues --owner <owner> [--repository <repo>] --project-id <id>`
+- `gitea-cli project issue add --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
     - Optional: `--issue-repository`
-- `gitea-cli project issue move --owner <owner> --repository <repo> --project-id <id> --column-id <id> --issue-id <id>`
+- `gitea-cli project issue move --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
     - Optional: `--sorting`, `--issue-repository`
-- `gitea-cli project issue remove --owner <owner> --repository <repo> --project-id <id> --column-id <id> --issue-id <id>`
+- `gitea-cli project issue remove --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
     - Optional: `--issue-repository`
 
 The project endpoints identify an issue by its global ID, which is not the
