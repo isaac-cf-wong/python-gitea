@@ -16,9 +16,11 @@ def _collect_all_pages(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Fetch every page of a paginated listing.
 
-    Pages are requested until one comes back empty or shorter than the pages
-    before it. The page size is taken from the first page rather than from the
+    Pages are requested until one comes back empty or shorter than the first
+    page. The page size is taken from the first page rather than from the
     requested limit, because a Gitea instance may cap the page size below it.
+    Only the first page is used, so that a later page which happens to be
+    longer cannot make the pages after it look terminal.
 
     Args:
         fetch_page: Callable returning the items and metadata of the given page number.
@@ -36,7 +38,8 @@ def _collect_all_pages(
         items.extend(batch)
         if not batch or len(batch) < page_size:
             return items, metadata
-        page_size = max(page_size, len(batch))
+        if not page_size:
+            page_size = len(batch)
         page += 1
 
 
