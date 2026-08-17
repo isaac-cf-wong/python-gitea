@@ -15,6 +15,7 @@ from tests.board import (
     column_ids,
     make_client,
     make_issue,
+    make_issue_with_projects,
     paged_issues,
 )
 
@@ -171,15 +172,81 @@ def test_returns_a_payload_that_is_not_an_issue_object_unchanged():
     client.project.list_project_columns.assert_not_called()
 
 
-def test_returns_the_issue_unchanged_without_a_global_issue_id():
-    """Column listings identify issues by global ID, so without one nothing can be matched."""
+def test_reports_a_null_column_without_a_global_issue_id():
+    """Column listings identify issues by global ID, so without one nothing can be matched.
+
+    The field is attached all the same: a consumer reading ``column_id`` off a
+    project must not have to ask first whether the issue had a global ID.
+    """
     client = make_client({}, {})
     issue = {"number": 15, "projects": [dict(ORGANIZATION_PROJECT)]}
 
     resolved = resolve_project_column_ids(client=client, owner="example-org", repository="example-repo", issue=issue)
 
-    assert resolved == issue
+    assert resolved == {**issue, "projects": [{**ORGANIZATION_PROJECT, "column_id": None}]}
     client.project.list_project_columns.assert_not_called()
+
+
+def test_passes_a_project_entry_that_is_not_an_object_through_untouched():
+    """A malformed entry has nothing to attach a column to, so it must not crash the lookup."""
+    client = make_client({29: [[{"id": 109}]]}, {109: [[{"id": ISSUE_ID}]]})
+
+    resolved = resolve_project_column_ids(
+        client=client,
+        owner="example-org",
+        repository="example-repo",
+        issue=make_issue_with_projects(["not a project", None, dict(ORGANIZATION_PROJECT)]),
+    )
+
+    assert resolved["projects"] == ["not a project", None, {**ORGANIZATION_PROJECT, "column_id": 109}]
+
+
+def test_skips_a_column_entry_that_is_not_an_object():
+    """A malformed column carries no ID to list issues by, so it must be skipped rather than crash."""
+    client = make_client(
+        {29: [[None, "not a column", {"id": 109}]]},
+        {109: [[{"id": ISSUE_ID}]]},
+    )
+
+    resolved = resolve_project_column_ids(
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
+    )
+
+    assert column_ids(resolved) == [109]
+    assert [call.kwargs["column_id"] for call in client.project.list_project_column_issues.call_args_list] == [109]
+
+
+def test_ignores_an_issue_entry_of_a_column_that_is_not_an_object():
+    """A malformed issue in a column's listing matches nothing rather than crashing the walk."""
+    client = make_client(
+        {29: [[{"id": 107}, {"id": 109}]]},
+        {107: [[None, "not an issue"]], 109: [[{"id": ISSUE_ID}]]},
+    )
+
+    resolved = resolve_project_column_ids(
+        client=client, owner="example-org", repository="example-repo", issue=make_issue(ORGANIZATION_PROJECT)
+    )
+
+    assert column_ids(resolved) == [109]
+
+
+def test_a_user_owned_project_keeps_a_null_column(caplog):
+    """An individual project's columns live under an endpoint this library does not wrap.
+
+    The lookup is attempted against the organization endpoint, which refuses it,
+    and the refusal must leave the column null rather than fail the issue.
+    """
+    client = MagicMock()
+    client.project.list_project_columns.side_effect = HTTPError("404 Client Error")
+    user_project = {"id": 41, "title": "My board", "repo_id": 0, "type": "individual"}
+
+    with caplog.at_level(logging.WARNING, logger="gitea"):
+        resolved = resolve_project_column_ids(
+            client=client, owner="example-org", repository="example-repo", issue=make_issue(user_project)
+        )
+
+    assert column_ids(resolved) == [None]
+    assert "41" in caplog.text
 
 
 def test_reports_no_column_for_a_project_without_a_usable_id():

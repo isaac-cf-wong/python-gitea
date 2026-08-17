@@ -92,7 +92,21 @@ def make_issue(*projects):
         The issue payload, shaped like the one the API returns.
 
     """
-    return {"id": ISSUE_ID, "number": 15, "title": "Board card", "projects": [dict(p) for p in projects]}
+    return make_issue_with_projects([dict(p) for p in projects])
+
+
+def make_issue_with_projects(projects):
+    """Build an issue payload whose projects field holds the given entries verbatim.
+
+    Args:
+        projects: The entries of the issue's projects field, which need not be
+            project objects.
+
+    Returns:
+        The issue payload, shaped like the one the API returns.
+
+    """
+    return {"id": ISSUE_ID, "number": 15, "title": "Board card", "projects": list(projects)}
 
 
 def column_ids(issue):

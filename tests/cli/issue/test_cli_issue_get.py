@@ -166,3 +166,41 @@ def test_get_command_leaves_an_issue_without_projects_alone(mock_gitea, mock_get
 
     assert data == {"id": 10, "comment_count": 3, "projects": []}
     client.project.list_project_columns.assert_not_called()
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_get_command_reports_a_column_on_every_project_of_an_issue_without_a_global_id(
+    mock_gitea, mock_get_auth_params, mock_execute
+):
+    """Every project the command emits carries column_id, whatever the issue payload lacks.
+
+    An instance that omits the global ID leaves nothing to match a card by, but
+    the field must still be there: a consumer indexing `column_id` must never
+    meet a KeyError because of what the issue happened to be missing.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = make_client({}, {})
+    client.issue.get_issue.return_value = (
+        {"number": 15, "projects": [dict(ORGANIZATION_PROJECT), dict(REPOSITORY_PROJECT)]},
+        {"status_code": 200},
+    )
+    mock_gitea.return_value.__enter__.return_value = client
+
+    get_command(
+        ctx=ctx,
+        owner="example-org",
+        repository="example-repo",
+        index=15,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    data, _ = mock_execute.call_args[1]["api_call"]()
+
+    assert [project["column_id"] for project in data["projects"]] == [None, None]
+    client.project.list_project_columns.assert_not_called()

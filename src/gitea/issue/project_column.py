@@ -19,6 +19,14 @@ An individual (user-owned) project is the one case that cannot be resolved: its
 columns live under the ``/user/projects`` endpoints, which this library does not
 wrap. The lookup is attempted against the organization endpoint, its rejection is
 logged, and ``column_id`` stays None rather than failing the issue itself.
+
+Resolution is best-effort by construction. The walk is a sequence of separate
+requests against a board that may be edited while it runs, so a card moved
+mid-walk can be reported under either column or under none. Any failure of a
+lookup - a refusal, a transport error, a timeout - is logged and leaves that
+project's ``column_id`` at None instead of failing the issue whose payload the
+caller already has in hand. ``column_id`` is therefore always present on a
+project entry, and None means "not resolved" as much as it means "no card".
 """
 
 from __future__ import annotations
@@ -38,8 +46,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger("gitea")
 
 
-def _is_resolvable(issue: dict[str, Any]) -> bool:
-    """Report whether an issue carries what a column lookup needs.
+def _lists_projects(issue: Any) -> bool:
+    """Report whether an issue payload has projects to attach a column to.
 
     A payload that is not an issue object at all is reported as nothing to
     resolve, so a body the caller already has in hand is never turned into a
@@ -49,25 +57,24 @@ def _is_resolvable(issue: dict[str, Any]) -> bool:
         issue: The issue data returned by the API.
 
     Returns:
-        True when the issue lists projects and has the global ID that the column
-        listings identify their issues by.
+        True when the payload is an issue object listing projects.
 
     """
-    if not isinstance(issue, dict):
-        return False
-    return isinstance(issue.get("projects"), list) and isinstance(issue.get("id"), int)
+    return isinstance(issue, dict) and isinstance(issue.get("projects"), list)
 
 
-def _identifier(item: dict[str, Any]) -> int | None:
-    """Extract the ID of a project or a column.
+def _identifier(item: Any) -> int | None:
+    """Extract the ID of an issue, a project or a column.
 
     Args:
-        item: The project or column data returned by the API.
+        item: The issue, project or column data returned by the API.
 
     Returns:
-        The ID, or None when the payload carries no usable one.
+        The ID, or None when the payload is not an object carrying a usable one.
 
     """
+    if not isinstance(item, dict):
+        return None
     identifier = item.get("id")
     return identifier if isinstance(identifier, int) else None
 
@@ -94,11 +101,12 @@ def _column_scope_repository(project: dict[str, Any], repository: str) -> str | 
     return None
 
 
-def _holds_issue(issues: list[dict[str, Any]], issue_id: int) -> bool:
+def _holds_issue(issues: list[Any], issue_id: int) -> bool:
     """Report whether a page of a column's issues lists the issue.
 
     Args:
-        issues: The issues of one page of a column's listing.
+        issues: The issues of one page of a column's listing. An entry that is
+            not an issue object matches nothing rather than raising.
         issue_id: The global ID of the issue.
 
     Returns:
@@ -109,6 +117,12 @@ def _holds_issue(issues: list[dict[str, Any]], issue_id: int) -> bool:
 
 
 _LOOKUP_FAILED = "Could not resolve the column of issue %s on project %s, reporting it as null: %s"
+
+# aiohttp raises its total timeout as a bare asyncio.TimeoutError, which is the
+# builtin TimeoutError since Python 3.11 and is not a ClientError. It is caught
+# alongside one so that the asynchronous path degrades on a timeout exactly as
+# the synchronous path does, where requests.Timeout is a RequestException.
+_ASYNC_LOOKUP_ERRORS = (ClientError, TimeoutError)
 
 
 def resolve_project_column_ids(
@@ -127,20 +141,29 @@ def resolve_project_column_ids(
         issue: The issue data returned by the API.
 
     Returns:
-        The issue data with a ``column_id`` on each of its projects, holding the
-        column the issue's card sits in or None when it has no card there. The
-        issue is returned unchanged when it lists no projects.
+        The issue data with a ``column_id`` on every project entry, holding the
+        column the issue's card sits in, or None when it has no card there and
+        when the lookup could not be made or failed. The issue is returned
+        unchanged when it lists no projects.
 
     """
-    if not _is_resolvable(issue):
+    if not _lists_projects(issue):
         return issue
 
-    issue_id: int = issue["id"]
-    projects: list[dict[str, Any]] = []
+    # Column listings identify their issues by global ID, so without one on the
+    # issue nothing can be matched and every column stays null. The field is
+    # still attached, so that consumers see one contract for every issue.
+    issue_id = _identifier(issue)
+    projects: list[Any] = []
     for project in issue["projects"]:
+        if not isinstance(project, dict):
+            # An entry that is not a project object has nothing to look a column
+            # up by and nothing to attach one to, so it is passed through.
+            projects.append(project)
+            continue
         column_id = None
         project_id = _identifier(project)
-        if project_id is not None:
+        if project_id is not None and issue_id is not None:
             try:
                 column_id = _find_column_id(
                     client=client,
@@ -225,20 +248,26 @@ async def resolve_async_project_column_ids(
         issue: The issue data returned by the API.
 
     Returns:
-        The issue data with a ``column_id`` on each of its projects, holding the
-        column the issue's card sits in or None when it has no card there. The
-        issue is returned unchanged when it lists no projects.
+        The issue data with a ``column_id`` on every project entry, holding the
+        column the issue's card sits in, or None when it has no card there and
+        when the lookup could not be made or failed. The issue is returned
+        unchanged when it lists no projects.
 
     """
-    if not _is_resolvable(issue):
+    if not _lists_projects(issue):
         return issue
 
-    issue_id: int = issue["id"]
-    projects: list[dict[str, Any]] = []
+    # As above: no global ID means no card can be matched, and the field is
+    # attached all the same.
+    issue_id = _identifier(issue)
+    projects: list[Any] = []
     for project in issue["projects"]:
+        if not isinstance(project, dict):
+            projects.append(project)
+            continue
         column_id = None
         project_id = _identifier(project)
-        if project_id is not None:
+        if project_id is not None and issue_id is not None:
             try:
                 column_id = await _find_async_column_id(
                     client=client,
@@ -247,7 +276,7 @@ async def resolve_async_project_column_ids(
                     project_id=project_id,
                     issue_id=issue_id,
                 )
-            except ClientError as e:
+            except _ASYNC_LOOKUP_ERRORS as e:
                 # As above: the issue itself was retrieved, so only the column
                 # is lost.
                 logger.warning(_LOOKUP_FAILED, issue_id, project_id, e)
