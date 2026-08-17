@@ -110,6 +110,9 @@ is the same implementation under a second, more discoverable name.
 - `gitea-cli project column create --owner <owner> --repository <repo> --project-id <id> --title <title>`
     - Optional: `--color`
 - `gitea-cli project column list --owner <owner> --repository <repo> --project-id <id>`
+- `gitea-cli project column issues --owner <owner> --repository <repo> --project-id <id> --column-id <id>`
+    - Optional: `--page`, `--limit`
+- `gitea-cli project issues --owner <owner> --repository <repo> --project-id <id>`
 - `gitea-cli project issue add --owner <owner> --repository <repo> --project-id <id> --column-id <id> --issue-id <id>`
 - `gitea-cli project issue move --owner <owner> --repository <repo> --project-id <id> --column-id <id> --issue-id <id>`
     - Optional: `--sorting`
@@ -150,6 +153,22 @@ gitea-cli project issue add \
     --project-id 1 \
     --column-id 2 \
     --issue-id 42
+```
+
+List the issues sitting in one column of an organization project (omit
+`--repository`; it is only needed for repository projects):
+
+```bash
+gitea-cli project column issues \
+    --owner my-org \
+    --project-id 1 \
+    --column-id 2
+```
+
+Show every card on a project together with the column it is in:
+
+```bash
+gitea-cli project issues --owner my-org --project-id 1
 ```
 
 ## See Also
