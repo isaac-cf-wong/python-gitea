@@ -45,6 +45,51 @@ with Gitea(token="TOKEN", base_url="https://gitea.example.com") as client:
     print(status["status_code"])
 ```
 
+## Where an Issue Sits on a Board
+
+An issue payload lists the projects the issue is on, but Gitea's project objects
+carry no column, so the issue alone does not say where on a board its card sits.
+`resolve_project_column_ids` fills that in, giving every project of the issue a
+`column_id` — the column holding its card, or `None` when the issue has no card
+on that project:
+
+```python
+from gitea.client.gitea import Gitea
+from gitea.issue import resolve_project_column_ids
+
+with Gitea(token="TOKEN", base_url="https://gitea.example.com") as client:
+    issue, _ = client.issue.get_issue(owner="my-org", repository="my-repo", index=15)
+    issue = resolve_project_column_ids(
+        client=client,
+        owner="my-org",
+        repository="my-repo",
+        issue=issue,
+    )
+    for project in issue["projects"]:
+        print(project["id"], project["column_id"])
+```
+
+The columns of each project are walked until the one holding the card is found,
+so the cost grows with the size of the board rather than of the repository. The
+`gitea-cli issue get` command does this for you.
+`resolve_async_project_column_ids` is the `await`-based twin for `AsyncGitea`.
+
+Both are best-effort, and `column_id` should be read with that in mind:
+
+- The walk is a sequence of requests, not a snapshot. `column_id` reflects the
+  board as it was while the walk ran, so a card moved during it may come back
+  under either column, or as `None`.
+- A lookup that fails - refused, timed out, or lost in transport - is logged as
+  a warning on the `gitea` logger and leaves that project's `column_id` at
+  `None`. The issue itself is returned; the exception is not re-raised, on the
+  synchronous and asynchronous paths alike. `None` therefore means "no card on
+  this project" and "could not be resolved" alike.
+- `column_id` is present on every project entry the functions return, including
+  when the issue payload carries no global ID for the columns to be matched by,
+  in which case every column is `None`.
+- The columns of a user-owned (individual) project live under endpoints this
+  library does not wrap, so such a project's `column_id` is always `None`.
+
 ## Asynchronous Client
 
 The `AsyncGitea` client has the same structure but `await`-based, and it uses

@@ -2,45 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Annotated, Any
 
 import typer
 
-# Number of items requested per page when paging through a project's board.
-PAGE_SIZE = 50
-
-
-def _collect_all_pages(
-    fetch_page: Callable[[int], tuple[list[dict[str, Any]], dict[str, Any]]],
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Fetch every page of a paginated listing.
-
-    Pages are requested until one comes back empty or shorter than the first
-    page. The page size is taken from the first page rather than from the
-    requested limit, because a Gitea instance may cap the page size below it.
-    Only the first page is used, so that a later page which happens to be
-    longer cannot make the pages after it look terminal.
-
-    Args:
-        fetch_page: Callable returning the items and metadata of the given page number.
-
-    Returns:
-        A tuple containing every item across all pages and the metadata of the last response.
-
-    """
-    items: list[dict[str, Any]] = []
-    metadata: dict[str, Any] = {}
-    page = 1
-    page_size = 0
-    while True:
-        batch, metadata = fetch_page(page)
-        items.extend(batch)
-        if not batch or len(batch) < page_size:
-            return items, metadata
-        if not page_size:
-            page_size = len(batch)
-        page += 1
+from gitea.utils.pagination import PAGE_SIZE, collect_all_pages
 
 
 def list_project_issues_command(
@@ -106,7 +72,7 @@ def list_project_issues_command(
 
         """
         with Gitea(token=token, base_url=base_url) as client:
-            columns, metadata = _collect_all_pages(
+            columns, metadata = collect_all_pages(
                 lambda page: client.project.list_project_columns(
                     owner=owner,
                     repository=repository,
@@ -119,7 +85,7 @@ def list_project_issues_command(
             data: list[dict[str, Any]] = []
             issue_count = 0
             for column in columns:
-                issues, _ = _collect_all_pages(
+                issues, _ = collect_all_pages(
                     lambda page, column_id=column["id"]: client.project.list_project_column_issues(
                         owner=owner,
                         repository=repository,

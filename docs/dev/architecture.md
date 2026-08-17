@@ -56,8 +56,9 @@ src/gitea/
 │   ├── project/             # project, column, and project-issue commands
 │   ├── user/                # user commands
 │   └── utils/               # auth resolution, API helpers, conversions
-└── utils/                   # Logging and response helpers
+└── utils/                   # Logging, pagination, and response helpers
     ├── log.py               # Logger setup
+    ├── pagination.py        # Paginated-listing walkers
     └── response.py          # Response processing helpers
 ```
 
@@ -95,6 +96,11 @@ names. Methods map one-to-one onto Gitea REST endpoints and return either:
 - a `(data, status)` tuple for list/get operations, where `data` is the decoded
   JSON payload and `status` carries metadata such as the HTTP status code, or
 - the raw HTTP response for mutating operations.
+
+Work that spans several endpoints lives beside the resource rather than inside
+it, so the resource methods stay one-to-one with the API. For example,
+`gitea.issue.project_column` resolves the board column an issue's card sits in,
+which Gitea only reveals through the project's column listings.
 
 ## CLI Layer
 

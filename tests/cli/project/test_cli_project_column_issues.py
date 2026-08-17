@@ -8,7 +8,8 @@ from typer.testing import CliRunner
 
 from gitea.cli.main import app
 from gitea.cli.project.column.issues import list_column_issues_command
-from gitea.cli.project.issues import PAGE_SIZE, _collect_all_pages, list_project_issues_command
+from gitea.cli.project.issues import list_project_issues_command
+from gitea.utils.pagination import PAGE_SIZE
 
 runner = CliRunner()
 
@@ -344,24 +345,3 @@ def test_list_project_issues_spans_several_continuation_pages(mock_gitea, mock_g
         client.project.list_project_columns.call_args_list + client.project.list_project_column_issues.call_args_list
     )
     assert [call.kwargs["limit"] for call in calls] == [PAGE_SIZE] * len(calls)
-
-
-def test_collect_all_pages_measures_short_pages_against_the_first_page():
-    """A page longer than the first must not make the pages after it look terminal."""
-    pages = [
-        [{"id": 1}, {"id": 2}],
-        [{"id": 3}, {"id": 4}, {"id": 5}],
-        [{"id": 6}, {"id": 7}],
-        [{"id": 8}],
-    ]
-    requested: list[int] = []
-
-    def fetch_page(page):
-        requested.append(page)
-        return (list(pages[page - 1]) if page <= len(pages) else [], {"status_code": 200, "page": page})
-
-    items, metadata = _collect_all_pages(fetch_page)
-
-    assert [item["id"] for item in items] == [1, 2, 3, 4, 5, 6, 7, 8]
-    assert requested == [1, 2, 3, 4]
-    assert metadata == {"status_code": 200, "page": 4}
