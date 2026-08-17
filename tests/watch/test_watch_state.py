@@ -39,7 +39,9 @@ class TestStatePath:
         path = default_state_path()
 
         assert path.name == "watch-state.json"
-        assert "gitea" in str(path)
+        # Named, rather than merely containing the name: a directory called
+        # something else with "gitea" in it is not this application's.
+        assert path.parent.name == "gitea"
 
     def test_a_named_path_wins_over_the_default(self, tmp_path: Path) -> None:
         """Naming a cache should be what decides where the snapshots go."""

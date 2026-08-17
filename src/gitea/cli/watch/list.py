@@ -22,7 +22,7 @@ from typing import Annotated, Any
 import typer
 
 from gitea.utils.pagination import PAGE_SIZE, collect_all_pages
-from gitea.watch.changes import detect_changes, format_change, issue_key, issue_snapshot
+from gitea.watch.changes import detect_changes, format_change, issue_key, issue_snapshot, usable_identifier
 from gitea.watch.state import STATE_FILE_ENV, load_state, record_scope, resolve_state_path, save_state, scope_snapshots
 
 logger = logging.getLogger("gitea")
@@ -141,14 +141,15 @@ def _comments(client: Any, holder: tuple[str, str], number: Any) -> list[dict[st
         to list them for.
 
     """
-    if not isinstance(number, int) or isinstance(number, bool):
+    issue_number = usable_identifier(number)
+    if issue_number is None:
         return []
 
     comments, _ = collect_all_pages(
         lambda page: client.comment.list_comments(
             owner=holder[0],
             repository=holder[1],
-            index=number,
+            index=issue_number,
             page=page,
             limit=PAGE_SIZE,
         )
@@ -191,8 +192,8 @@ def _scope_issues(client: Any, owner: str, scope: _Scope) -> tuple[list[dict[str
 
     issues: list[dict[str, Any]] = []
     for column in columns:
-        identifier = column.get("id") if isinstance(column, dict) else None
-        if not isinstance(identifier, int) or isinstance(identifier, bool):
+        identifier = usable_identifier(column.get("id")) if isinstance(column, dict) else None
+        if identifier is None:
             continue
         column_issues, metadata = collect_all_pages(
             lambda page, column_id=identifier: client.project.list_project_column_issues(

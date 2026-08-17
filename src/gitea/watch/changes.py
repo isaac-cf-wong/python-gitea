@@ -88,6 +88,25 @@ def _names(entries: Any, field: str) -> list[str]:
     return sorted(names)
 
 
+def usable_identifier(value: Any) -> int | None:
+    """Read a value that has to be a whole number to identify anything.
+
+    Every identifier a watch reads - an issue's global ID, its number, a
+    column's ID - is read through here, so that a payload with a nonsense one in
+    it is refused the same way whichever field it was in.
+
+    Args:
+        value: The value the payload carries for the identifier.
+
+    Returns:
+        The identifier, or None when the value is not one. `True` is not one:
+        it is an `int` as far as Python is concerned, and would key every issue
+        whose ID came back as a boolean under the same entry.
+
+    """
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 def issue_key(issue: dict[str, Any]) -> str | None:
     """Build the key an issue is recorded under.
 
@@ -102,11 +121,8 @@ def issue_key(issue: dict[str, Any]) -> str | None:
         The key, or None when the payload carries no usable global ID.
 
     """
-    identifier = issue.get("id")
-    # bool is an int, and an issue whose ID came back as one is not an issue.
-    if not isinstance(identifier, int) or isinstance(identifier, bool):
-        return None
-    return str(identifier)
+    identifier = usable_identifier(issue.get("id"))
+    return None if identifier is None else str(identifier)
 
 
 def issue_snapshot(
@@ -126,14 +142,12 @@ def issue_snapshot(
         The snapshot of the issue.
 
     """
-    identifier = issue.get("id")
-    number = issue.get("number")
     title = issue.get("title")
     updated_at = issue.get("updated_at")
 
     return {
-        "issue_id": identifier if isinstance(identifier, int) and not isinstance(identifier, bool) else None,
-        "number": number if isinstance(number, int) and not isinstance(number, bool) else None,
+        "issue_id": usable_identifier(issue.get("id")),
+        "number": usable_identifier(issue.get("number")),
         "title": title if isinstance(title, str) else "",
         "repository": repository,
         "updated_at": updated_at if isinstance(updated_at, str) else "",

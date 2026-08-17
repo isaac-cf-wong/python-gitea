@@ -13,7 +13,14 @@ without producing work, on a quiet tick.
 
 from __future__ import annotations
 
-from gitea.watch.changes import comment_hash, detect_changes, format_change, issue_key, issue_snapshot
+from gitea.watch.changes import (
+    comment_hash,
+    detect_changes,
+    format_change,
+    issue_key,
+    issue_snapshot,
+    usable_identifier,
+)
 from gitea.watch.state import (
     STATE_FILE_ENV,
     default_state_path,
@@ -37,4 +44,5 @@ __all__ = [
     "resolve_state_path",
     "save_state",
     "scope_snapshots",
+    "usable_identifier",
 ]

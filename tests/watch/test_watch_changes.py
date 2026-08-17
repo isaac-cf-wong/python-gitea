@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from gitea.watch.changes import comment_hash, detect_changes, format_change, issue_key, issue_snapshot
+import pytest
+
+from gitea.watch.changes import (
+    comment_hash,
+    detect_changes,
+    format_change,
+    issue_key,
+    issue_snapshot,
+    usable_identifier,
+)
 
 COMMENT = {
     "id": 7,
@@ -94,6 +103,38 @@ class TestCommentHash:
         assert comment_hash({**COMMENT, "user": "alice"}) == comment_hash({**COMMENT, "user": None})
 
 
+class TestUsableIdentifier:
+    """Tests for the one reading every identifier a watch takes from a payload."""
+
+    def test_a_whole_number_identifies_something(self) -> None:
+        """The ordinary case has to come back unchanged."""
+        assert usable_identifier(1854) == 1854
+        assert usable_identifier(0) == 0
+
+    @pytest.mark.parametrize("value", [None, "1854", 15.0, [1854], {"id": 1854}])
+    def test_anything_that_is_not_a_whole_number_identifies_nothing(self, value: Any) -> None:
+        """A payload with nonsense in the field should be refused, not coerced.
+
+        Args:
+            value: The value the payload carries for the identifier.
+
+        """
+        assert usable_identifier(value) is None
+
+    @pytest.mark.parametrize("value", [True, False])
+    def test_a_boolean_identifies_nothing(self, value: bool) -> None:
+        """`bool` is an `int`, so the refusal has to be explicit about it.
+
+        Every issue whose ID came back as a boolean would otherwise be cached
+        under the same entry as every other.
+
+        Args:
+            value: The boolean the payload carries for the identifier.
+
+        """
+        assert usable_identifier(value) is None
+
+
 class TestIssueKey:
     """Tests for the key an issue is recorded under."""
 
@@ -149,6 +190,13 @@ class TestIssueSnapshot:
         assert taken["labels"] == []
         assert taken["comment_hashes"] == [comment_hash(COMMENT)]
 
+    def test_an_identifier_that_is_not_a_whole_number_is_dropped(self) -> None:
+        """A nonsense ID or number must not reach the report as if it were one."""
+        taken = issue_snapshot({"id": True, "number": "15"}, [])
+
+        assert taken["issue_id"] is None
+        assert taken["number"] is None
+
     def test_a_missing_field_reads_as_its_empty_value(self) -> None:
         """An issue payload without the optional fields should still snapshot."""
         assert issue_snapshot({"id": 1854}, []) == {
@@ -186,6 +234,26 @@ class TestDetectChanges:
         assert changes[0]["title"] == "Fix the docs"
         assert changes[0]["added"] == []
         assert changes[0]["removed"] == []
+
+    def test_every_new_issue_is_reported_not_only_the_first(self) -> None:
+        """Two issues opened between runs are two changes."""
+        current = {"1854": snapshot(), "1900": snapshot(issue_id=1900, number=16)}
+
+        changes = detect_changes(current, {})
+
+        assert [change["number"] for change in changes] == [15, 16]
+
+    def test_a_snapshot_missing_a_field_compares_as_if_it_were_empty(self) -> None:
+        """A snapshot built without every field should compare rather than raise.
+
+        The snapshots the cache and `issue_snapshot` produce always carry every
+        field, so this is the case a library caller building its own reaches.
+        """
+        changes = detect_changes({"1854": {"number": 15, "assignees": ["alice"]}}, {"1854": {"number": 15}})
+
+        assert [change["kind"] for change in changes] == ["assignees"]
+        assert changes[0]["added"] == ["alice"]
+        assert changes[0]["title"] == ""
 
     def test_an_assignee_change_names_who_arrived_and_who_left(self) -> None:
         """Both halves of an assignment change should be reported."""
