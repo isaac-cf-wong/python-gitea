@@ -7,12 +7,14 @@ from typing import Annotated, Literal
 
 import typer
 
+from gitea.cli.utils.options import REPOSITORY_REQUIRED_HELP
+
 
 def create_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
     title: Annotated[str, typer.Option("--title", help="Title of the milestone.")],
+    repository: Annotated[str | None, typer.Option("--repository", help=REPOSITORY_REQUIRED_HELP)] = None,
     description: Annotated[
         str | None,
         typer.Option("--description", help="Description of the milestone."),
@@ -52,7 +54,7 @@ def create_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, which this command requires.
         title: The title of the milestone.
         description: The description of the milestone.
         due_on: The due date of the milestone.
@@ -66,6 +68,7 @@ def create_command(
 
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
+    from gitea.cli.utils.options import require_repository  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -82,10 +85,12 @@ def create_command(
             A tuple containing the milestone data and metadata.
 
         """
+        target_repository = require_repository(repository, command="gitea-cli milestone create")
+
         with Gitea(token=token, base_url=base_url) as client:
             return client.milestone.create_milestone(
                 owner=owner,
-                repository=repository,
+                repository=target_repository,
                 title=title,
                 description=description,
                 due_on=due_on,

@@ -25,7 +25,7 @@ def test_get_command_calls_execute_and_delegates(mock_gitea, mock_get_auth_param
     client.issue.get_issue.return_value = ({"id": 10}, {"meta": 2})
     mock_gitea.return_value.__enter__.return_value = client
 
-    get_command(ctx=ctx, owner="owner", repository="repo", index=5, account_name="acct", token=None, base_url=None)
+    get_command(ctx=ctx, owner="owner", repository="repo", issue_id=5, account_name="acct", token=None, base_url=None)
 
     mock_get_auth_params.assert_called_once_with(
         config_path="/tmp/config", account_name="acct", token=None, base_url=None
@@ -53,7 +53,7 @@ def test_get_command_renames_comments_to_comment_count(mock_gitea, mock_get_auth
     client.issue.get_issue.return_value = ({"id": 10, "comments": 3, "title": "Bug"}, {"status_code": 200})
     mock_gitea.return_value.__enter__.return_value = client
 
-    get_command(ctx=ctx, owner="owner", repository="repo", index=5, account_name="acct", token=None, base_url=None)
+    get_command(ctx=ctx, owner="owner", repository="repo", issue_id=5, account_name="acct", token=None, base_url=None)
 
     data, metadata = mock_execute.call_args[1]["api_call"]()
     assert data == {"id": 10, "comment_count": 3, "title": "Bug"}
@@ -101,7 +101,7 @@ def test_get_command_reports_the_column_of_every_project_the_issue_is_on(
         ctx=ctx,
         owner="example-org",
         repository="example-repo",
-        index=15,
+        issue_id=15,
         account_name="acct",
         token=None,
         base_url=None,
@@ -129,7 +129,7 @@ def test_get_command_reports_a_null_column_for_a_project_without_a_card(mock_git
         ctx=ctx,
         owner="example-org",
         repository="example-repo",
-        index=15,
+        issue_id=15,
         account_name="acct",
         token=None,
         base_url=None,
@@ -156,7 +156,7 @@ def test_get_command_leaves_an_issue_without_projects_alone(mock_gitea, mock_get
         ctx=ctx,
         owner="example-org",
         repository="example-repo",
-        index=15,
+        issue_id=15,
         account_name="acct",
         token=None,
         base_url=None,
@@ -194,7 +194,7 @@ def test_get_command_reports_a_column_on_every_project_of_an_issue_without_a_glo
         ctx=ctx,
         owner="example-org",
         repository="example-repo",
-        index=15,
+        issue_id=15,
         account_name="acct",
         token=None,
         base_url=None,

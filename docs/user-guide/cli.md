@@ -79,6 +79,68 @@ failing over an enrichment of it.
 
 Tokens are never included in the output of `config` commands in either format.
 
+## Option naming
+
+Every resource command addresses its target the same way, so an invocation can
+be written without reading `--help` first:
+
+| Option          | Meaning                                                  |
+| --------------- | -------------------------------------------------------- |
+| `--owner`       | The user or organization that owns the target. Required. |
+| `--repository`  | Narrows the target to one repository of that owner.      |
+| `--<entity>-id` | Names the entity acted on.                               |
+
+The entity options are `--issue-id`, `--project-id`, `--column-id`, `--label-id`
+and `--comment-id`.
+
+Omitting `--repository` asks for the target that belongs to the owner itself
+rather than to one of its repositories. The `project` commands have both forms:
+
+```bash
+gitea-cli project get --owner my-org --project-id 1                      # organization project
+gitea-cli project get --owner my-org --repository my-repo --project-id 1  # repository project
+```
+
+The other families have no owner-wide endpoint - an issue, a comment, a label, a
+milestone and a pull request all live in a repository - so omitting
+`--repository` there is reported as an error naming the option to pass:
+
+```console
+$ gitea-cli issue get --owner my-org --issue-id 42
+ERROR  'gitea-cli issue get' needs a repository: pass --repository REPOSITORY.
+       Omitting --repository asks for the target of the owner itself, which only
+       the 'gitea-cli project' commands have.
+```
+
+A second target named in the same command carries its own coordinates, and those
+are required together because there is no scope for them to fall back to:
+`issue dependency add` takes `--dependency-owner`, `--dependency-repository` and
+`--dependency-issue-id`.
+
+`notification` is the one family where `--owner` is optional as well: given
+neither `--owner` nor `--repository` it acts on the authenticated user's
+notifications, and the two must be passed together or not at all.
+
+### Deprecated option names
+
+`--index` has been renamed to `--issue-id`, so that one option name means "which
+issue" in every family. The old names are still accepted and log a deprecation
+warning naming their replacement, so existing scripts keep working; they are
+hidden from `--help` and will be removed in a future release.
+
+| Deprecated           | Use instead             |
+| -------------------- | ----------------------- |
+| `--index`            | `--issue-id`            |
+| `--dependency-index` | `--dependency-issue-id` |
+
+`--index` is still accepted by `issue get`, `issue edit`, the three
+`issue dependency` commands and `comment add`/`comment list` - and by the same
+commands under the `issue comment` alias. `--dependency-index` is still accepted
+by `issue dependency add` and `issue dependency remove`.
+
+Passing both names for the same issue is accepted while they agree, and is an
+error when they disagree.
+
 ## Commands
 
 ### Config - manage accounts
@@ -98,7 +160,7 @@ Tokens are never included in the output of `config` commands in either format.
 - `gitea-cli issue list --owner <owner> --repository <repo>`
     - Optional: `--state`, `--labels`, `--search-string`, `--created-by`,
       `--assigned-by`, `--since`, `--before`, `--page`, `--limit`
-- `gitea-cli issue get --owner <owner> --repository <repo> --index <index>`
+- `gitea-cli issue get --owner <owner> --repository <repo> --issue-id <number>`
     - The `comment_count` field is the number of comments on the issue, not the
       comments themselves; use `gitea-cli issue comment list` to read the
       bodies.
@@ -114,16 +176,16 @@ Tokens are never included in the output of `config` commands in either format.
       so `null` means "no card here" and "could not tell" alike. The columns of
       a user-owned (individual) project cannot be listed at all, so its
       `column_id` is always `null`.
-- `gitea-cli issue edit --owner <owner> --repository <repo> --index <index>`
+- `gitea-cli issue edit --owner <owner> --repository <repo> --issue-id <number>`
     - Optional: `--title`, `--body`, `--state`, `--assignees`, `--milestone`,
       `--due-date`
-- `gitea-cli issue dependency add --owner <owner> --repository <repo> --index <index>`
+- `gitea-cli issue dependency add --owner <owner> --repository <repo> --issue-id <number>`
     - Required: `--dependency-owner <owner>`, `--dependency-repository <repo>`,
-      `--dependency-index <index>`
-- `gitea-cli issue dependency list --owner <owner> --repository <repo> --index <index>`
-- `gitea-cli issue dependency remove --owner <owner> --repository <repo> --index <index>`
+      `--dependency-issue-id <number>`
+- `gitea-cli issue dependency list --owner <owner> --repository <repo> --issue-id <number>`
+- `gitea-cli issue dependency remove --owner <owner> --repository <repo> --issue-id <number>`
     - Required: `--dependency-owner <owner>`, `--dependency-repository <repo>`,
-      `--dependency-index <index>`
+      `--dependency-issue-id <number>`
 
 ### Pull Request - manage pull requests
 
@@ -133,8 +195,8 @@ Tokens are never included in the output of `config` commands in either format.
 
 ### Comment - manage issue comments
 
-- `gitea-cli comment add --owner <owner> --repository <repo> --index <index> --body <body>`
-- `gitea-cli comment list --owner <owner> --repository <repo> --index <index>`
+- `gitea-cli comment add --owner <owner> --repository <repo> --issue-id <number> --body <body>`
+- `gitea-cli comment list --owner <owner> --repository <repo> --issue-id <number>`
 - `gitea-cli comment edit --owner <owner> --repository <repo> --comment-id <id> --body <body>`
 - `gitea-cli comment delete --owner <owner> --repository <repo> --comment-id <id>`
 

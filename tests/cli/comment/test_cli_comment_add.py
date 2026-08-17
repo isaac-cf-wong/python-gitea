@@ -28,7 +28,7 @@ def test_add_command_calls_execute_and_wires_params(mock_gitea, mock_get_auth_pa
         ctx=ctx,
         owner="owner",
         repository="repo",
-        index=7,
+        issue_id=7,
         body="Hello",
         account_name="acct",
         token=None,

@@ -6,12 +6,15 @@ from typing import Annotated
 
 import typer
 
+from gitea.cli.utils.options import DEPRECATED_INDEX_HELP, ISSUE_ID_HELP, REPOSITORY_REQUIRED_HELP
+
 
 def list_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
-    index: Annotated[int, typer.Option("--index", help="Index of the issue.")],
+    repository: Annotated[str | None, typer.Option("--repository", help=REPOSITORY_REQUIRED_HELP)] = None,
+    issue_id: Annotated[int | None, typer.Option("--issue-id", help=ISSUE_ID_HELP)] = None,
+    index: Annotated[int | None, typer.Option("--index", help=DEPRECATED_INDEX_HELP, hidden=True)] = None,
     page: Annotated[
         int | None,
         typer.Option("--page", help="The page number for pagination."),
@@ -47,8 +50,9 @@ def list_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
-        index: The index of the issue.
+        repository: The name of the repository, which this command requires.
+        issue_id: The issue number shown in the web UI.
+        index: The deprecated name of `issue_id`.
         page: The page number for pagination.
         limit: The number of comments per page.
         account_name: Name of the account to use for authentication.
@@ -60,6 +64,7 @@ def list_command(
 
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
+    from gitea.cli.utils.options import require_repository, resolve_issue_id  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -76,11 +81,14 @@ def list_command(
             A tuple containing the comment data and metadata.
 
         """
+        target_repository = require_repository(repository, command="gitea-cli comment list")
+        target_issue = resolve_issue_id(issue_id=issue_id, index=index, command="gitea-cli comment list")
+
         with Gitea(token=token, base_url=base_url) as client:
             return client.comment.list_comments(
                 owner=owner,
-                repository=repository,
-                index=index,
+                repository=target_repository,
+                index=target_issue,
                 page=page,
                 limit=limit,
             )

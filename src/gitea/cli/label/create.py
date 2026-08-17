@@ -6,13 +6,15 @@ from typing import Annotated
 
 import typer
 
+from gitea.cli.utils.options import REPOSITORY_REQUIRED_HELP
+
 
 def create_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str, typer.Option("--repository", help="Name of the repository.")],
     name: Annotated[str, typer.Option("--name", help="Name of the label.")],
     color: Annotated[str, typer.Option("--color", help="Color of the label in hexadecimal format (e.g. #00aabb).")],
+    repository: Annotated[str | None, typer.Option("--repository", help=REPOSITORY_REQUIRED_HELP)] = None,
     description: Annotated[
         str | None,
         typer.Option("--description", help="Description of the label."),
@@ -44,7 +46,7 @@ def create_command(
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
-        repository: The name of the repository.
+        repository: The name of the repository, which this command requires.
         name: The name of the label.
         color: The color of the label in hexadecimal format.
         description: The description of the label.
@@ -57,6 +59,7 @@ def create_command(
 
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
+    from gitea.cli.utils.options import require_repository  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -73,10 +76,12 @@ def create_command(
             A tuple containing the label data and metadata.
 
         """
+        target_repository = require_repository(repository, command="gitea-cli label create")
+
         with Gitea(token=token, base_url=base_url) as client:
             return client.label.create_label(
                 owner=owner,
-                repository=repository,
+                repository=target_repository,
                 name=name,
                 color=color,
                 description=description,
