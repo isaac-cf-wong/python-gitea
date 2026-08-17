@@ -20,6 +20,7 @@ column_app = typer.Typer(
 def register_commands() -> None:
     """Register project-related commands to the project_app."""
     from gitea.cli.project.column.create import create_column_command  # noqa: PLC0415
+    from gitea.cli.project.column.issues import list_column_issues_command  # noqa: PLC0415
     from gitea.cli.project.column.list import list_columns_command  # noqa: PLC0415
     from gitea.cli.project.create import create_command  # noqa: PLC0415
     from gitea.cli.project.delete import delete_command  # noqa: PLC0415
@@ -28,6 +29,7 @@ def register_commands() -> None:
     from gitea.cli.project.issue.add import add_issue_command  # noqa: PLC0415
     from gitea.cli.project.issue.move import move_issue_command  # noqa: PLC0415
     from gitea.cli.project.issue.remove import remove_issue_command  # noqa: PLC0415
+    from gitea.cli.project.issues import list_project_issues_command  # noqa: PLC0415
     from gitea.cli.project.list import list_command  # noqa: PLC0415
 
     project_app.command("create", help="Create a project.")(create_command)
@@ -35,9 +37,11 @@ def register_commands() -> None:
     project_app.command("get", help="Get a project.")(get_command)
     project_app.command("edit", help="Edit a project.")(edit_command)
     project_app.command("delete", help="Delete a project.")(delete_command)
+    project_app.command("issues", help="List a project's issues, grouped by column.")(list_project_issues_command)
 
     column_app.command("create", help="Create a column in a project.")(create_column_command)
     column_app.command("list", help="List a project's columns.")(list_columns_command)
+    column_app.command("issues", help="List the issues in a project's column.")(list_column_issues_command)
 
     project_app.add_typer(column_app, name="column", help="Commands for managing project columns.")
 
