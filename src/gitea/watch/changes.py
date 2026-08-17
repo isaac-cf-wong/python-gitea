@@ -35,6 +35,25 @@ _HASH_LENGTH = 16
 _FIELD_KINDS = (("assignees", "assignees"), ("labels", "labels"))
 
 
+def usable_identifier(value: Any) -> int | None:
+    """Read a value that has to be a whole number to identify anything.
+
+    Every identifier a watch reads - an issue's global ID, its number, a
+    column's ID - is read through here, so that a payload with a nonsense one in
+    it is refused the same way whichever field it was in.
+
+    Args:
+        value: The value the payload carries for the identifier.
+
+    Returns:
+        The identifier, or None when the value is not one. `True` is not one:
+        it is an `int` as far as Python is concerned, and would key every issue
+        whose ID came back as a boolean under the same entry.
+
+    """
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 def comment_hash(comment: dict[str, Any]) -> str:
     """Hash a comment's identity, stably across re-fetches.
 
@@ -47,6 +66,15 @@ def comment_hash(comment: dict[str, Any]) -> str:
     comment it replaced, so an edit is reported as a change rather than passing
     for the comment already recorded.
 
+    The author is taken by ID and never by login, because a login is renameable
+    and the digest has to survive a rename: hashing the login would turn every
+    comment a renamed user ever wrote into a removal and an addition, on every
+    issue being watched, although nothing about any of them changed. A comment's
+    author cannot change, so the ID is only there to tell two comments apart
+    when the payload carries no comment ID of its own - and a payload carrying
+    no user ID contributes no author at all rather than falling back to the
+    login, which would put the rename back.
+
     Args:
         comment: The comment data returned by the API. A payload missing any of
             these fields hashes as if it carried them empty, rather than
@@ -57,10 +85,10 @@ def comment_hash(comment: dict[str, Any]) -> str:
 
     """
     user = comment.get("user")
-    author = user.get("login") if isinstance(user, dict) else None
+    author = usable_identifier(user.get("id")) if isinstance(user, dict) else None
     identity = [
         comment.get("id"),
-        author if isinstance(author, str) else "",
+        author,
         comment.get("body") if isinstance(comment.get("body"), str) else "",
         comment.get("created_at") if isinstance(comment.get("created_at"), str) else "",
         comment.get("updated_at") if isinstance(comment.get("updated_at"), str) else "",
@@ -86,25 +114,6 @@ def _names(entries: Any, field: str) -> list[str]:
         return []
     names = {entry[field] for entry in entries if isinstance(entry, dict) and isinstance(entry.get(field), str)}
     return sorted(names)
-
-
-def usable_identifier(value: Any) -> int | None:
-    """Read a value that has to be a whole number to identify anything.
-
-    Every identifier a watch reads - an issue's global ID, its number, a
-    column's ID - is read through here, so that a payload with a nonsense one in
-    it is refused the same way whichever field it was in.
-
-    Args:
-        value: The value the payload carries for the identifier.
-
-    Returns:
-        The identifier, or None when the value is not one. `True` is not one:
-        it is an `int` as far as Python is concerned, and would key every issue
-        whose ID came back as a boolean under the same entry.
-
-    """
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def issue_key(issue: dict[str, Any]) -> str | None:

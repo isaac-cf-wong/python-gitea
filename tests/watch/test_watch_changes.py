@@ -18,7 +18,7 @@ from gitea.watch.changes import (
 COMMENT = {
     "id": 7,
     "body": "Looks right to me",
-    "user": {"login": "alice"},
+    "user": {"id": 3, "login": "alice"},
     "created_at": "2026-08-01T09:00:00Z",
     "updated_at": "2026-08-01T09:00:00Z",
 }
@@ -71,7 +71,7 @@ class TestCommentHash:
         variants = [
             {**COMMENT, "id": 8},
             {**COMMENT, "body": "Looks wrong to me"},
-            {**COMMENT, "user": {"login": "bob"}},
+            {**COMMENT, "user": {"id": 4, "login": "bob"}},
             {**COMMENT, "created_at": "2026-08-01T09:00:01Z"},
             {**COMMENT, "updated_at": "2026-08-03T11:00:00Z"},
         ]
@@ -82,15 +82,47 @@ class TestCommentHash:
         # Each variant differs from every other, not merely from the original.
         assert len(digests) == len(variants)
 
+    def test_renaming_the_author_does_not_change_the_hash(self) -> None:
+        """A user renaming themselves must not look like their comments moving.
+
+        A login is renameable and a user ID is not, so the digest is taken over
+        the ID. Hashing the login would turn every comment a renamed user ever
+        wrote into a removal and an addition, on every issue being watched.
+        """
+        renamed = {**COMMENT, "user": {"id": 3, "login": "alice-in-another-name"}}
+
+        assert comment_hash(renamed) == comment_hash(COMMENT)
+
+    def test_an_author_named_but_not_identified_contributes_nothing(self) -> None:
+        """A payload with no user ID must not fall back to the renameable login.
+
+        Falling back would put the rename above back for exactly the payloads
+        that cannot prove the author is the same person.
+        """
+        by_alice = {**COMMENT, "user": {"login": "alice"}}
+        by_bob = {**COMMENT, "user": {"login": "bob"}}
+
+        assert comment_hash(by_alice) == comment_hash(by_bob)
+        assert comment_hash(by_alice) == comment_hash({**COMMENT, "user": None})
+
+    def test_two_comments_of_different_authors_hash_apart(self) -> None:
+        """The author still tells two otherwise identical comments apart."""
+        first = {**COMMENT, "id": None, "user": {"id": 3, "login": "alice"}}
+        second = {**COMMENT, "id": None, "user": {"id": 4, "login": "bob"}}
+
+        assert comment_hash(first) != comment_hash(second)
+
     def test_a_body_cannot_be_confused_with_the_next_field(self) -> None:
         """Two comments differing only in where a field ends should hash apart.
 
         A serialization that joined the fields with a separator would hash these
         two identically, because the body of one ends with what begins the
-        author of the other.
+        timestamp of the other. The values are contrived - a real timestamp
+        carries no separator - because the point is that the encoding does not
+        rely on them not carrying one.
         """
-        first = {**COMMENT, "body": "text", "user": {"login": "alice"}}
-        second = {**COMMENT, "body": "text|alice", "user": {"login": ""}}
+        first = {**COMMENT, "body": "x", "created_at": "y|w"}
+        second = {**COMMENT, "body": "x|y", "created_at": "w"}
 
         assert comment_hash(first) != comment_hash(second)
 

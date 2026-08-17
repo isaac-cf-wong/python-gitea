@@ -354,15 +354,17 @@ Three behaviours of it are worth knowing before it surprises you:
 - **The first run against a scope reports nothing.** It records what is there
   and reports from the second run onwards, so pointing this at a repository with
   200 open issues does not announce all 200.
-- **An unreadable cache is treated as no cache.** A missing, empty or corrupt
-  file baselines every scope again rather than failing, so a scheduled run
-  recovers by itself - at the cost of never reporting what changed while the
-  cache was gone. The recovery is logged.
-- **The cache is written atomically, and the last writer wins.** A run writes a
-  temporary file and renames it over the cache, so an interrupted run cannot
-  leave a half-written one. No lock is taken: two runs overlapping on the same
-  cache each write a complete document, and the scopes only the earlier one
-  watched are baselined again.
+- **An unreadable cache is treated as no cache.** A missing, empty, corrupt or
+  not-even-text file baselines every scope again rather than failing, so a
+  scheduled run recovers by itself - at the cost of never reporting what changed
+  while the cache was gone. The recovery is logged.
+- **A run writes only the scopes it watched.** The cache is written by renaming
+  a temporary file over it, so an interrupted run cannot leave a half-written
+  one, and it is re-read immediately before that so only the scopes of this run
+  are replaced. Two runs watching different scopes therefore leave both
+  recorded. This is not a lock, so it is not concurrency-safe: a write landing
+  in the moment between that re-read and the rename is still lost, and two runs
+  watching the same scope still end with the later one's snapshots.
 
 `--dry-run` reports the changes and leaves the cache untouched, so the same
 changes come back on the next run. Everything else about the run is unchanged,

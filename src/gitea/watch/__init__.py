@@ -27,6 +27,7 @@ from gitea.watch.state import (
     load_state,
     record_scope,
     resolve_state_path,
+    save_scopes,
     save_state,
     scope_snapshots,
 )
@@ -42,6 +43,7 @@ __all__ = [
     "load_state",
     "record_scope",
     "resolve_state_path",
+    "save_scopes",
     "save_state",
     "scope_snapshots",
     "usable_identifier",

@@ -139,34 +139,51 @@ from the package `__init__` (e.g. `from gitea.issue import Issue`). See the
 is built on, for a caller wanting the same comparison without the command's
 choices about scopes and output.
 
+Both listings below are walked with `collect_all_pages`, as the command walks
+them. A single call returns one page, so comparing against `list_issues(...)[0]`
+would report every issue past the first page as gone, and every comment past the
+first page of an issue's comments would never be seen at all.
+
 ```python
 from gitea.client.gitea import Gitea
-from gitea.watch import detect_changes, issue_snapshot, load_state, record_scope, save_state, scope_snapshots
+from gitea.utils.pagination import PAGE_SIZE, collect_all_pages
+from gitea.watch import detect_changes, issue_key, issue_snapshot, load_state, save_scopes, scope_snapshots
+
+OWNER, REPOSITORY = "my-org", "my-repo"
+SCOPE = f"repo:{OWNER}/{REPOSITORY}"
 
 state = load_state("watch-state.json")
 
 with Gitea(token="your-token", base_url="https://gitea.example.com") as client:
-    issues, _ = client.issue.list_issues(owner="my-org", repository="my-repo", state="open")
-    current = {
-        str(issue["id"]): issue_snapshot(
-            issue,
-            client.comment.list_comments(owner="my-org", repository="my-repo", index=issue["number"])[0],
-            repository="my-org/my-repo",
+    issues, _ = collect_all_pages(
+        lambda page: client.issue.list_issues(
+            owner=OWNER, repository=REPOSITORY, state="open", page=page, limit=PAGE_SIZE
         )
-        for issue in issues
-    }
+    )
+
+    current = {}
+    for issue in issues:
+        comments, _ = collect_all_pages(
+            lambda page, index=issue["number"]: client.comment.list_comments(
+                owner=OWNER, repository=REPOSITORY, index=index, page=page, limit=PAGE_SIZE
+            )
+        )
+        current[issue_key(issue)] = issue_snapshot(issue, comments, repository=f"{OWNER}/{REPOSITORY}")
 
 # None - a scope never recorded - baselines it, so nothing is reported the
 # first time round.
-for change in detect_changes(current, scope_snapshots(state, "repo:my-org/my-repo")):
+for change in detect_changes(current, scope_snapshots(state, SCOPE)):
     print(change["kind"], change["number"], change["detail"])
 
-record_scope(state, "repo:my-org/my-repo", current)
-save_state("watch-state.json", state)
+save_scopes("watch-state.json", {SCOPE: current})
 ```
 
 `issue_snapshot` reduces an issue to the fields the comparison reads,
-`comment_hash` identifies a comment stably across re-fetches, and the state
-helpers read and write the cache the snapshots live in - atomically, and
-tolerating a cache that is missing or unreadable. The
+`comment_hash` identifies a comment stably across re-fetches - by the author's
+ID rather than their login, so renaming a user does not look like every comment
+they wrote being replaced - and the state helpers read and write the cache the
+snapshots live in. `save_scopes` re-reads the cache and replaces only the scopes
+it is given, so it does not erase what another run recorded; `save_state` writes
+a whole document, for a caller that has one. Both write atomically, and reading
+tolerates a cache that is missing or unreadable. The
 [CLI documentation](cli.md#the-cache) describes what that tolerance costs.

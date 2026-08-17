@@ -24,7 +24,7 @@ import typer
 
 from gitea.utils.pagination import PAGE_SIZE, collect_all_pages
 from gitea.watch.changes import detect_changes, format_change, issue_key, issue_snapshot, usable_identifier
-from gitea.watch.state import STATE_FILE_ENV, load_state, record_scope, resolve_state_path, save_state, scope_snapshots
+from gitea.watch.state import STATE_FILE_ENV, load_state, resolve_state_path, save_scopes, scope_snapshots
 
 logger = logging.getLogger("gitea")
 
@@ -63,7 +63,10 @@ def build_scopes(owner: str, repositories: list[str], project_ids: list[int]) ->
         project_ids: The projects named, in the order they were named.
 
     Returns:
-        One scope per repository and per project, repositories first.
+        One scope per repository and per project, repositories first, and one
+        scope per key: naming the same repository twice watches it once, rather
+        than fetching it twice and comparing the second fetch against the same
+        recorded snapshots as the first.
 
     Raises:
         CommandError: If nothing was named to watch, or if projects were named
@@ -99,7 +102,11 @@ def build_scopes(owner: str, repositories: list[str], project_ids: list[int]) ->
         )
         for identifier in project_ids
     ]
-    return scopes
+
+    unique: dict[str, _Scope] = {}
+    for scope in scopes:
+        unique.setdefault(scope.key, scope)
+    return list(unique.values())
 
 
 def _holder(issue: dict[str, Any], owner: str, repository: str | None) -> tuple[str, str] | None:
@@ -349,6 +356,7 @@ def list_command(
 
         changes: list[dict[str, Any]] = []
         baselined: list[str] = []
+        recorded: dict[str, dict[str, dict[str, Any]]] = {}
         issue_count = 0
         metadata: dict[str, Any] = {}
 
@@ -362,12 +370,14 @@ def list_command(
                     baselined.append(scope.key)
                 changes.extend({**change, "scope": scope.key} for change in detect_changes(snapshots, previous))
 
-                record_scope(state, scope.key, snapshots)
+                recorded[scope.key] = snapshots
                 issue_count += len(snapshots)
 
         if not dry_run:
             try:
-                save_state(state_path, state)
+                # Only the scopes this run watched are replaced, so a run that
+                # finished while this one was fetching keeps what it recorded.
+                save_scopes(state_path, recorded)
             except OSError as error:
                 raise CommandError(
                     f"Could not write the watch cache at {state_path}: {error}. The changes reported by this run "

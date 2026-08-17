@@ -29,14 +29,19 @@ written down here: changes made between the last good write and the recovery are
 never reported, because the run they would have been reported against is the one
 that re-baselines. Losing the cache loses that window, it does not delay it.
 
-**Writes are atomic, and concurrent writes are last-one-wins.** The document is
-written to a temporary file in the same directory and renamed over the cache, so
-a reader - including the next run - never sees a half-written document, whatever
-the writer was interrupted by. No lock is taken: two runs overlapping on the
-same cache each write a complete document and the later rename wins, so the
-scopes only the earlier one watched are lost from the cache and get baselined
-again. For a single-user CLI, whose runs are a cron interval apart, that is
-accepted rather than solved.
+**Writes are atomic, and touch only the scopes the run watched.** The document
+is written to a temporary file in the same directory and renamed over the cache,
+so a reader - including the next run - never sees a half-written document,
+whatever the writer was interrupted by. `save_scopes` re-reads the document
+immediately before writing and replaces only the scopes it is given, so two runs
+watching different scopes no longer erase each other's: writing back the
+document a run started from would put back whatever it held then.
+
+No lock is taken, so this is not concurrency-safe, only narrower than it was: a
+write landing between that re-read and the rename is still lost, and two runs
+watching the *same* scope still end with the later one's snapshots. The window
+is a fraction of a run rather than the whole of it, and for a single-user CLI
+whose runs are a cron interval apart that is accepted rather than solved.
 
 Reading is deliberately lenient: a field the document does not carry reads as
 its empty value and a field it carries that this version does not know is
@@ -110,6 +115,12 @@ def load_state(path: str | Path) -> dict[str, Any]:
     because it means the scopes in it are about to be baselined again and the
     changes since the last good write will never be reported.
 
+    A file whose bytes are not UTF-8 at all is one of those, and is caught here
+    rather than left to the caller: decoding raises `UnicodeDecodeError`, which
+    is a `ValueError` and not an `OSError`, so catching only the latter would
+    let a cache truncated mid-character - or a wholly unrelated binary file
+    named as one - end the run instead of re-baselining it.
+
     Args:
         path: Path of the cache.
 
@@ -122,7 +133,7 @@ def load_state(path: str | Path) -> dict[str, Any]:
         raw = path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return empty_state()
-    except OSError as error:
+    except (OSError, UnicodeError) as error:
         logger.warning("Could not read the watch cache at %s (%s); every scope will be recorded afresh.", path, error)
         return empty_state()
 
@@ -259,3 +270,27 @@ def record_scope(state: dict[str, Any], scope: str, snapshots: dict[str, dict[st
     """
     scopes = state.setdefault("scopes", {})
     scopes[scope] = {"issues": dict(snapshots)}
+
+
+def save_scopes(path: str | Path, scopes: dict[str, dict[str, dict[str, Any]]]) -> None:
+    """Record the scopes a run watched, leaving every other scope as it is.
+
+    A run is authoritative only for the scopes it was asked to watch, so the
+    document is re-read here - immediately before it is written, rather than at
+    the start of the run - and only those scopes are replaced in it. Writing the
+    document the run started from would put back whatever it held then, erasing
+    the scopes a concurrent run recorded while this one was fetching and
+    reporting every issue in them as new on the next run.
+
+    Args:
+        path: Path of the cache.
+        scopes: The snapshots to record, keyed by scope.
+
+    Raises:
+        OSError: If the cache cannot be written. It is left as it was.
+
+    """
+    state = load_state(path)
+    for scope, snapshots in scopes.items():
+        record_scope(state, scope, snapshots)
+    save_state(path, state)

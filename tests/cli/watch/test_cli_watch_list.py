@@ -14,7 +14,7 @@ from gitea.cli.main import app
 from gitea.cli.watch.list import build_scopes
 from gitea.utils.pagination import PAGE_SIZE
 from gitea.watch.changes import comment_hash
-from gitea.watch.state import STATE_FILE_ENV
+from gitea.watch.state import STATE_FILE_ENV, empty_state, record_scope, save_state
 from tests.cli.envelope import parse_envelope
 from tests.cli.rendering import unrendered
 from tests.cli.transport import RecordingSession
@@ -46,7 +46,7 @@ OTHER_ISSUE = {
 COMMENT = {
     "id": 7,
     "body": "Looks right to me",
-    "user": {"login": "alice"},
+    "user": {"id": 3, "login": "alice"},
     "created_at": "2026-08-01T09:00:00Z",
     "updated_at": "2026-08-01T09:00:00Z",
 }
@@ -215,6 +215,18 @@ class TestBuildScopes:
         with pytest.raises(CommandError, match="needs something to watch"):
             build_scopes("my-org", [], [])
 
+    def test_the_same_repository_named_twice_is_watched_once(self) -> None:
+        """One scope per key, so a repeated name is not fetched and compared twice.
+
+        Both occurrences would otherwise be compared against the same recorded
+        snapshots, reporting every change on it twice.
+        """
+        assert [scope.key for scope in build_scopes("my-org", ["one", "two", "one"], [])] == [
+            "repo:my-org/one",
+            "repo:my-org/two",
+        ]
+        assert [scope.key for scope in build_scopes("my-org", [], [29, 29])] == ["project:my-org/29"]
+
     def test_a_project_cannot_be_resolved_against_several_repositories(self) -> None:
         """Two repositories leave no single scope for a project ID to belong to."""
         from gitea.cli.utils.errors import CommandError
@@ -330,6 +342,21 @@ class TestReportedChanges:
         result = run(*watch(state_path), client=make_client([ISSUE], comments={15: [COMMENT, answered]}))
 
         assert result.stdout == "my-org/my-repo#15 comments: 1 new · Fix the docs\n"
+
+    def test_renaming_a_commenter_reports_nothing(self, tmp_path: Path) -> None:
+        """A user renaming themselves is not a change to anything they wrote.
+
+        Every comment they ever wrote would otherwise be reported as removed and
+        added again, on every issue being watched, on the run after the rename.
+        """
+        state_path = tmp_path / "watch-state.json"
+        run(*watch(state_path), client=make_client([ISSUE], comments={15: [COMMENT]}))
+
+        renamed = {**COMMENT, "user": {"id": 3, "login": "alice-in-another-name"}}
+        result = run(*watch(state_path), client=make_client([ISSUE], comments={15: [renamed]}))
+
+        assert result.exit_code == 0
+        assert result.stdout == ""
 
     def test_an_edited_comment_is_reported_as_a_change(self, tmp_path: Path) -> None:
         """A comment rewritten in place is not the comment that was recorded."""
@@ -528,6 +555,43 @@ class TestSeveralScopes:
         payload = parse_envelope(result.stdout)
         assert payload["metadata"]["baselined_scopes"] == ["repo:my-org/other"]
         assert payload["data"] == []
+
+    def test_a_scope_another_run_recorded_mid_flight_is_not_erased(self, tmp_path: Path) -> None:
+        """Two runs watching different scopes must not undo each other.
+
+        The other run is made to finish while this one is fetching, which is the
+        window that matters: this run has already read the cache, so writing the
+        document it read would put the cache back as it was and lose the other
+        scope - reporting every issue in it as new on the next run.
+        """
+        state_path = tmp_path / "watch-state.json"
+        served = paged([ISSUE])
+
+        def concurrent_run(**kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+            """Answer the listing, recording another scope on the first page.
+
+            Args:
+                **kwargs: The listing arguments, passed to the ordinary answer.
+
+            Returns:
+                The page the ordinary answer would have given.
+
+            """
+            if kwargs.get("page", 1) == 1:
+                other = empty_state()
+                record_scope(other, "repo:my-org/watched-elsewhere", {"9": {"number": 9}})
+                save_state(state_path, other)
+            return served(**kwargs)
+
+        client = make_client()
+        client.issue.list_issues.side_effect = concurrent_run
+
+        result = run(*watch(state_path), client=client)
+
+        assert result.exit_code == 0
+        recorded = json.loads(state_path.read_text(encoding="utf-8"))["scopes"]
+        assert set(recorded) == {"repo:my-org/my-repo", "repo:my-org/watched-elsewhere"}
+        assert list(recorded["repo:my-org/watched-elsewhere"]["issues"]) == ["9"]
 
     def test_a_change_names_the_scope_it_was_seen_in(self, tmp_path: Path) -> None:
         """A multi-scope digest has to say which scope each change came from."""
@@ -863,6 +927,26 @@ class TestRecovery:
 
         assert result.exit_code == 0
         assert result.stdout == ""
+        assert json.loads(state_path.read_text(encoding="utf-8"))["scopes"]["repo:my-org/my-repo"]["issues"]
+
+    def test_a_cache_that_is_not_utf_8_baselines_rather_than_crashing(self, tmp_path: Path) -> None:
+        """Bytes that are not text must not end the run with a traceback.
+
+        Decoding the cache raises `UnicodeDecodeError`, which is a `ValueError`
+        rather than an `OSError`, so it does not go through the corrupt-cache
+        handling unless that handling is written to expect it - and a watchdog
+        that exits on a corrupt cache never gets past one.
+        """
+        state_path = tmp_path / "watch-state.json"
+        state_path.write_bytes(b"\xff\xfe{\x00")
+
+        with patch("gitea.cli.utils.api.logger") as logger:
+            result = run(*watch(state_path), client=make_client([ISSUE, OTHER_ISSUE]))
+
+        assert result.exit_code == 0
+        assert result.stdout == ""
+        assert logger.exception.call_count == 0
+        # Re-baselined, and left as a cache the next run can read.
         assert json.loads(state_path.read_text(encoding="utf-8"))["scopes"]["repo:my-org/my-repo"]["issues"]
 
     def test_a_cache_written_by_a_newer_version_is_read_not_rejected(self, tmp_path: Path) -> None:

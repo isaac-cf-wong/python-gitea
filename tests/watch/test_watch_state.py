@@ -16,6 +16,7 @@ from gitea.watch.state import (
     load_state,
     record_scope,
     resolve_state_path,
+    save_scopes,
     save_state,
     scope_snapshots,
 )
@@ -166,6 +167,29 @@ class TestUnreadableCache:
 
         assert load_state(path) == empty_state(), name
 
+    def test_a_cache_that_is_not_utf_8_reads_as_no_cache(self, tmp_path: Path) -> None:
+        """Bytes that are not text at all must re-baseline, not end the run.
+
+        Decoding raises `UnicodeDecodeError`, which is a `ValueError` and not an
+        `OSError`, so it escapes a handler catching only the latter - and a
+        watchdog that exits on a corrupt cache never recovers from one.
+        """
+        path = tmp_path / "watch-state.json"
+        path.write_bytes(b"\xff\xfe{\x00")
+
+        with patch("gitea.watch.state.logger") as logger:
+            assert load_state(path) == empty_state()
+
+        assert logger.warning.call_count == 1
+
+    def test_a_cache_truncated_mid_character_reads_as_no_cache(self, tmp_path: Path) -> None:
+        """A write cut short between the bytes of one character is the same case."""
+        path = tmp_path / "watch-state.json"
+        # The first two bytes of "€" (e2 82 ac), as an interrupted write leaves.
+        path.write_bytes(b'{"scopes": {"repo:my-org/my-repo\xe2\x82')
+
+        assert load_state(path) == empty_state()
+
     def test_a_missing_cache_reads_as_no_cache(self, tmp_path: Path) -> None:
         """The ordinary first run has nothing to read and must not fail."""
         assert load_state(tmp_path / "absent.json") == empty_state()
@@ -264,6 +288,57 @@ class TestReadingSnapshots:
         state = {"scopes": {"s": {"issues": {"1854": {"assignees": ["bob", "alice"]}}}}}
 
         assert scope_snapshots(state, "s")["1854"]["assignees"] == ["alice", "bob"]
+
+
+class TestSaveScopes:
+    """Tests for recording only the scopes a run watched."""
+
+    def test_the_scopes_given_are_recorded(self, tmp_path: Path) -> None:
+        """The ordinary case still writes what it was handed."""
+        path = tmp_path / "watch-state.json"
+
+        save_scopes(path, {"repo:my-org/my-repo": {"1854": SNAPSHOT}})
+
+        assert scope_snapshots(load_state(path), "repo:my-org/my-repo") == {"1854": SNAPSHOT}
+
+    def test_a_scope_recorded_while_the_run_was_working_survives(self, tmp_path: Path) -> None:
+        """A concurrent run's scope must not be erased by this one's write.
+
+        Writing back the document this run loaded would put back the cache as it
+        was when the run started, dropping the scope the other run recorded in
+        the meantime - and reporting every issue in it as new on the next run.
+        """
+        path = tmp_path / "watch-state.json"
+
+        # Another run finished and recorded its own scope after this one loaded
+        # the cache and before it came to write.
+        concurrent = empty_state()
+        record_scope(concurrent, "repo:my-org/two", {"2": SNAPSHOT})
+        save_state(path, concurrent)
+
+        save_scopes(path, {"repo:my-org/one": {"1": SNAPSHOT}})
+
+        loaded = load_state(path)
+        assert list(scope_snapshots(loaded, "repo:my-org/one")) == ["1"]
+        assert list(scope_snapshots(loaded, "repo:my-org/two")) == ["2"]
+
+    def test_the_scopes_given_replace_what_was_recorded_for_them(self, tmp_path: Path) -> None:
+        """Merging is per scope, not per issue: a scope is what the run just saw."""
+        path = tmp_path / "watch-state.json"
+        save_scopes(path, {"repo:my-org/one": {"1": SNAPSHOT, "2": SNAPSHOT}})
+
+        save_scopes(path, {"repo:my-org/one": {"1": SNAPSHOT}})
+
+        assert list(scope_snapshots(load_state(path), "repo:my-org/one")) == ["1"]
+
+    def test_an_unreadable_cache_is_replaced_rather_than_failing_the_write(self, tmp_path: Path) -> None:
+        """Re-reading before writing must not make a corrupt cache fatal."""
+        path = tmp_path / "watch-state.json"
+        path.write_text("not json at all", encoding="utf-8")
+
+        save_scopes(path, {"repo:my-org/one": {"1": SNAPSHOT}})
+
+        assert list(scope_snapshots(load_state(path), "repo:my-org/one")) == ["1"]
 
 
 class TestAtomicWrite:
