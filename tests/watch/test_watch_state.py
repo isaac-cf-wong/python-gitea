@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import platformdirs
 import pytest
 
 from gitea.watch.state import (
@@ -35,13 +36,28 @@ class TestStatePath:
     """Tests for choosing the cache a run reads and writes."""
 
     def test_the_default_cache_lives_in_the_user_cache_directory(self) -> None:
-        """The default should be a per-user cache file, not the config directory."""
+        r"""The default should be a per-user cache file, not the config directory.
+
+        Where the application's own directory sits inside the cache directory is
+        the platform's business and not this library's: POSIX ends the path with
+        it (`~/.cache/gitea`), while Windows follows it with a `Cache` component
+        (`...\AppData\Local\gitea\gitea\Cache`). So what is asserted is that
+        the application names a whole component of the path - a directory merely
+        containing those letters is not this application's - and that the cache
+        directory is the one the file sits in.
+
+        The cache is not the configuration, which is where this CLI keeps the
+        accounts, and that is asserted against the file the config directory
+        would hold rather than against the directory: on Windows `user_config_dir`
+        is the parent of `user_cache_dir`, so a cache path is under the config
+        directory there and asserting otherwise would fail on Windows alone.
+        """
         path = default_state_path()
 
         assert path.name == "watch-state.json"
-        # Named, rather than merely containing the name: a directory called
-        # something else with "gitea" in it is not this application's.
-        assert path.parent.name == "gitea"
+        assert "gitea" in path.parts
+        assert Path(platformdirs.user_cache_dir(appname="gitea")) in path.parents
+        assert path != Path(platformdirs.user_config_dir(appname="gitea")) / "watch-state.json"
 
     def test_a_named_path_wins_over_the_default(self, tmp_path: Path) -> None:
         """Naming a cache should be what decides where the snapshots go."""

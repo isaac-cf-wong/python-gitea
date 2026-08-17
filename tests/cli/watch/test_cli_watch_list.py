@@ -897,22 +897,31 @@ class TestRecovery:
         assert result.stdout == "my-org/my-repo#16 new: new issue · Ship the release\n"
 
     def test_a_cache_that_cannot_be_written_fails_the_run(self, tmp_path: Path) -> None:
-        """A run whose changes were never recorded would report them forever."""
-        state_path = tmp_path / "unwritable" / "watch-state.json"
-        state_path.parent.mkdir()
-        state_path.parent.chmod(0o500)
+        """A run whose changes were never recorded would report them forever.
 
-        try:
-            with patch("gitea.cli.utils.api.logger") as logger:
-                result = run(*watch(state_path), client=make_client([ISSUE]))
-        finally:
-            state_path.parent.chmod(0o700)
+        The cache path is a directory here, which no platform lets a file be
+        renamed over. Making the directory the cache sits in read-only instead
+        would only refuse the write on POSIX: on Windows the read-only attribute
+        of a directory does not stop files being created inside it, so the run
+        would succeed and the test would assert nothing.
+        """
+        state_path = tmp_path / "watch-state.json"
+        state_path.mkdir()
+        # Non-empty, because replacing an empty directory is the one case the
+        # platforms are documented to differ on.
+        (state_path / "occupied").touch()
+
+        with patch("gitea.cli.utils.api.logger") as logger:
+            result = run(*watch(state_path), client=make_client([ISSUE]))
 
         assert result.exit_code == 1
         # A failed command leaves stdout parsable, as every other error does.
         assert result.stdout == ""
         assert logger.exception.call_count == 0
         assert "Could not write the watch cache at" in logged_error(logger)
+        # The failure is the write, reported rather than raised as a traceback,
+        # and the cache is left as it was rather than half replaced.
+        assert [entry.name for entry in state_path.iterdir()] == ["occupied"]
 
 
 class TestScopeErrors:
