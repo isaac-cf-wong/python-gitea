@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -132,3 +133,95 @@ class TestDeleteCommand:
         result = runner.invoke(app, ["--config-path", str(temp_config_with_accounts), "config", "delete", "--force"])
 
         assert result.exit_code != 0
+
+
+class TestDeleteCommandJsonOutput:
+    """Tests for `config delete` under `--output json`."""
+
+    def test_json_output_is_the_data_metadata_envelope(self, temp_config_with_accounts: Path) -> None:
+        """Should report the deleted account inside the standard envelope."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_with_accounts),
+                "--output",
+                "json",
+                "config",
+                "delete",
+                "--name",
+                "account2",
+                "--force",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["data"] == {"name": "account2", "status": "deleted"}
+        assert payload["metadata"] == {"config_path": str(temp_config_with_accounts)}
+
+    def test_json_output_when_cancelled(self, temp_config_with_accounts: Path) -> None:
+        """Should report the cancellation as an envelope, not as prose."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_with_accounts),
+                "--output",
+                "json",
+                "config",
+                "delete",
+                "--name",
+                "account2",
+            ],
+            input="n\n",
+        )
+
+        assert result.exit_code == 0
+        # The confirmation prompt goes to stderr in JSON mode, so it cannot break
+        # a consumer parsing stdout. CliRunner itself echoes the typed answer into
+        # stdout, which a real non-interactive consumer never sees.
+        assert "Are you sure" not in result.stdout
+        assert "Are you sure" in result.stderr
+
+        payload = json.loads(result.stdout[result.stdout.index("{") :])
+        assert payload["data"] == {"name": "account2", "status": "cancelled"}
+        assert payload["metadata"] == {}
+        assert "Deletion cancelled." not in result.stdout
+
+        with temp_config_with_accounts.open("r") as f:
+            config = yaml.safe_load(f)
+        assert "account2" in config["accounts"]
+
+    def test_no_envelope_on_failure(self, temp_config_with_accounts: Path) -> None:
+        """Should print no envelope when the account does not exist."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_with_accounts),
+                "--output",
+                "json",
+                "config",
+                "delete",
+                "--name",
+                "nonexistent",
+                "--force",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert result.stdout.strip() == ""
+
+    def test_text_output_keeps_the_cancellation_message(self, temp_config_with_accounts: Path) -> None:
+        """Should keep the human-readable cancellation message in text mode."""
+        result = runner.invoke(
+            app,
+            ["--config-path", str(temp_config_with_accounts), "config", "delete", "--name", "account2"],
+            input="n\n",
+        )
+
+        assert result.exit_code == 0
+        assert "Deletion cancelled." in result.stdout
+        # Text mode keeps prompting on stdout, as it did before.
+        assert "Are you sure" in result.stdout

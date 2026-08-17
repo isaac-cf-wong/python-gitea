@@ -1,15 +1,38 @@
 """Unit tests for CLI main module."""
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 import typer
+from typer.main import get_command
 from typer.testing import CliRunner
 
-from gitea.cli.main import LoggingLevel, app, register_commands, setup_logging, version_callback
+from gitea.cli.main import LoggingLevel, app, main, register_commands, setup_logging, version_callback
+from gitea.cli.output import OutputFormat, get_output_format
 from gitea.version import __version__
 
 runner = CliRunner()
+
+
+def _leaf_command_paths(command: Any, prefix: tuple[str, ...] = ()) -> list[list[str]]:
+    """Collect the argument path of every leaf command in a Click command tree.
+
+    Groups are recognized by carrying a `commands` mapping, so the walk does not
+    depend on the Click classes Typer happens to build the tree from.
+
+    Args:
+        command: Command to walk.
+        prefix: Names of the groups traversed so far.
+
+    Returns:
+        One list of argument names per leaf command.
+
+    """
+    subcommands = getattr(command, "commands", None)
+    if subcommands:
+        return [path for name, sub in subcommands.items() for path in _leaf_command_paths(sub, (*prefix, name))]
+    return [list(prefix)]
 
 
 class TestLoggingLevel:
@@ -75,6 +98,89 @@ class TestMainCallback:
         config_file = tmp_path / "config.yaml"
         result = runner.invoke(app, ["--config-path", str(config_file), "config", "--help"])
         assert result.exit_code == 0
+
+
+class TestOutputOption:
+    """Tests for the global `--output` option."""
+
+    def test_output_option_is_documented_on_the_root_app(self) -> None:
+        """`--output` should be listed among the global options."""
+        result = runner.invoke(app, ["--help"])
+
+        assert result.exit_code == 0
+        assert "--output" in result.stdout
+
+    def test_output_option_accepted_by_every_subcommand(self) -> None:
+        """Every leaf subcommand should be reachable through `--output json`."""
+        paths = _leaf_command_paths(get_command(app))
+
+        # Guard against the walk silently finding nothing to check.
+        assert len(paths) > 1
+        assert ["config", "list"] in paths
+
+        for path in paths:
+            result = runner.invoke(app, ["--output", "json", *path, "--help"])
+            assert result.exit_code == 0, f"{path}: {result.output}"
+
+    def test_output_short_option_accepted(self) -> None:
+        """`-o` should be an alias for `--output`."""
+        result = runner.invoke(app, ["-o", "json", "config", "list", "--help"])
+
+        assert result.exit_code == 0
+
+    def test_output_option_rejects_unknown_format(self) -> None:
+        """An unsupported format should be a usage error naming the valid ones."""
+        result = runner.invoke(app, ["--output", "yaml", "config", "list", "--help"])
+
+        assert result.exit_code == 2
+        assert "text" in result.output
+        assert "json" in result.output
+
+    def test_callback_stores_requested_format_on_the_context(self) -> None:
+        """The root callback should put the requested format on `ctx.obj`."""
+        probe_app = typer.Typer()
+        probe_app.callback()(main)
+
+        @probe_app.command("probe")
+        def probe(ctx: typer.Context) -> None:
+            """Print the output format seen by a subcommand.
+
+            Args:
+                ctx: Typer context.
+
+            """
+            typer.echo(get_output_format(ctx).value)
+
+        assert runner.invoke(probe_app, ["--output", "json", "probe"]).stdout.strip() == "json"
+        assert runner.invoke(probe_app, ["probe"]).stdout.strip() == "text"
+
+    def test_callback_reads_format_from_environment(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`PYTHON_GITEA_OUTPUT` should set the format when the flag is absent."""
+        probe_app = typer.Typer()
+        probe_app.callback()(main)
+
+        @probe_app.command("probe")
+        def probe(ctx: typer.Context) -> None:
+            """Print the output format seen by a subcommand.
+
+            Args:
+                ctx: Typer context.
+
+            """
+            typer.echo(get_output_format(ctx).value)
+
+        monkeypatch.setenv("PYTHON_GITEA_OUTPUT", "json")
+
+        assert runner.invoke(probe_app, ["probe"]).stdout.strip() == "json"
+
+    def test_callback_defaults_to_text(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Omitting the option should leave the CLI in text mode."""
+        monkeypatch.delenv("PYTHON_GITEA_CONFIG_PATH", raising=False)
+        ctx = MagicMock()
+
+        main(ctx, config_path=None, verbose=LoggingLevel.INFO, output=OutputFormat.TEXT, version=False)
+
+        assert ctx.obj == {"config_path": None, "output": OutputFormat.TEXT}
 
 
 class TestVersionOption:

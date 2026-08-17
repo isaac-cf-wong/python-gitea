@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -178,3 +179,140 @@ class TestUpdateCommand:
         )
 
         assert result.exit_code != 0
+
+
+class TestUpdateCommandJsonOutput:
+    """Tests for `config update` under `--output json`."""
+
+    def test_json_output_is_the_data_metadata_envelope(self, temp_config_with_account: Path) -> None:
+        """Should report the updated fields inside the standard envelope."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_with_account),
+                "--output",
+                "json",
+                "config",
+                "update",
+                "--name",
+                "test",
+                "--base-url",
+                "https://new.gitea.com",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["data"] == {
+            "name": "test",
+            "base_url": "https://new.gitea.com",
+            "is_default": True,
+            "updated_fields": ["base_url"],
+            "status": "updated",
+        }
+        assert payload["metadata"] == {"config_path": str(temp_config_with_account)}
+
+    def test_json_output_lists_every_updated_field(self, temp_config_with_account: Path) -> None:
+        """Should list each field the command changed."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_with_account),
+                "--output",
+                "json",
+                "config",
+                "update",
+                "--name",
+                "test",
+                "--token",
+                "new_token",
+                "--base-url",
+                "https://new.gitea.com",
+                "--default",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["data"]["updated_fields"] == ["token", "base_url", "default_account"]
+
+    def test_json_output_with_no_changes(self, temp_config_with_account: Path) -> None:
+        """Should report an empty field list when nothing was changed."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_with_account),
+                "--output",
+                "json",
+                "config",
+                "update",
+                "--name",
+                "test",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["data"]["updated_fields"] == []
+
+    def test_json_output_omits_the_token(self, temp_config_with_account: Path) -> None:
+        """Should not echo the new token back in machine-readable output."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_with_account),
+                "--output",
+                "json",
+                "config",
+                "update",
+                "--name",
+                "test",
+                "--token",
+                "secret_token",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "secret_token" not in result.stdout
+
+    def test_no_envelope_on_failure(self, temp_config_with_account: Path) -> None:
+        """Should print no envelope when the account does not exist."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_with_account),
+                "--output",
+                "json",
+                "config",
+                "update",
+                "--name",
+                "nonexistent",
+                "--token",
+                "new_token",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert result.stdout.strip() == ""
+
+    def test_text_output_prints_nothing_on_stdout(self, temp_config_with_account: Path) -> None:
+        """Should leave stdout empty in text mode, as before."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_with_account),
+                "config",
+                "update",
+                "--name",
+                "test",
+                "--token",
+                "new_token",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert result.stdout.strip() == ""

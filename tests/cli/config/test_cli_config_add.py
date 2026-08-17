@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -151,3 +152,119 @@ class TestAddCommand:
         with temp_config_file.open("r") as f:
             config = yaml.safe_load(f)
         assert config["default_account"] == "first"
+
+
+class TestAddCommandJsonOutput:
+    """Tests for `config add` under `--output json`."""
+
+    def test_json_output_is_the_data_metadata_envelope(self, temp_config_file: Path) -> None:
+        """Should report the stored account inside the standard envelope."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_file),
+                "--output",
+                "json",
+                "config",
+                "add",
+                "--name",
+                "test",
+                "--token",
+                "test_token",
+                "--base-url",
+                "https://gitea.example.com/",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        # The stored, normalized base URL is reported, not the raw argument.
+        assert payload["data"] == {
+            "name": "test",
+            "base_url": "https://gitea.example.com",
+            "is_default": True,
+            "status": "added",
+        }
+        assert payload["metadata"] == {"config_path": str(temp_config_file)}
+
+    def test_json_output_reports_non_default_account(self, temp_config_file: Path) -> None:
+        """Should report `is_default` false for an account that is not the default."""
+        runner.invoke(
+            app,
+            ["--config-path", str(temp_config_file), "config", "add", "--name", "first", "--token", "first_token"],
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_file),
+                "--output",
+                "json",
+                "config",
+                "add",
+                "--name",
+                "second",
+                "--token",
+                "second_token",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["data"]["is_default"] is False
+
+    def test_json_output_omits_the_token(self, temp_config_file: Path) -> None:
+        """Should not echo the token back in machine-readable output."""
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_file),
+                "--output",
+                "json",
+                "config",
+                "add",
+                "--name",
+                "test",
+                "--token",
+                "secret_token",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "secret_token" not in result.stdout
+
+    def test_no_envelope_on_failure(self, temp_config_file: Path) -> None:
+        """Should print no envelope when the account cannot be added."""
+        runner.invoke(
+            app, ["--config-path", str(temp_config_file), "config", "add", "--name", "test", "--token", "token1"]
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "--config-path",
+                str(temp_config_file),
+                "--output",
+                "json",
+                "config",
+                "add",
+                "--name",
+                "test",
+                "--token",
+                "token2",
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert result.stdout.strip() == ""
+
+    def test_text_output_prints_nothing_on_stdout(self, temp_config_file: Path) -> None:
+        """Should leave stdout empty in text mode, as before."""
+        result = runner.invoke(
+            app, ["--config-path", str(temp_config_file), "config", "add", "--name", "test", "--token", "test_token"]
+        )
+
+        assert result.exit_code == 0
+        assert result.stdout.strip() == ""
