@@ -9,11 +9,12 @@ operations. Run `gitea-cli --help` for the full list at any time.
 gitea-cli [OPTIONS] COMMAND [ARGS]...
 ```
 
-| Option                  | Description                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------ |
-| `--config-path <path>`  | Config file path; defaults to `PYTHON_GITEA_CONFIG_PATH` or platform location. |
-| `-v, --verbose <level>` | Log level; default `INFO`.                                                     |
-| `--version`             | Print the installed `python-gitea` version and exit.                           |
+| Option                  | Description                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `--config-path <path>`  | Config file path; defaults to `PYTHON_GITEA_CONFIG_PATH` or platform location.          |
+| `-v, --verbose <level>` | Log level; default `INFO`.                                                              |
+| `-o, --output <format>` | Output format, `text` or `json`; default `text`. See [Output formats](#output-formats). |
+| `--version`             | Print the installed `python-gitea` version and exit.                                    |
 
 All resource commands share authentication options:
 
@@ -25,6 +26,53 @@ All resource commands share authentication options:
 
 See [Configuration](configuration.md) for how authentication is resolved.
 
+## Output formats
+
+`--output` is a **global** option accepted by every subcommand, so a script
+never has to know which command renders text and which renders JSON. Because it
+belongs to the top-level command, it goes **before** the subcommand:
+
+```bash
+gitea-cli --output json config list      # correct
+gitea-cli config list --output json      # not a valid option here
+```
+
+It can also be set once for a whole session with the `PYTHON_GITEA_OUTPUT`
+environment variable; an explicit `--output` on the command line wins.
+
+Two formats are supported:
+
+- `text` (default) — human-readable rendering where a command has one. Commands
+  that only report an API result print the JSON envelope below in either format,
+  so `text` never loses information.
+- `json` — always the same envelope on stdout:
+
+```json
+{
+  "data": ...,
+  "metadata": { ... }
+}
+```
+
+`data` is the result itself and is never wrapped any further: the object or list
+returned by the Gitea API, or - for local commands such as `config` - an object
+describing what the command read or changed.
+
+`metadata` describes the call rather than the result, and its keys vary by
+command:
+
+- API commands report `status_code`.
+- Commands that page through the API add counts, such as `column_count` and
+  `issue_count` for `project issues`.
+- `config` commands report `config_path`.
+- It is `{}` when the command made no call at all.
+
+Errors are not part of the envelope: messages go to stderr and the process exits
+non-zero, so nothing is printed on stdout for a failed command. Log output also
+goes to stderr in both formats, so stdout stays parsable.
+
+Tokens are never included in the output of `config` commands in either format.
+
 ## Commands
 
 ### Config - manage accounts
@@ -33,6 +81,8 @@ See [Configuration](configuration.md) for how authentication is resolved.
 - `gitea-cli config list`
 - `gitea-cli config update --name <name> [--token <token>] [--base-url <url>] [--default]`
 - `gitea-cli config delete --name <name> [--force]`
+    - Under `--output json` the confirmation prompt is written to stderr so that
+      stdout stays parsable; pass `--force` to skip it entirely.
 
 ### Issue - manage issues
 
@@ -169,6 +219,14 @@ Show every card on a project together with the column it is in:
 
 ```bash
 gitea-cli project issues --owner my-org --project-id 1
+```
+
+Read a configured account's base URL from a script, with `jq` unwrapping the
+envelope described in [Output formats](#output-formats):
+
+```bash
+gitea-cli --output json config list |
+    jq -r '.data.accounts[] | select(.name == "my-account") | .base_url'
 ```
 
 ## See Also
