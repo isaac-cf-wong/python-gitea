@@ -91,6 +91,13 @@ pytest_add_cli_args = [
   "--deselect",
   "tests/utils/test_utils_pagination.py::TestEndOfListing::test_the_walkers_decide_nothing_of_their_own",
 ]
+# A mutant is judged to hang when its tests exceed `timeout_multiplier` times what
+# they took clean, plus this constant. Most tests here take a millisecond or two,
+# so the default constant of one second leaves a budget an unmutated run can miss
+# on a loaded machine - and a mutant reported as a timeout has no verdict at all:
+# it is not known to be caught, and it is not reported as surviving either. Ten
+# seconds is still far below anything a real hang would finish in.
+timeout_constant = 10.0
 
 [tool.coverage.run]
 branch = true
