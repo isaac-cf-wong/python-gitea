@@ -103,6 +103,7 @@ class RecordingSession:
         """
         self.payload: Any = [] if payload is None else payload
         self.requests: list[tuple[str, str]] = []
+        self.headers: list[dict[str, Any]] = []
 
     def request(self, method: str, url: str, **kwargs: Any) -> RecordedResponse:
         """Record a request and answer it with the fixed payload.
@@ -110,13 +111,17 @@ class RecordingSession:
         Args:
             method: HTTP method the client asked for.
             url: Full URL the client built.
-            **kwargs: Headers, timeout and body, which are not recorded.
+            **kwargs: Timeout and body, which are not recorded, and headers,
+                which are: they carry the credentials the command resolved, and a
+                command reaching the right URL unauthenticated is not a command
+                that works.
 
         Returns:
             The recorded response.
 
         """
         self.requests.append((method, url))
+        self.headers.append(dict(kwargs.get("headers") or {}))
         return RecordedResponse(self.payload)
 
     def close(self) -> None:
@@ -166,13 +171,15 @@ class RoutedSession(RecordingSession):
         Args:
             method: HTTP method the client asked for.
             url: Full URL the client built.
-            **kwargs: Headers, timeout and body, which are not recorded.
+            **kwargs: Timeout and body, which are not recorded, and headers,
+                which are.
 
         Returns:
             The recorded response.
 
         """
         self.requests.append((method, url))
+        self.headers.append(dict(kwargs.get("headers") or {}))
         for fragment, payload in self.routes:
             if fragment in url:
                 return RecordedResponse(payload)

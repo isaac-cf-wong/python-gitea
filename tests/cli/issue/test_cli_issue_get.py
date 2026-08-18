@@ -101,6 +101,16 @@ def test_get_command_reports_the_column_of_every_project_the_issue_is_on(
     assert [project["column_id"] for project in data["projects"]] == [109, 6]
     assert metadata == {"status_code": 200}
 
+    # Each project's columns have to be listed where that project keeps them: a
+    # repository project under the repository holding the issue - which only this
+    # command knows and has to pass on - and an organization project under the
+    # owner, which is what a repository of None asks for.
+    scopes = {
+        call.kwargs["project_id"]: call.kwargs["repository"]
+        for call in client.project.list_project_columns.call_args_list
+    }
+    assert scopes == {ORGANIZATION_PROJECT["id"]: None, REPOSITORY_PROJECT["id"]: "example-repo"}
+
 
 @patch("gitea.cli.utils.api.execute_api_command")
 @patch("gitea.cli.utils.auth.get_auth_params")

@@ -45,13 +45,31 @@ runner = CliRunner()
 
 BASE_URL = "https://gitea.invalid"
 
-# Credentials every command reaching the API is given, so that none of them
-# resolves an account from the configuration.
-AUTH = ("--token", "stub-token", "--base-url", BASE_URL)
-
-# The account the throwaway configuration carries, for the `config` commands
-# acting on an existing one.
+# The account each command is expected to act as, in the throwaway configuration
+# every invocation is given. It is deliberately not the default account: a command
+# that drops `--account-name` on the way to resolving it then reaches `OTHER`
+# below, which the assertions can see, where falling back to the same account
+# would look like working.
 ACCOUNT = "seed"
+TOKEN = "seed-token"
+
+# The default account, which nothing here asks for. Its address and token differ
+# from `ACCOUNT`'s, so reaching it is a visible failure rather than a silent one.
+OTHER = "other"
+OTHER_BASE_URL = "https://other.invalid"
+OTHER_TOKEN = "other-token"
+
+# The two ways a command is told which instance to talk to and with what. Both are
+# run for every command reaching the API: an account to resolve, and credentials
+# given outright. What a command emits cannot depend on which was used, and a
+# command mishandling either reaches the wrong instance, or none, or reaches it
+# unauthenticated - none of which the envelope shows when the responses are faked.
+ACCOUNT_AUTH = ("--account-name", ACCOUNT)
+EXPLICIT_AUTH = ("--token", TOKEN, "--base-url", BASE_URL)
+
+# What the client sends once it has resolved either of them.
+AUTHORIZATION = f"token {TOKEN}"
+API_ROOT = f"{BASE_URL}/api/v1/"
 
 
 class Unchanged:
@@ -282,17 +300,25 @@ CONTRACTS = (
     ),
     Contract(
         path=("config", "list"),
-        data={"default_account": ACCOUNT, "accounts": [{"name": ACCOUNT, "base_url": BASE_URL}]},
+        # Both accounts, in the order the configuration carries them, and no token
+        # for either: `config` commands never print one.
+        data={
+            "default_account": OTHER,
+            "accounts": [
+                {"name": OTHER, "base_url": OTHER_BASE_URL},
+                {"name": ACCOUNT, "base_url": BASE_URL},
+            ],
+        },
         metadata=("config_path", "account_count"),
         api=False,
     ),
     Contract(
         path=("config", "update"),
-        args=("--name", ACCOUNT, "--base-url", "https://other.invalid"),
+        args=("--name", ACCOUNT, "--base-url", "https://moved.invalid"),
         data={
             "name": ACCOUNT,
-            "base_url": "https://other.invalid",
-            "is_default": True,
+            "base_url": "https://moved.invalid",
+            "is_default": False,
             "updated_fields": ["base_url"],
             "status": "updated",
         },
@@ -412,6 +438,10 @@ CONTRACTS = (
 def write_config(path: Path) -> None:
     """Write the throwaway configuration an invocation is given.
 
+    Two accounts, and the one the commands name is not the default, so that
+    resolving the wrong one is a request to a different address with a different
+    token rather than the same request by another route.
+
     Args:
         path: Location to write the configuration to.
 
@@ -419,23 +449,32 @@ def write_config(path: Path) -> None:
     path.write_text(
         yaml.safe_dump(
             {
-                "default_account": ACCOUNT,
-                "accounts": {ACCOUNT: {"name": ACCOUNT, "base_url": BASE_URL, "token": "seed-token"}},
+                "default_account": OTHER,
+                "accounts": {
+                    ACCOUNT: {"name": ACCOUNT, "base_url": BASE_URL, "token": TOKEN},
+                    OTHER: {"name": OTHER, "base_url": OTHER_BASE_URL, "token": OTHER_TOKEN},
+                },
             }
         )
     )
 
 
-def invoke(contract: Contract, routes: tuple[tuple[str, Any], ...], config_path: Path) -> Any:
+def invoke(
+    contract: Contract,
+    routes: tuple[tuple[str, Any], ...],
+    config_path: Path,
+    auth: tuple[str, ...],
+) -> tuple[Any, RoutedSession]:
     """Run one subcommand in JSON mode against the responses it declared.
 
     Args:
         contract: The subcommand to run.
         routes: The endpoints to answer, for this invocation.
         config_path: The throwaway configuration to read.
+        auth: How the command is told which instance to talk to.
 
     Returns:
-        The result of the invocation.
+        The result of the invocation, and the session recording what it asked for.
 
     """
     session = RoutedSession(routes, payload=contract.payload)
@@ -446,16 +485,36 @@ def invoke(contract: Contract, routes: tuple[tuple[str, Any], ...], config_path:
         "json",
         *contract.path,
         *contract.args,
-        *(AUTH if contract.api else ()),
+        *auth,
     ]
 
     with patch("gitea.client.gitea.requests.Session", return_value=session):
-        return runner.invoke(app, arguments)
+        return runner.invoke(app, arguments), session
 
 
-@pytest.mark.parametrize("contract", CONTRACTS, ids=[" ".join(entry.path) for entry in CONTRACTS])
+def contract_cases() -> list[Any]:
+    """Build one case per subcommand and way of authenticating it.
+
+    Returns:
+        Every contract, once for each way of authenticating the command: both for
+        a command reaching the API, and once with neither for the `config`
+        commands, which reach only the configuration file.
+
+    """
+    cases = []
+    for contract in CONTRACTS:
+        name = " ".join(contract.path)
+        if not contract.api:
+            cases.append(pytest.param(contract, (), id=name))
+            continue
+        cases.append(pytest.param(contract, ACCOUNT_AUTH, id=f"{name} [account]"))
+        cases.append(pytest.param(contract, EXPLICIT_AUTH, id=f"{name} [credentials]"))
+    return cases
+
+
+@pytest.mark.parametrize(("contract", "auth"), contract_cases())
 def test_subcommand_emits_the_declared_data(
-    contract: Contract, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    contract: Contract, auth: tuple[str, ...], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Every subcommand should emit the envelope its contract declares, exactly."""
     monkeypatch.setenv(STATE_FILE_ENV, str(tmp_path / "watch-state.json"))
@@ -463,10 +522,10 @@ def test_subcommand_emits_the_declared_data(
     write_config(config_path)
 
     if contract.warmup is not None:
-        warmup = invoke(contract, contract.warmup, config_path)
+        warmup, _ = invoke(contract, contract.warmup, config_path, auth)
         assert warmup.exit_code == 0, f"warm-up run failed: {warmup.output!r}"
 
-    result = invoke(contract, contract.routes, config_path)
+    result, session = invoke(contract, contract.routes, config_path, auth)
 
     assert result.exit_code == 0, result.output
     envelope = parse_envelope(result.stdout)
@@ -474,6 +533,44 @@ def test_subcommand_emits_the_declared_data(
     expected = contract.payload if isinstance(contract.data, Unchanged) else contract.data
     assert envelope["data"] == expected
     assert set(envelope["metadata"]) == set(contract.metadata)
+
+    assert_requests_were_addressed(contract, session)
+
+
+def assert_requests_were_addressed(contract: Contract, session: RoutedSession) -> None:
+    """Check that the command reached the instance it was told to, authenticated.
+
+    The data a command emits is only the API's if the command asked the API the
+    caller meant: a request sent to the default instance, or sent without the
+    account's token, answers with somebody else's data or with nothing. Neither is
+    visible in the envelope when the responses are faked, so it is asserted here.
+
+    A URL is refused when it carries `None` in it, which is what a coordinate the
+    command dropped rather than resolved looks like once it is interpolated into a
+    path - `/orgs/None/projects/31/columns`. The fake answers such a request as
+    readily as the right one, so nothing else would notice.
+
+    Args:
+        contract: The subcommand that ran.
+        session: The session recording what it asked for.
+
+    Raises:
+        AssertionError: If the command reached the API when it had no reason to,
+            or reached it at the wrong address, or reached it unauthenticated.
+
+    """
+    if not contract.api:
+        assert session.requests == [], f"{contract.path} reached the API: {session.urls}"
+        return
+
+    assert session.requests, f"{contract.path} made no request"
+
+    for url in session.urls:
+        assert url.startswith(API_ROOT), f"{contract.path} asked {url}"
+        assert "None" not in url, f"{contract.path} interpolated a missing coordinate: {url}"
+
+    for headers in session.headers:
+        assert headers.get("Authorization") == AUTHORIZATION, f"{contract.path} sent {headers}"
 
 
 def test_every_subcommand_has_a_contract() -> None:
