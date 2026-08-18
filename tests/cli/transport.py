@@ -14,6 +14,13 @@ Use it by patching the session the client constructs:
         result = runner.invoke(app, [...])
 
     assert session.requests == [("GET", "https://gitea.invalid/api/v1/orgs/org/projects/1")]
+
+`RecordingSession` answers every request alike. `RoutedSession` answers each
+endpoint with a payload of its own, for a command reaching several - resolving an
+issue before acting on it, walking a board's columns before their issues - and
+`NO_CONTENT` answers as an endpoint that succeeds without a body does, so a
+command whose endpoint really answers `204` is not tested against a body the API
+never sends.
 """
 
 from __future__ import annotations
