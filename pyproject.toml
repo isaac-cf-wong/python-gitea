@@ -30,6 +30,11 @@ dependencies = [
 [dependency-groups]
 dev = [
   "ruff>=0.16.3",
+  # The mutation runner, in the environment `uv run` resolves, so that
+  # `uv run mutmut run` reaches the same interpreter as `uv run pytest` and finds
+  # the pytest plugins the suite's own options need. Run from a tool environment
+  # of its own it cannot read `--cov`, and the run dies at collection.
+  "mutmut>=3.7.0",
   "prek>=0.4.13",
   "pytest-github-actions-annotate-failures>=0.4.2",
   "pytest-cov>=7.1.0",
