@@ -81,6 +81,20 @@ submitting a pull request—this guide will help you get started.
     pytest
     ```
 
+    Mutation testing runs the suite again for each deliberate alteration of the
+    source, and reports the alterations no test noticed:
+
+    ```shell
+    uv run mutmut run                  # every module
+    uv run mutmut run "gitea.cli.*"    # one subtree, while iterating
+    uv run mutmut results              # what survived
+    ```
+
+    A survivor is a change to the code that every test tolerated. Some cannot be
+    killed - a rewritten `typing.cast`, or anything in a `register_commands()`
+    that runs at import time - so read the diff `uv run mutmut show <mutant>`
+    prints before writing a test for one.
+
 8. Open a Pull Request
 
     Clearly describe the motivation and scope of your change. Link it to the relevant issue if applicable.
