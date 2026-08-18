@@ -75,6 +75,23 @@ source = "vcs"
 [tool.hatch.build.targets.wheel]
 packages = ["src/gitea"]
 
+[tool.mutmut]
+# The suite imports from `scripts/` (see `pythonpath` under
+# `[tool.pytest.ini_options]`), so the copy of the tree that mutmut runs it from
+# needs that directory as well - without it every mutant is reported as killed by
+# a collection error in `tests/test_release_version.py`.
+source_paths = ["src/gitea/"]
+also_copy = ["scripts/"]
+# mutmut runs the suite against a rewritten copy of each module, in which every
+# mutated function is replaced by a table of its variants. A test asserting on the
+# *text* of a module therefore reads the instrumentation rather than the code, and
+# fails for every mutant - a red baseline, which reports every mutant as killed.
+# The one such test is deselected here, and is run by `pytest` as usual.
+pytest_add_cli_args = [
+  "--deselect",
+  "tests/utils/test_utils_pagination.py::TestEndOfListing::test_the_walkers_decide_nothing_of_their_own",
+]
+
 [tool.coverage.run]
 branch = true
 
