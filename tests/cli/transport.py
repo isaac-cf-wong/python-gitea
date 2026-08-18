@@ -19,7 +19,30 @@ Use it by patching the session the client constructs:
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Any
+
+
+class NoContent:
+    """The answer of an endpoint that reports success without a body.
+
+    A `DELETE` answers `204 No Content`, and a payload of `None` would still be
+    a body carrying `null`. A test asserting on what such a command emits has to
+    be answered the way the real endpoint answers, or it pins a shape the API
+    never produces.
+    """
+
+    def __repr__(self) -> str:
+        """Name the sentinel in a test failure.
+
+        Returns:
+            The name this is referred to by.
+
+        """
+        return "NO_CONTENT"
+
+
+NO_CONTENT = NoContent()
 
 
 class RecordedResponse:
@@ -35,11 +58,16 @@ class RecordedResponse:
         """Hold the payload this response carries.
 
         Args:
-            payload: JSON-serializable body to answer with.
+            payload: JSON-serializable body to answer with, or `NO_CONTENT` to
+                answer as an endpoint that succeeds without a body does.
 
         """
-        self.status_code = 200
-        self.content = json.dumps(payload).encode()
+        if isinstance(payload, NoContent):
+            self.status_code = 204
+            self.content = b""
+        else:
+            self.status_code = 200
+            self.content = json.dumps(payload).encode()
 
     def json(self) -> Any:
         """Parse the body, as the real response does.
@@ -103,3 +131,49 @@ class RecordingSession:
 
         """
         return [url for _, url in self.requests]
+
+
+class RoutedSession(RecordingSession):
+    """Session answering each request with the payload declared for its endpoint.
+
+    A command reaching more than one endpoint - resolving an issue before acting
+    on it, walking a board's columns before their issues - needs a different
+    payload per endpoint, which the one fixed payload of `RecordingSession`
+    cannot give it.
+
+    Routes are matched in order and the first whose fragment appears in the URL
+    answers, so a route for `/columns/1/issues` has to be declared before one for
+    `/columns`, whose fragment the longer URL also contains. Anything unrouted is
+    answered with the fixed payload, as before.
+    """
+
+    def __init__(self, routes: Sequence[tuple[str, Any]], payload: Any = None) -> None:
+        """Start a session answering the given endpoints.
+
+        Args:
+            routes: The fragment to match and the payload to answer it with, in
+                the order they are matched.
+            payload: Body every unrouted request is answered with. Defaults to
+                an empty listing, as `RecordingSession` does.
+
+        """
+        super().__init__(payload)
+        self.routes = list(routes)
+
+    def request(self, method: str, url: str, **kwargs: Any) -> RecordedResponse:
+        """Record a request and answer it with the payload its endpoint declared.
+
+        Args:
+            method: HTTP method the client asked for.
+            url: Full URL the client built.
+            **kwargs: Headers, timeout and body, which are not recorded.
+
+        Returns:
+            The recorded response.
+
+        """
+        self.requests.append((method, url))
+        for fragment, payload in self.routes:
+            if fragment in url:
+                return RecordedResponse(payload)
+        return RecordedResponse(self.payload)

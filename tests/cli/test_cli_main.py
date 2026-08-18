@@ -20,6 +20,7 @@ from gitea.watch.state import STATE_FILE_ENV
 from tests.cli.envelope import parse_envelope
 from tests.cli.rendering import unrendered
 from tests.cli.transport import RecordingSession
+from tests.cli.tree import leaf_command_paths, leaf_commands
 
 runner = CliRunner()
 
@@ -50,40 +51,6 @@ _SCOPE_OPTIONS = frozenset({"--owner", "--repository", "--issue-id", "--dependen
 # `execute_api_command` and lets it print the envelope; both share the error
 # handling the walks below assert on.
 _API_HELPERS = ("execute_api_command", "execute_api_call")
-
-
-def _leaf_commands(command: Any, prefix: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any]]:
-    """Collect every leaf command in a Click command tree with its argument path.
-
-    Groups are recognized by carrying a `commands` mapping, so the walk does not
-    depend on the Click classes Typer happens to build the tree from.
-
-    Args:
-        command: Command to walk.
-        prefix: Names of the groups traversed so far.
-
-    Returns:
-        One `(argument path, command)` pair per leaf command.
-
-    """
-    subcommands = getattr(command, "commands", None)
-    if subcommands:
-        return [pair for name, sub in subcommands.items() for pair in _leaf_commands(sub, (*prefix, name))]
-    return [(prefix, command)]
-
-
-def _leaf_command_paths(command: Any, prefix: tuple[str, ...] = ()) -> list[list[str]]:
-    """Collect the argument path of every leaf command in a Click command tree.
-
-    Args:
-        command: Command to walk.
-        prefix: Names of the groups traversed so far.
-
-    Returns:
-        One list of argument names per leaf command.
-
-    """
-    return [list(path) for path, _ in _leaf_commands(command, prefix)]
 
 
 def _noop_invocation(command: Any) -> list[str]:
@@ -381,7 +348,7 @@ class TestOutputOption:
 
     def test_output_option_accepted_by_every_subcommand(self) -> None:
         """Every leaf subcommand should be reachable through `--output json`."""
-        paths = _leaf_command_paths(get_command(app))
+        paths = leaf_command_paths(get_command(app))
 
         # Guard against the walk silently finding nothing to check.
         assert len(paths) > 1
@@ -407,7 +374,7 @@ class TestOutputOption:
         """
         monkeypatch.setenv(STATE_FILE_ENV, str(tmp_path / "watch-state.json"))
         leaves = [
-            (path, command) for path, command in _leaf_commands(get_command(app)) if path not in _NO_NOOP_INVOCATION
+            (path, command) for path, command in leaf_commands(get_command(app)) if path not in _NO_NOOP_INVOCATION
         ]
 
         # Guard against the walk silently finding nothing to run.
@@ -446,7 +413,7 @@ class TestOutputOption:
         and therefore never run. The helpers are imported inside the command
         bodies to keep startup cheap, so the module source is what is searched.
         """
-        for path, command in _leaf_commands(get_command(app)):
+        for path, command in leaf_commands(get_command(app)):
             module = importlib.import_module(command.callback.__module__)
             source = inspect.getsource(module)
 
@@ -591,7 +558,7 @@ class TestUnreachableInstance:
 
         leaves = [
             (path, command)
-            for path, command in _leaf_commands(get_command(app))
+            for path, command in leaf_commands(get_command(app))
             if path not in _NO_NOOP_INVOCATION
             and any(
                 helper in inspect.getsource(importlib.import_module(command.callback.__module__))
@@ -665,7 +632,7 @@ class TestOptionNaming:
         """
         offered = [
             (path, param)
-            for path, command in _leaf_commands(get_command(app))
+            for path, command in leaf_commands(get_command(app))
             for param in command.params
             if "--repository" in param.opts
         ]
@@ -676,7 +643,7 @@ class TestOptionNaming:
 
     def test_every_command_that_narrows_by_repository_also_names_an_owner(self) -> None:
         """`--repository` should never be the only half of the scope offered."""
-        for path, command in _leaf_commands(get_command(app)):
+        for path, command in leaf_commands(get_command(app)):
             flags = {opt for param in command.params for opt in param.opts}
             if "--repository" in flags:
                 assert "--owner" in flags, path
@@ -691,7 +658,7 @@ class TestOptionNaming:
         """
         deprecated = {"--index", "--dependency-index"}
 
-        for path, command in _leaf_commands(get_command(app)):
+        for path, command in leaf_commands(get_command(app)):
             flags = {opt for param in command.params for opt in param.opts}
             assert {flag for flag in flags if flag.endswith("index")} <= deprecated, path
 
@@ -700,7 +667,7 @@ class TestOptionNaming:
         replacements = {"--index": "--issue-id", "--dependency-index": "--dependency-issue-id"}
         seen: set[str] = set()
 
-        for path, command in _leaf_commands(get_command(app)):
+        for path, command in leaf_commands(get_command(app)):
             flags = {opt for param in command.params for opt in param.opts}
             for deprecated, replacement in replacements.items():
                 if deprecated in flags:
@@ -712,7 +679,7 @@ class TestOptionNaming:
 
     def test_the_deprecated_issue_options_are_hidden_from_help(self) -> None:
         """`--help` should offer one name per concept, not the retired one too."""
-        for path, command in _leaf_commands(get_command(app)):
+        for path, command in leaf_commands(get_command(app)):
             for param in command.params:
                 if {"--index", "--dependency-index"} & set(param.opts):
                     assert param.hidden, path
