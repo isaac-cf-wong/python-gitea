@@ -81,6 +81,40 @@ failing over an enrichment of it.
 
 Tokens are never included in the output of `config` commands in either format.
 
+## Field names
+
+Every field of `data` is named as the Gitea API names it. Nothing is renamed and
+nothing is dropped on the way out, so a key can be looked up in
+[Gitea's own API reference](https://docs.gitea.com/api/1.24/) rather than in
+this CLI's source, and the same value never arrives under two names depending on
+which command fetched it.
+
+A field the API cannot send is added only where it carries something the API has
+no way of saying, and is documented with the command that adds it: `column_id`
+on the project entries of `issue get` is the one today. It is never a second
+name for a field already in the payload.
+
+Two consequences worth knowing:
+
+- A project column is `title`, not `name`:
+
+    ```console
+    $ gitea-cli --output json project column list --owner my-org --project-id 31
+    {
+      "data": [{ "id": 117, "title": "Working", "default": false, "sorting": 0, ... }],
+      "metadata": { "status_code": 200 }
+    }
+    ```
+
+- A field whose name misleads is documented rather than renamed. `comments` on
+  an issue is the _number_ of comments; `gitea-cli issue comment list` reads the
+  bodies.
+
+The Python client follows the same convention and additionally keeps a field
+name callers already wrote readable as an alias - `column["name"]` reads the
+title - which the [Python API guide](python-api.md#field-names) describes. An
+alias is never emitted, so it cannot appear in the JSON above.
+
 ## Option naming
 
 Every resource command addresses its target the same way, so an invocation can
@@ -169,9 +203,11 @@ endpoint to serve it with, so they answer by naming the option to pass.
     - Optional: `--state`, `--labels`, `--search-string`, `--created-by`,
       `--assigned-by`, `--since`, `--before`, `--page`, `--limit`
 - `gitea-cli issue get --owner <owner> --repository <repo> --issue-id <number>`
-    - The `comment_count` field is the number of comments on the issue, not the
+    - The `comments` field is the number of comments on the issue, not the
       comments themselves; use `gitea-cli issue comment list` to read the
-      bodies.
+      bodies. The field keeps the API's name, as
+      [the field-name convention](#field-names) requires: this command used to
+      rename it to `comment_count` and was alone in doing so.
     - Each entry of `projects` carries a `column_id`: the column the issue's
       card sits in, or `null` when the issue has no card on that project. Gitea
       does not report it on the issue itself, so it is resolved from each

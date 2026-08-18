@@ -1,4 +1,13 @@
-"""Get issues command."""
+"""Get issues command.
+
+The issue is emitted with the field names the API sends, as `gitea.utils.fields`
+requires. `comments` is one worth knowing about: it is the *number* of comments
+on the issue and not their bodies, which `gitea-cli issue comment list` is for.
+An earlier version of this command renamed it to `comment_count` to say so, and
+was the only command emitting an issue that did - the same count arrived under
+two names depending on which command fetched the issue, which was the worse
+surprise of the two.
+"""
 
 from __future__ import annotations
 
@@ -7,26 +16,6 @@ from typing import Annotated, Any
 import typer
 
 from gitea.cli.utils.options import DEPRECATED_INDEX_HELP, ISSUE_ID_HELP, REPOSITORY_REQUIRED_HELP
-
-
-def rename_comment_count(issue: dict[str, Any]) -> dict[str, Any]:
-    """Rename the ``comments`` field of an issue to ``comment_count``.
-
-    The Gitea API returns ``comments`` as an integer count rather than the list of
-    comments, which misleads consumers expecting comment bodies. The value is kept
-    as-is; only the name is made unambiguous. Use ``gitea-cli issue comment list``
-    (or ``gitea-cli comment list``) to retrieve the comments themselves.
-
-    Args:
-        issue: The issue data returned by the API.
-
-    Returns:
-        The issue data with ``comments`` renamed to ``comment_count``.
-
-    """
-    if "comments" not in issue:
-        return issue
-    return {("comment_count" if key == "comments" else key): value for key, value in issue.items()}
 
 
 def get_command(
@@ -104,6 +93,6 @@ def get_command(
                 index=target_issue,
             )
             data = resolve_project_column_ids(client=client, owner=owner, repository=target_repository, issue=data)
-        return rename_comment_count(data), metadata
+        return data, metadata
 
     execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli issue get")

@@ -493,3 +493,64 @@ class TestAsyncProject:
                 params={},
             )
             assert result == ({}, {"status_code": 204})
+
+
+# The methods answering with a column payload, with the arguments each one takes
+# beyond the project they all name, and the shape its response comes back in.
+COLUMN_METHODS = [
+    pytest.param("list_project_columns", {}, [{"id": 5, "title": "Todo"}], True, id="list"),
+    pytest.param("create_project_column", {"title": "Todo"}, {"id": 5, "title": "Todo"}, False, id="create"),
+    pytest.param("get_project_column", {"column_id": 5}, {"id": 5, "title": "Todo"}, False, id="get"),
+    pytest.param(
+        "edit_project_column", {"column_id": 5, "title": "Todo"}, {"id": 5, "title": "Todo"}, False, id="edit"
+    ),
+]
+
+
+class TestProjectColumnFieldNames:
+    """Every method answering with a column keys it as the API does, and reads `name`.
+
+    The convention itself is tested in `tests/utils/test_utils_fields.py`; what
+    is asserted here is that each method the API answers with a column through
+    is wired to it, since one that is not would hand back a payload where
+    `column["name"]` raises - the friction the alias exists to remove.
+    """
+
+    @pytest.fixture
+    def mock_client(self):
+        """Fixture to create a mock Gitea client."""
+        return MagicMock()
+
+    @pytest.fixture
+    def project(self, mock_client):
+        """Fixture to create a Project instance."""
+        return Project(client=mock_client)
+
+    @pytest.mark.parametrize(("method", "arguments", "payload", "listing"), COLUMN_METHODS)
+    def test_column_reads_name_as_title(self, project, method, arguments, payload, listing):
+        """A column comes back keyed by `title` and readable by `name`."""
+        with patch("gitea.project.project.process_response") as mock_process:
+            mock_process.return_value = (payload, 200)
+            data, _ = getattr(project, method)(owner="o", repository="r", project_id=1, **arguments)
+
+        column = data[0] if listing else data
+        assert column["title"] == "Todo"
+        assert column["name"] == "Todo"
+        assert "name" not in dict(column)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("method", "arguments", "payload", "listing"), COLUMN_METHODS)
+    async def test_async_column_reads_name_as_title(self, method, arguments, payload, listing):
+        """A column fetched asynchronously reads the same way as one fetched synchronously."""
+        client = MagicMock()
+        client._request = AsyncMock(return_value=MagicMock())
+        project = AsyncProject(client=client)
+
+        with patch("gitea.project.async_project.process_async_response") as mock_process:
+            mock_process.return_value = (payload, 200)
+            data, _ = await getattr(project, method)(owner="o", repository="r", project_id=1, **arguments)
+
+        column = data[0] if listing else data
+        assert column["title"] == "Todo"
+        assert column["name"] == "Todo"
+        assert "name" not in dict(column)

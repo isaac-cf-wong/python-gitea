@@ -132,6 +132,42 @@ and an async class (e.g. `gitea.issue.AsyncIssue`); some modules re-export them
 from the package `__init__` (e.g. `from gitea.issue import Issue`). See the
 [API Reference](../reference/index.md) for the full method list and signatures.
 
+## Field Names
+
+A payload returned by a client method is the JSON the Gitea API sent, keyed as
+the API keys it. Nothing is renamed and nothing is dropped, in the client
+dictionaries and in [the CLI's JSON envelope](cli.md#field-names) alike, so a
+key is looked up in Gitea's API reference and not in this library's source.
+
+A project column is therefore `title`:
+
+```python
+columns, _ = client.project.list_project_columns(owner="my-org", repository=None, project_id=31)
+print(columns[0]["title"])  # 'Working'
+```
+
+`name` reads it too. It is an alias, not a second key: reading a payload by it
+works, and enumerating or serializing the payload sees `title` alone, so nothing
+downstream can come to depend on a name the API does not use.
+
+```python
+column = columns[0]
+column["name"]        # 'Working' - reads the title
+column.get("name")    # 'Working'
+"name" in column      # True
+list(column)          # ['id', 'title', 'default', 'sorting', ...] - no 'name'
+json.dumps(column)    # {"id": 117, "title": "Working", ...} - no 'name'
+```
+
+Only reading is widened. `column["name"] = x` writes a field called `name`, as
+it would on any dictionary, rather than changing the title through a name Gitea
+does not use.
+
+`gitea.utils.fields` holds the convention itself, the record types declaring the
+aliases of a resource, and the bar an alias has to clear to be added: a name
+callers have written, not a name that reads well. Today there is one, `name` on
+a project column.
+
 ## Detecting What Changed
 
 `gitea.watch` is not a resource: it holds the change detection that

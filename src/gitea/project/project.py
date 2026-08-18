@@ -8,6 +8,7 @@ from requests import Response
 
 from gitea.project.base import BaseProject
 from gitea.resource.resource import Resource
+from gitea.utils.fields import ProjectColumn, as_records
 from gitea.utils.response import process_response
 
 
@@ -391,6 +392,8 @@ class Project(BaseProject, Resource):
 
         Returns:
             A tuple containing a list of columns as dictionaries and a dictionary with metadata.
+            A column is keyed as the API keys it - `title`, not `name` - and reads `name` as an alias of
+            `title`, as `gitea.utils.fields` describes.
 
         """
         response = self._list_project_columns(
@@ -402,7 +405,7 @@ class Project(BaseProject, Resource):
             **kwargs,
         )
         data, status_code = process_response(response, default=[])
-        return cast(list[dict[str, Any]], data), {"status_code": status_code}
+        return cast(list[dict[str, Any]], as_records(data, ProjectColumn)), {"status_code": status_code}
 
     def _create_project_column(
         self,
@@ -457,6 +460,8 @@ class Project(BaseProject, Resource):
 
         Returns:
             A tuple containing the created column as a dictionary and a dictionary with metadata.
+            A column is keyed as the API keys it - `title`, not `name` - and reads `name` as an alias of
+            `title`, as `gitea.utils.fields` describes.
 
         """
         response = self._create_project_column(
@@ -468,7 +473,7 @@ class Project(BaseProject, Resource):
             **kwargs,
         )
         data, status_code = process_response(response, default={})
-        return cast(dict[str, Any], data), {"status_code": status_code}
+        return cast(dict[str, Any], as_records(data, ProjectColumn)), {"status_code": status_code}
 
     def _get_project_column(
         self,
@@ -518,6 +523,8 @@ class Project(BaseProject, Resource):
 
         Returns:
             A tuple containing the column as a dictionary and a dictionary with metadata.
+            A column is keyed as the API keys it - `title`, not `name` - and reads `name` as an alias of
+            `title`, as `gitea.utils.fields` describes.
 
         """
         response = self._get_project_column(
@@ -528,7 +535,7 @@ class Project(BaseProject, Resource):
             **kwargs,
         )
         data, status_code = process_response(response, default={})
-        return cast(dict[str, Any], data), {"status_code": status_code}
+        return cast(dict[str, Any], as_records(data, ProjectColumn)), {"status_code": status_code}
 
     def _edit_project_column(
         self,
@@ -593,6 +600,8 @@ class Project(BaseProject, Resource):
 
         Returns:
             A tuple containing the edited column as a dictionary and a dictionary with metadata.
+            A column is keyed as the API keys it - `title`, not `name` - and reads `name` as an alias of
+            `title`, as `gitea.utils.fields` describes.
 
         """
         response = self._edit_project_column(
@@ -606,7 +615,7 @@ class Project(BaseProject, Resource):
             **kwargs,
         )
         data, status_code = process_response(response, default={})
-        return cast(dict[str, Any], data), {"status_code": status_code}
+        return cast(dict[str, Any], as_records(data, ProjectColumn)), {"status_code": status_code}
 
     def _delete_project_column(
         self,

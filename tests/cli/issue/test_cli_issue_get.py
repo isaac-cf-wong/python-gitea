@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from gitea.cli.issue.get import get_command, rename_comment_count
+from gitea.cli.issue.get import get_command
 from tests.board import ISSUE_ID, ORGANIZATION_PROJECT, REPOSITORY_PROJECT, make_client, make_issue
 
 
@@ -43,8 +43,13 @@ def test_get_command_calls_execute_and_delegates(mock_gitea, mock_get_auth_param
 @patch("gitea.cli.utils.api.execute_api_command")
 @patch("gitea.cli.utils.auth.get_auth_params")
 @patch("gitea.client.gitea.Gitea")
-def test_get_command_renames_comments_to_comment_count(mock_gitea, mock_get_auth_params, mock_execute):
-    """get_command should expose the API's `comments` count as `comment_count`."""
+def test_get_command_emits_the_comment_count_as_the_api_names_it(mock_gitea, mock_get_auth_params, mock_execute):
+    """get_command should pass the API's `comments` count through under its own name.
+
+    This command used to rename the field to `comment_count`, alone among the
+    commands that emit an issue. The rename is gone, so the count arrives under
+    one name whichever command fetched the issue.
+    """
     ctx = make_ctx()
 
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
@@ -56,25 +61,9 @@ def test_get_command_renames_comments_to_comment_count(mock_gitea, mock_get_auth
     get_command(ctx=ctx, owner="owner", repository="repo", issue_id=5, account_name="acct", token=None, base_url=None)
 
     data, metadata = mock_execute.call_args[1]["api_call"]()
-    assert data == {"id": 10, "comment_count": 3, "title": "Bug"}
-    assert "comments" not in data
+    assert data == {"id": 10, "comments": 3, "title": "Bug"}
+    assert "comment_count" not in data
     assert metadata == {"status_code": 200}
-
-
-def test_rename_comment_count_renames_in_place():
-    """The `comments` key should be renamed while keeping its value and position."""
-    issue = {"id": 1, "comments": 7, "title": "Bug"}
-
-    result = rename_comment_count(issue)
-
-    assert list(result.items()) == [("id", 1), ("comment_count", 7), ("title", "Bug")]
-
-
-def test_rename_comment_count_without_comments_field():
-    """An issue without a `comments` key should be returned unchanged."""
-    issue = {"id": 1, "title": "Bug"}
-
-    assert rename_comment_count(issue) == {"id": 1, "title": "Bug"}
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -111,6 +100,16 @@ def test_get_command_reports_the_column_of_every_project_the_issue_is_on(
 
     assert [project["column_id"] for project in data["projects"]] == [109, 6]
     assert metadata == {"status_code": 200}
+
+    # Each project's columns have to be listed where that project keeps them: a
+    # repository project under the repository holding the issue - which only this
+    # command knows and has to pass on - and an organization project under the
+    # owner, which is what a repository of None asks for.
+    scopes = {
+        call.kwargs["project_id"]: call.kwargs["repository"]
+        for call in client.project.list_project_columns.call_args_list
+    }
+    assert scopes == {ORGANIZATION_PROJECT["id"]: None, REPOSITORY_PROJECT["id"]: "example-repo"}
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -164,7 +163,7 @@ def test_get_command_leaves_an_issue_without_projects_alone(mock_gitea, mock_get
 
     data, _ = mock_execute.call_args[1]["api_call"]()
 
-    assert data == {"id": 10, "comment_count": 3, "projects": []}
+    assert data == {"id": 10, "comments": 3, "projects": []}
     client.project.list_project_columns.assert_not_called()
 
 

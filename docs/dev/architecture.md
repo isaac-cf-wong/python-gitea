@@ -56,7 +56,8 @@ src/gitea/
 │   ├── project/             # project, column, and project-issue commands
 │   ├── user/                # user commands
 │   └── utils/               # auth resolution, API helpers, conversions
-└── utils/                   # Logging, pagination, and response helpers
+└── utils/                   # Logging, field names, pagination, and response helpers
+    ├── fields.py            # Field-name convention and compatibility aliases
     ├── log.py               # Logger setup
     ├── pagination.py        # Paginated-listing walkers
     └── response.py          # Response processing helpers
