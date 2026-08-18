@@ -8,6 +8,7 @@ from aiohttp import ClientResponse
 
 from gitea.project.base import BaseProject
 from gitea.resource.async_resource import AsyncResource
+from gitea.utils.fields import ProjectColumn, as_records
 from gitea.utils.response import process_async_response
 
 
@@ -391,6 +392,8 @@ class AsyncProject(BaseProject, AsyncResource):
 
         Returns:
             A tuple containing a list of columns as dictionaries and a dictionary with metadata.
+            A column is keyed as the API keys it - `title`, not `name` - and reads `name` as an alias of
+            `title`, as `gitea.utils.fields` describes.
 
         """
         response = await self._list_project_columns(
@@ -402,7 +405,7 @@ class AsyncProject(BaseProject, AsyncResource):
             **kwargs,
         )
         data, status_code = await process_async_response(response, default=[])
-        return cast(list[dict[str, Any]], data), {"status_code": status_code}
+        return cast(list[dict[str, Any]], as_records(data, ProjectColumn)), {"status_code": status_code}
 
     async def _create_project_column(
         self,
@@ -457,6 +460,8 @@ class AsyncProject(BaseProject, AsyncResource):
 
         Returns:
             A tuple containing the created column as a dictionary and a dictionary with metadata.
+            A column is keyed as the API keys it - `title`, not `name` - and reads `name` as an alias of
+            `title`, as `gitea.utils.fields` describes.
 
         """
         response = await self._create_project_column(
@@ -468,7 +473,7 @@ class AsyncProject(BaseProject, AsyncResource):
             **kwargs,
         )
         data, status_code = await process_async_response(response, default={})
-        return cast(dict[str, Any], data), {"status_code": status_code}
+        return cast(dict[str, Any], as_records(data, ProjectColumn)), {"status_code": status_code}
 
     async def _get_project_column(
         self,
@@ -518,6 +523,8 @@ class AsyncProject(BaseProject, AsyncResource):
 
         Returns:
             A tuple containing the column as a dictionary and a dictionary with metadata.
+            A column is keyed as the API keys it - `title`, not `name` - and reads `name` as an alias of
+            `title`, as `gitea.utils.fields` describes.
 
         """
         response = await self._get_project_column(
@@ -528,7 +535,7 @@ class AsyncProject(BaseProject, AsyncResource):
             **kwargs,
         )
         data, status_code = await process_async_response(response, default={})
-        return cast(dict[str, Any], data), {"status_code": status_code}
+        return cast(dict[str, Any], as_records(data, ProjectColumn)), {"status_code": status_code}
 
     async def _edit_project_column(
         self,
@@ -593,6 +600,8 @@ class AsyncProject(BaseProject, AsyncResource):
 
         Returns:
             A tuple containing the edited column as a dictionary and a dictionary with metadata.
+            A column is keyed as the API keys it - `title`, not `name` - and reads `name` as an alias of
+            `title`, as `gitea.utils.fields` describes.
 
         """
         response = await self._edit_project_column(
@@ -606,7 +615,7 @@ class AsyncProject(BaseProject, AsyncResource):
             **kwargs,
         )
         data, status_code = await process_async_response(response, default={})
-        return cast(dict[str, Any], data), {"status_code": status_code}
+        return cast(dict[str, Any], as_records(data, ProjectColumn)), {"status_code": status_code}
 
     async def _delete_project_column(
         self,
