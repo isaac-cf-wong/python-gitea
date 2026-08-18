@@ -5,7 +5,7 @@ part of it that changes without anyone deciding to change it. A helper that
 rebuilds a payload, a rename that reads better, a field renamed upstream and
 mirrored here - each is a one-line edit, none of them fails a test that only
 checks that a command ran and printed an envelope, and each of them breaks a
-script that was reading the old name (management/weave-workspace#34).
+script that was reading the old name.
 
 So each subcommand is declared here with the responses it is answered with and
 the `data` it has to emit for them, and the test runs the command and compares.

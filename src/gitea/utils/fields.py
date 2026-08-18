@@ -14,8 +14,8 @@ caller writes `column["name"]`, it works, and it breaks on the version that
 notices the rename and removes it. Worse, a rename applied in one path and not
 the other - in a CLI command that rebuilds a payload but not in the client
 method feeding it - makes the same value arrive under two names depending on
-which door it came through, which is the shape the friction was reported in
-(management/weave-workspace#34).
+which door it came through, which is the shape this was reported in: a caller
+reading a column by one name in one place and the other name in the other.
 
 So the canonical name is the API's, everywhere, in the client dictionaries and
 in the CLI's JSON envelope alike. What this module adds is the other half of
