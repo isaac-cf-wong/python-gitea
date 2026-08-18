@@ -947,6 +947,99 @@ class TestRequests:
         assert [call.kwargs["page"] for call in client.issue.list_issues.call_args_list] == [1, 2, 3]
 
 
+class TestAnInstanceThatIgnoresThePageParameter:
+    """Tests for the instance behaviour that used to make a run never return."""
+
+    def test_a_repeating_comment_listing_does_not_run_forever(self, tmp_path: Path) -> None:
+        """An issue whose comments come back identically for every page must not hang.
+
+        Some instances answer every page number of the comment listing with the
+        same items, so the listing is never empty and never short and the walk
+        asking for page 3, page 4 and page 5 never reaches an end. The fetcher
+        below gives up rather than answering forever, so a walk that does not
+        terminate fails this test instead of hanging the suite on it.
+        """
+        state_path = tmp_path / "watch-state.json"
+        comments = [
+            {
+                "id": 7,
+                "body": "the first",
+                "user": {"id": 3, "login": "alice"},
+                "created_at": "2026-08-01T09:00:00Z",
+                "updated_at": "2026-08-01T09:00:00Z",
+            },
+            {
+                "id": 8,
+                "body": "the second",
+                "user": {"id": 4, "login": "bob"},
+                "created_at": "2026-08-01T10:00:00Z",
+                "updated_at": "2026-08-01T10:00:00Z",
+            },
+        ]
+        pages_asked: list[int] = []
+
+        def every_page_the_same(**kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+            """Answer every requested page with the same two comments.
+
+            Args:
+                **kwargs: The listing arguments, of which only the page is read.
+
+            Returns:
+                The same page, whatever page was asked for.
+
+            """
+            pages_asked.append(kwargs.get("page", 1))
+            if len(pages_asked) > 50:
+                raise AssertionError(f"the comment listing was still being walked after {len(pages_asked)} requests")
+            return (list(comments), {"status_code": 200})
+
+        client = make_client([ISSUE])
+        client.comment.list_comments.side_effect = every_page_the_same
+
+        result = run(*watch(state_path, output="json"), client=client)
+
+        assert result.exit_code == 0, result.output
+        # The repeat ends the walk at the second request, and the issue is
+        # recorded with the comments the instance did give.
+        assert pages_asked == [1, 2]
+        recorded = json.loads(state_path.read_text(encoding="utf-8"))["scopes"]["repo:my-org/my-repo"]["issues"]
+        assert len(recorded["1854"]["comment_hashes"]) == 2
+
+    def test_a_repeating_issue_listing_does_not_run_forever(self, tmp_path: Path) -> None:
+        """The same instance behaviour on the issue listing must terminate too.
+
+        The fix is in the walker every paginated command shares, so the listing
+        that repeats is not the only one covered.
+        """
+        state_path = tmp_path / "watch-state.json"
+        pages_asked: list[int] = []
+
+        def every_page_the_same(**kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+            """Answer every requested page with the same two issues.
+
+            Args:
+                **kwargs: The listing arguments, of which only the page is read.
+
+            Returns:
+                The same page, whatever page was asked for.
+
+            """
+            pages_asked.append(kwargs.get("page", 1))
+            if len(pages_asked) > 50:
+                raise AssertionError(f"the issue listing was still being walked after {len(pages_asked)} requests")
+            return ([ISSUE, OTHER_ISSUE], {"status_code": 200})
+
+        client = make_client()
+        client.issue.list_issues.side_effect = every_page_the_same
+
+        result = run(*watch(state_path, output="json"), client=client)
+
+        assert result.exit_code == 0, result.output
+        assert pages_asked == [1, 2]
+        # Two issues, not the four a walk handing back the repeat would record.
+        assert parse_envelope(result.stdout)["metadata"]["issue_count"] == 2
+
+
 class TestRecovery:
     """Tests for the caches a run has to survive."""
 
