@@ -132,6 +132,11 @@ nav:
                       - Overview: reference/gitea/project/index.md
                       - Project: reference/gitea/project/project.md
                       - Async Project: reference/gitea/project/async_project.md
+                - Organization:
+                      - Overview: reference/gitea/organization/index.md
+                      - Organization: reference/gitea/organization/organization.md
+                      - Async Organization:
+                            reference/gitea/organization/async_organization.md
                 - User:
                       - Overview: reference/gitea/user/index.md
                       - User: reference/gitea/user/user.md

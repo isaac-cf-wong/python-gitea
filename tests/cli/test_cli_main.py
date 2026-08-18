@@ -878,6 +878,8 @@ class TestRegisterCommands:
             "milestone": "Commands for managing milestones.",
             "notification": "Commands for managing notifications.",
             "project": "Commands for managing projects.",
+            "org": "Commands for managing organizations.",
+            "repo": "Commands for managing repositories.",
             "watch": "Commands for watching issues for changes.",
         }
         calls = mock_add_typer.call_args_list

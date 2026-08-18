@@ -44,6 +44,7 @@ src/gitea/
 ├── milestone/               # Milestone resource (sync + async)
 ├── notification/            # Notification resource (sync + async)
 ├── project/                 # Project resource (sync + async)
+├── organization/            # Organization resource (sync + async)
 ├── cli/                     # Typer CLI application
 │   ├── main.py              # gitea-cli entry point, command registration
 │   ├── config/              # config commands
@@ -54,6 +55,8 @@ src/gitea/
 │   ├── milestone/           # milestone commands
 │   ├── notification/        # notification commands
 │   ├── project/             # project, column, and project-issue commands
+│   ├── organization/        # org commands
+│   ├── repository/          # repo commands
 │   ├── user/                # user commands
 │   └── utils/               # auth resolution, API helpers, conversions
 └── utils/                   # Logging, field names, pagination, and response helpers
@@ -86,6 +89,7 @@ with Gitea(token="...", base_url="...") as client:
     client.milestone      # Milestone
     client.notification   # Notification
     client.project        # Project
+    client.organization   # Organization
 ```
 
 ## Resource Layer
