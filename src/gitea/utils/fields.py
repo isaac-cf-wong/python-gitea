@@ -40,6 +40,14 @@ alone and no consumer can come to depend on the alias by reading the output.
 of the same items, and unpacking one with `{**payload}` gives that plain
 dictionary back, alias-free.
 
+Only reading is widened. Writing through an alias is not aliased either way:
+`payload["name"] = x` sets a field named `name`, as it would on any dictionary,
+and `pop("name")` and `del payload["name"]` raise unless such a field is really
+there. Resolving a write to the canonical field would be the more surprising
+rule - it would let `column["name"] = x` change the title of a column through a
+name Gitea does not use - and a payload a caller has written a literal `name`
+into is a payload the caller built, not one this library handed over.
+
 The bar for adding an entry is a name callers have actually written, not a name
 that reads well: every alias is a second way to spell one field, which is the
 thing this module exists to prevent. The one recorded today is `name` on a
@@ -71,7 +79,8 @@ class AliasedDict(dict[str, Any]):
     Reading is widened and nothing else is: `payload["name"]`,
     `payload.get("name")` and `"name" in payload` all resolve an alias to the
     field it aliases, while `keys()`, iteration, `len()` and every serialization
-    see the canonical fields alone.
+    see the canonical fields alone. Writing is not aliased: an alias assigned to
+    becomes a field of that name, and one deleted or popped has to be one.
 
     Subclasses declare the aliases of one resource. A subclass declaring none
     behaves as a plain dictionary, which is what makes this usable as the base

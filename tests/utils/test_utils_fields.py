@@ -231,3 +231,40 @@ def test_the_policy_is_written_down() -> None:
     """
     assert "Gitea API" in FIELD_NAME_POLICY
     assert "never emitted" in FIELD_NAME_POLICY
+
+
+class TestWritesAreNotAliased:
+    """An alias widens reading. Writing through one is writing a field of that name.
+
+    Which is worth pinning rather than asserting in prose: an implementation that
+    resolved a write would let `column["name"] = x` change a column's title
+    through a name Gitea does not use, and would put the alias into the payload's
+    keys - and so into the JSON - by a route the read-side tests never take.
+    """
+
+    def test_assigning_an_alias_writes_a_field_of_that_name(self) -> None:
+        """An assigned alias becomes a key, as it would on any dictionary."""
+        payload = Aliased({"canonical": "value"})
+        payload["alias"] = "written"
+
+        assert payload["canonical"] == "value"
+        assert sorted(payload) == ["alias", "canonical"]
+        assert json.loads(json.dumps(payload)) == {"canonical": "value", "alias": "written"}
+
+    def test_popping_an_alias_of_a_present_field_raises(self) -> None:
+        """`pop` does not resolve an alias, so the canonical field survives it."""
+        payload = Aliased({"canonical": "value"})
+
+        with pytest.raises(KeyError):
+            payload.pop("alias")
+
+        assert payload["canonical"] == "value"
+
+    def test_deleting_an_alias_of_a_present_field_raises(self) -> None:
+        """`del` does not resolve an alias either."""
+        payload = Aliased({"canonical": "value"})
+
+        with pytest.raises(KeyError):
+            del payload["alias"]
+
+        assert payload["canonical"] == "value"

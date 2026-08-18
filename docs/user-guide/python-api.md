@@ -159,6 +159,10 @@ list(column)          # ['id', 'title', 'default', 'sorting', ...] - no 'name'
 json.dumps(column)    # {"id": 117, "title": "Working", ...} - no 'name'
 ```
 
+Only reading is widened. `column["name"] = x` writes a field called `name`, as
+it would on any dictionary, rather than changing the title through a name Gitea
+does not use.
+
 `gitea.utils.fields` holds the convention itself, the record types declaring the
 aliases of a resource, and the bar an alias has to clear to be added: a name
 callers have written, not a name that reads well. Today there is one, `name` on
