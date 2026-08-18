@@ -1,10 +1,22 @@
 """Unit tests for the paginated-listing helpers."""
 
+import inspect
 from unittest.mock import patch
 
 import pytest
 
-from gitea.utils.pagination import MAX_PAGES, collect_all_pages, iter_async_pages, iter_pages
+from gitea.utils import pagination
+from gitea.utils.pagination import (
+    MAX_PAGES,
+    PAGE_LIMIT,
+    REPEATED_PAGE,
+    REPORTED_LAST_PAGE,
+    SHORT_PAGE,
+    _end_of_listing,
+    collect_all_pages,
+    iter_async_pages,
+    iter_pages,
+)
 
 
 def make_fetch_page(pages, requested=None):
@@ -367,3 +379,164 @@ async def test_iter_async_pages_honours_a_reported_page_count():
 
     assert requested == [1, 2, 3]
     assert len(seen) == 3
+
+
+class TestEndOfListing:
+    """Tests for the one place every rule that ends a walk is written down."""
+
+    def test_a_repeat_is_the_first_rule_asked(self):
+        """The repeat has to win over every other ending, and drop its page.
+
+        The page below satisfies all four rules at once, which no real walk
+        reaches - but it is the only way to assert which one is consulted first
+        rather than inferring it from a walk that happens to agree.
+        """
+        verdict = _end_of_listing(
+            batch=[{"id": 1}],
+            metadata={"page_count": 1, "has_more": False},
+            previous=[{"id": 1}],
+            page=MAX_PAGES,
+            page_size=99,
+        )
+
+        assert verdict.reason == REPEATED_PAGE
+        # The items are the caller's page 1 over again, so they are not handed
+        # back; every other ending hands its page over.
+        assert verdict.include is False
+
+    @pytest.mark.parametrize(
+        ("batch", "metadata", "page", "page_size", "reason"),
+        [
+            ([], {}, 1, 0, SHORT_PAGE),
+            ([{"id": 1}], {}, 2, 2, SHORT_PAGE),
+            ([{"id": 1}], {"page_count": 1}, 1, 1, REPORTED_LAST_PAGE),
+            ([{"id": 1}], {"has_more": False}, 1, 1, REPORTED_LAST_PAGE),
+            ([{"id": 1}], {}, MAX_PAGES, 1, PAGE_LIMIT),
+        ],
+    )
+    def test_every_other_ending_hands_its_page_over(self, batch, metadata, page, page_size, reason):
+        """The page that ends a listing belongs to it, unless it is a repeat.
+
+        Args:
+            batch: The items of the page just fetched.
+            metadata: The metadata of the page just fetched.
+            page: The number of the page just fetched.
+            page_size: The size of the first page.
+            reason: The ending expected.
+
+        """
+        verdict = _end_of_listing(
+            batch=batch,
+            metadata=metadata,
+            previous=[{"id": 2}],
+            page=page,
+            page_size=page_size,
+        )
+
+        assert verdict.reason == reason
+        assert verdict.include is True
+
+    def test_a_page_with_nothing_to_end_it_keeps_the_walk_going(self):
+        """The ordinary case: hand the page over and ask for the next one."""
+        verdict = _end_of_listing(
+            batch=[{"id": 1}, {"id": 2}],
+            metadata={"status_code": 200},
+            previous=[{"id": 3}, {"id": 4}],
+            page=2,
+            page_size=2,
+        )
+
+        assert verdict.reason is None
+        assert verdict.include is True
+
+    def test_the_walkers_decide_nothing_of_their_own(self):
+        """Neither walker may re-implement a rule instead of asking for it.
+
+        The rules were written out in both walkers once, which is how they came
+        to disagree about handing a repeated page over. Asserting the source
+        keeps them delegating rather than only that they currently agree.
+        """
+        source = inspect.getsource(pagination)
+        walkers = source[source.index("def iter_pages(") : source.index("def collect_all_pages(")]
+
+        assert walkers.count("_end_of_listing(") == 2
+        for rule in ("_repeats_previous", "_is_last_page", "_reports_last_page", "MAX_PAGES"):
+            assert rule not in walkers, f"{rule} is applied in a walker rather than in _end_of_listing"
+
+
+class TestReportedPageCountIsPositive:
+    """Tests for a page count that does not describe a listing."""
+
+    @pytest.mark.parametrize("page_count", [0, -1, -100])
+    def test_a_page_count_of_zero_or_less_does_not_end_a_full_first_page(self, page_count):
+        """Taking such a count at its word would throw away a listing that has items.
+
+        Args:
+            page_count: The count the metadata reports.
+
+        """
+        pages = [[{"id": 1}, {"id": 2}], [{"id": 3}]]
+        requested: list[int] = []
+
+        def fetch_page(page):
+            requested.append(page)
+            if len(requested) > 20:
+                raise AssertionError(f"the walk did not end after {len(requested)} requests")
+            return (list(pages[page - 1]) if page <= len(pages) else [], {"page_count": page_count})
+
+        items, _ = collect_all_pages(fetch_page)
+
+        assert [item["id"] for item in items] == [1, 2, 3]
+        assert requested == [1, 2]
+
+    def test_a_page_count_of_one_still_ends_the_first_page(self):
+        """The smallest count that describes a listing has to be honoured."""
+        requested: list[int] = []
+
+        def fetch_page(page):
+            requested.append(page)
+            if len(requested) > 20:
+                raise AssertionError(f"the walk did not end after {len(requested)} requests")
+            return ([{"id": page}] * 2, {"page_count": 1})
+
+        items, _ = collect_all_pages(fetch_page)
+
+        assert requested == [1]
+        assert len(items) == 2
+
+
+@pytest.mark.asyncio
+async def test_iter_async_pages_drops_a_repeat_that_other_rules_would_have_kept():
+    """The asynchronous walk has to read the same verdict as the synchronous one.
+
+    The repeated page also reports itself as the last, so a walk consulting the
+    reported pagination first would hand its items over and duplicate them.
+    """
+    requested: list[int] = []
+
+    async def fetch_page_async(page):
+        requested.append(page)
+        if len(requested) > 20:
+            raise AssertionError(f"the walk did not end after {len(requested)} requests")
+        return ([{"id": 1}, {"id": 2}], {"page_count": 2})
+
+    seen = [batch async for batch, _ in iter_async_pages(fetch_page_async)]
+
+    assert requested == [1, 2]
+    assert [item["id"] for batch in seen for item in batch] == [1, 2]
+
+
+def test_iter_pages_drops_a_repeat_that_other_rules_would_have_kept():
+    """The synchronous twin of the walk above, for the same reason."""
+    requested: list[int] = []
+
+    def fetch_page(page):
+        requested.append(page)
+        if len(requested) > 20:
+            raise AssertionError(f"the walk did not end after {len(requested)} requests")
+        return ([{"id": 1}, {"id": 2}], {"page_count": 2})
+
+    items, _ = collect_all_pages(fetch_page)
+
+    assert requested == [1, 2]
+    assert [item["id"] for item in items] == [1, 2]
