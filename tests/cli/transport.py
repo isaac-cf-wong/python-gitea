@@ -111,6 +111,7 @@ class RecordingSession:
         self.payload: Any = [] if payload is None else payload
         self.requests: list[tuple[str, str]] = []
         self.headers: list[dict[str, Any]] = []
+        self.params: list[dict[str, Any]] = []
 
     def request(self, method: str, url: str, **kwargs: Any) -> RecordedResponse:
         """Record a request and answer it with the fixed payload.
@@ -118,18 +119,32 @@ class RecordingSession:
         Args:
             method: HTTP method the client asked for.
             url: Full URL the client built.
-            **kwargs: Timeout and body, which are not recorded, and headers,
-                which are: they carry the credentials the command resolved, and a
-                command reaching the right URL unauthenticated is not a command
-                that works.
+            **kwargs: Timeout and body, which are not recorded, and headers and
+                query parameters, which are: the headers carry the credentials
+                the command resolved, and a command reaching the right URL
+                unauthenticated is not a command that works, while the
+                parameters carry what it asked that endpoint for.
 
         Returns:
             The recorded response.
 
         """
+        self._record(method, url, **kwargs)
+        return RecordedResponse(self.payload)
+
+    def _record(self, method: str, url: str, **kwargs: Any) -> None:
+        """Keep what one request was made with.
+
+        Args:
+            method: HTTP method the client asked for.
+            url: Full URL the client built.
+            **kwargs: The headers and the query parameters, which are kept, and
+                the timeout and body, which are not.
+
+        """
         self.requests.append((method, url))
         self.headers.append(dict(kwargs.get("headers") or {}))
-        return RecordedResponse(self.payload)
+        self.params.append(dict(kwargs.get("params") or {}))
 
     def close(self) -> None:
         """Close the session, as leaving the client's context manager does."""
@@ -178,15 +193,14 @@ class RoutedSession(RecordingSession):
         Args:
             method: HTTP method the client asked for.
             url: Full URL the client built.
-            **kwargs: Timeout and body, which are not recorded, and headers,
-                which are.
+            **kwargs: Timeout and body, which are not recorded, and headers and
+                query parameters, which are.
 
         Returns:
             The recorded response.
 
         """
-        self.requests.append((method, url))
-        self.headers.append(dict(kwargs.get("headers") or {}))
+        self._record(method, url, **kwargs)
         for fragment, payload in self.routes:
             if fragment in url:
                 return RecordedResponse(payload)

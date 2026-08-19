@@ -147,8 +147,10 @@ def register_commands() -> None:
     from gitea.cli.label.main import label_app  # noqa: PLC0415
     from gitea.cli.milestone.main import milestone_app  # noqa: PLC0415
     from gitea.cli.notification.main import notification_app  # noqa: PLC0415
+    from gitea.cli.organization.main import organization_app  # noqa: PLC0415
     from gitea.cli.project.main import project_app  # noqa: PLC0415
     from gitea.cli.pull_request.main import pull_request_app  # noqa: PLC0415
+    from gitea.cli.repository.main import repository_app  # noqa: PLC0415
     from gitea.cli.user.main import user_app  # noqa: PLC0415
     from gitea.cli.watch.main import watch_app  # noqa: PLC0415
 
@@ -161,6 +163,8 @@ def register_commands() -> None:
     app.add_typer(milestone_app, name="milestone", help="Commands for managing milestones.")
     app.add_typer(notification_app, name="notification", help="Commands for managing notifications.")
     app.add_typer(project_app, name="project", help="Commands for managing projects.")
+    app.add_typer(organization_app, name="org", help="Commands for managing organizations.")
+    app.add_typer(repository_app, name="repo", help="Commands for managing repositories.")
     app.add_typer(watch_app, name="watch", help="Commands for watching issues for changes.")
 
 

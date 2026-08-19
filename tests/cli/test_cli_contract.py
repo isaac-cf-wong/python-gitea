@@ -101,6 +101,8 @@ REPOSITORY = {"id": 254, "name": "r", "owner": "o", "full_name": "o/r"}
 
 USER = {"id": 36, "login": "someone", "full_name": "", "email": "someone@example.invalid", "username": "someone"}
 
+ORGANIZATION = {"id": 23, "username": "o", "full_name": "", "description": "", "visibility": "limited"}
+
 COLUMN = {
     "id": 117,
     "title": "Working",
@@ -376,6 +378,9 @@ CONTRACTS = (
     Contract(path=("notification", "read"), payload=[NOTIFICATION]),
     Contract(path=("user", "get"), payload=USER),
     Contract(path=("user", "update-settings"), args=("--theme", "gitea"), payload=USER_SETTINGS),
+    # --- org, repo: discovering what an instance holds ----------------------
+    Contract(path=("org", "list"), payload=[ORGANIZATION]),
+    Contract(path=("repo", "list"), args=("--owner", "o"), payload=[REPOSITORY]),
     # --- project -----------------------------------------------------------
     Contract(path=("project", "create"), args=("--owner", "o", "--title", "Board"), payload=PROJECT),
     Contract(path=("project", "list"), args=("--owner", "o"), payload=[PROJECT]),

@@ -117,8 +117,8 @@ alias is never emitted, so it cannot appear in the JSON above.
 
 ## Option naming
 
-Every resource command addresses its target the same way, so an invocation can
-be written without reading `--help` first:
+Every command that addresses something an account owns names its target the same
+way, so an invocation can be written without reading `--help` first:
 
 | Option          | Meaning                                                  |
 | --------------- | -------------------------------------------------------- |
@@ -156,6 +156,16 @@ are required together because there is no scope for them to fall back to:
 `notification` is the one family where `--owner` is optional as well: given
 neither `--owner` nor `--repository` it acts on the authenticated user's
 notifications, and the two must be passed together or not at all.
+
+A command whose target is an account rather than something an account owns takes
+no `--owner` at all, and names the account with `--username` instead: `org list`
+lists an account's organizations and `user get` reads an account's profile, both
+answering for the account the token belongs to when `--username` is omitted.
+
+`repo list` is the one command where the _kind_ of owner matters: Gitea serves
+an organization's repositories and a user's at different endpoints, so
+`--owner-type` says which of the two `--owner` names. It defaults to
+`organization`.
 
 ### Deprecated option names
 
@@ -340,6 +350,31 @@ instance is down.
 - `gitea-cli user update-settings`
     - Optional: `--full-name`, `--website`, `--location`, `--language`,
       `--theme`, `--diff-view-style`, `--hide-email`, `--hide-activity`
+
+### Org - discover organizations
+
+- `gitea-cli org list`
+    - Optional: `--username`, `--page`, `--limit`
+    - Lists the organizations of the account the token belongs to; `--username`
+      lists those of another account instead.
+    - Gitea also has a site-wide listing of every organization, which a token
+      that is not scoped for it is refused. This command does not read from it,
+      so it answers with the organizations of an account and never with the
+      instance's.
+
+### Repo - discover repositories
+
+- `gitea-cli repo list --owner <owner>`
+    - Optional: `--owner-type`, `--page`, `--limit`
+    - `--owner-type` is `organization` (the default) or `user`: Gitea serves the
+      two at different endpoints - `/orgs/<owner>/repos` and
+      `/users/<owner>/repos` - and an owner's name does not say which of the two
+      it is.
+
+```bash
+gitea-cli repo list --owner my-org                     # an organization's repositories
+gitea-cli repo list --owner alice --owner-type user    # a user's repositories
+```
 
 ### Watch - report what changed since the last run
 

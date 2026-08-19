@@ -126,6 +126,7 @@ is simpler and sufficient.
 | `client.milestone`    | Milestones                            |
 | `client.notification` | Notifications                         |
 | `client.project`      | Projects, columns, and project issues |
+| `client.organization` | Organizations                         |
 
 Each resource is implemented in a synchronous class (e.g. `gitea.issue.Issue`)
 and an async class (e.g. `gitea.issue.AsyncIssue`); some modules re-export them
