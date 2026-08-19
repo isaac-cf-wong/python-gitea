@@ -397,6 +397,21 @@ CONTRACTS = (
         data=[{"column": {"id": COLUMN["id"], "title": COLUMN["title"]}, "issues": [ISSUE_ON_BOARD]}],
         metadata=("status_code", "column_count", "issue_count"),
     ),
+    Contract(
+        path=("project", "show"),
+        args=BOARD,
+        payload=PROJECT,
+        routes=BOARD_ROUTES,
+        # The board in one object: the project as the API sent it, and every
+        # column as the API sent it with the cards on it counted and named.
+        # `issue_count` and `issue_ids` are added because the columns endpoint
+        # has no way of saying either; nothing the endpoint did send is dropped.
+        data={
+            "project": PROJECT,
+            "columns": [{**COLUMN, "issue_count": 1, "issue_ids": [ISSUE_ON_BOARD["id"]]}],
+        },
+        metadata=("status_code", "column_count", "issue_count"),
+    ),
     Contract(path=("project", "column", "create"), args=(*BOARD, "--title", "Working"), payload=COLUMN),
     Contract(path=("project", "column", "list"), args=BOARD, payload=[COLUMN]),
     Contract(path=("project", "column", "issues"), args=(*BOARD, "--column-id", "117"), payload=[ISSUE]),
@@ -624,9 +639,10 @@ def test_a_column_is_emitted_by_its_api_field_name() -> None:
         contract_for(("project", "column", "create")).payload,
         *contract_for(("project", "column", "list")).payload,
         *(entry["column"] for entry in contract_for(("project", "issues")).data),
+        *contract_for(("project", "show")).data["columns"],
     ]
 
-    assert len(columns) == 3
+    assert len(columns) == 4
     for column in columns:
         assert "title" in column
         assert "name" not in column
