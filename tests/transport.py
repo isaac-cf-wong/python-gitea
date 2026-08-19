@@ -1,11 +1,12 @@
-"""Recording stand-in for the HTTP session a CLI invocation makes its requests through.
+"""Recording stand-in for the HTTP session the client makes its requests through.
 
-Patching the client itself proves that a command ran, but not where it sent the
-user: a stub whose every attribute answers the same way accepts a call to the
-repository endpoint and the organization one alike. Standing in one level lower -
-at the session the real client builds its URLs for - keeps the client, the
-resource and the path building under test and records the URL each command
-actually asked for.
+Patching the client itself proves that a command or a method ran, but not what it
+asked for: a stub whose every attribute answers the same way accepts a call to
+the repository endpoint and the organization one alike, and a value that stopped
+being forwarded on the way to the request changes nothing such a test observes.
+Standing in one level lower - at the session the real client builds its URLs for -
+keeps the client, the resource and the path building under test, and records the
+URL, the query parameters and the body each request really carried.
 
 Use it by patching the session the client constructs:
 
@@ -16,11 +17,16 @@ Use it by patching the session the client constructs:
     assert session.requests == [("GET", "https://gitea.invalid/api/v1/orgs/org/projects/1")]
 
 `RecordingSession` answers every request alike. `RoutedSession` answers each
-endpoint with a payload of its own, for a command reaching several - resolving an
+endpoint with a payload of its own, for a caller reaching several - resolving an
 issue before acting on it, walking a board's columns before their issues - and
 `NO_CONTENT` answers as an endpoint that succeeds without a body does, so a
-command whose endpoint really answers `204` is not tested against a body the API
+request whose endpoint really answers `204` is not tested against a body the API
 never sends.
+
+`AsyncRecordingSession` is the same stand-in for the asynchronous client, which
+builds an `aiohttp` session rather than a `requests` one and awaits both the
+request and the reading of its body. It records what the synchronous one records,
+so a test asserting on either reads the same fields.
 """
 
 from __future__ import annotations
@@ -112,6 +118,7 @@ class RecordingSession:
         self.requests: list[tuple[str, str]] = []
         self.headers: list[dict[str, Any]] = []
         self.params: list[dict[str, Any]] = []
+        self.bodies: list[Any] = []
 
     def request(self, method: str, url: str, **kwargs: Any) -> RecordedResponse:
         """Record a request and answer it with the fixed payload.
@@ -119,11 +126,11 @@ class RecordingSession:
         Args:
             method: HTTP method the client asked for.
             url: Full URL the client built.
-            **kwargs: Timeout and body, which are not recorded, and headers and
-                query parameters, which are: the headers carry the credentials
-                the command resolved, and a command reaching the right URL
-                unauthenticated is not a command that works, while the
-                parameters carry what it asked that endpoint for.
+            **kwargs: Timeout, which is not recorded, and headers, query
+                parameters and JSON body, which are: the headers carry the
+                credentials the caller resolved, and a request reaching the
+                right URL unauthenticated is not one that works, while the
+                parameters and the body carry what it asked that endpoint for.
 
         Returns:
             The recorded response.
@@ -135,16 +142,21 @@ class RecordingSession:
     def _record(self, method: str, url: str, **kwargs: Any) -> None:
         """Keep what one request was made with.
 
+        The body is kept as it was passed, `None` and all: a request that was
+        meant to carry one and does not is the shape a dropped payload arrives
+        in, and coercing it to an empty object here would hide that.
+
         Args:
             method: HTTP method the client asked for.
             url: Full URL the client built.
-            **kwargs: The headers and the query parameters, which are kept, and
-                the timeout and body, which are not.
+            **kwargs: The headers, the query parameters and the JSON body, which
+                are kept, and the timeout, which is not.
 
         """
         self.requests.append((method, url))
         self.headers.append(dict(kwargs.get("headers") or {}))
         self.params.append(dict(kwargs.get("params") or {}))
+        self.bodies.append(kwargs.get("json"))
 
     def close(self) -> None:
         """Close the session, as leaving the client's context manager does."""
@@ -193,8 +205,8 @@ class RoutedSession(RecordingSession):
         Args:
             method: HTTP method the client asked for.
             url: Full URL the client built.
-            **kwargs: Timeout and body, which are not recorded, and headers and
-                query parameters, which are.
+            **kwargs: Timeout, which is not recorded, and the headers, query
+                parameters and JSON body, which are.
 
         Returns:
             The recorded response.
@@ -205,3 +217,73 @@ class RoutedSession(RecordingSession):
             if fragment in url:
                 return RecordedResponse(payload)
         return RecordedResponse(self.payload)
+
+
+class AsyncRecordedResponse:
+    """The answer the asynchronous recording session gives, shaped like an `aiohttp` response.
+
+    Only the parts `process_async_response` and the asynchronous client's error
+    handling read are provided - the status, the body read as bytes, and the two
+    calls the client makes on a failure - so an addition to either shows up as an
+    attribute error here rather than as a test passing against a response the
+    real code could not have produced.
+    """
+
+    def __init__(self, payload: Any) -> None:
+        """Hold the payload this response carries.
+
+        Args:
+            payload: JSON-serializable body to answer with, or `NO_CONTENT` to
+                answer as an endpoint that succeeds without a body does.
+
+        """
+        if isinstance(payload, NoContent):
+            self.status = 204
+            self.body = b""
+        else:
+            self.status = 200
+            self.body = json.dumps(payload).encode()
+
+    async def read(self) -> bytes:
+        """Read the body, as the real response does.
+
+        Returns:
+            The bytes this response carries.
+
+        """
+        return self.body
+
+    def raise_for_status(self) -> None:
+        """Raise nothing: the recorded response is always a success."""
+
+    def release(self) -> None:
+        """Release the response, as the asynchronous client does on a failure."""
+
+
+class AsyncRecordingSession(RecordingSession):
+    """Session recording what the asynchronous client asks for, and answering it all alike.
+
+    The asynchronous client awaits the request and reads the body as bytes, so
+    both are replaced here; everything a test reads afterwards - the requests,
+    the headers, the query parameters and the bodies - is recorded by the
+    synchronous session this extends and is read the same way.
+    """
+
+    async def request(self, method: str, url: str, **kwargs: Any) -> AsyncRecordedResponse:  # type: ignore[override]
+        """Record a request and answer it with the fixed payload.
+
+        Args:
+            method: HTTP method the client asked for.
+            url: Full URL the client built.
+            **kwargs: Timeout, which is not recorded, and the headers, query
+                parameters and JSON body, which are.
+
+        Returns:
+            The recorded response.
+
+        """
+        self._record(method, url, **kwargs)
+        return AsyncRecordedResponse(self.payload)
+
+    async def close(self) -> None:  # type: ignore[override]
+        """Close the session, as leaving the client's context manager does."""

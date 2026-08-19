@@ -17,7 +17,7 @@ from gitea.watch.changes import comment_hash
 from gitea.watch.state import STATE_FILE_ENV, empty_state, record_scope, save_state
 from tests.cli.envelope import parse_envelope
 from tests.cli.rendering import unrendered
-from tests.cli.transport import RecordingSession
+from tests.transport import RecordingSession
 
 runner = CliRunner()
 

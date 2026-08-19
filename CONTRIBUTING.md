@@ -95,6 +95,66 @@ submitting a pull request—this guide will help you get started.
     that runs at import time - so read the diff `uv run mutmut show <mutant>`
     prints before writing a test for one.
 
+    A filter selects which mutants are _run_, not which are written: every module
+    is mutated either way, so a scoped run still reports mutating the whole tree
+    and its progress counter reads `46/9042`, where the denominator counts every
+    mutant written and the numerator counts the ones the filter selected and
+    checked. Take the result of a scoped run from `uv run mutmut results` rather
+    than from that counter: it lists every mutant that was not killed, labelling
+    each as `survived` or as `not checked`, and naming the module it belongs to,
+    so the survivors of a scope are the `survived` entries whose names begin with
+    it. A filter matching no mutant stops the run with an error instead of
+    quietly widening it, so a scoped run that gets as far as testing is one that
+    scoped.
+
+    That listing names no killed mutant, though, so it cannot say how large the
+    scope was or what share of it died. Both are recorded per module, in the
+    `.meta` file mutmut writes beside each mutated module, whose
+    `exit_code_by_key` maps every mutant to the exit code of the run that checked
+    it - `0` survived, `1` killed, `null` never checked. Counting those gives the
+    verdict of a scope, and shows the modules outside it untouched. Point it at
+    the package directory the scope sits in - every module in the tree has a
+    `.meta`, so pointing it at the whole of `src/gitea` prints a line per module:
+
+    ```shell
+    uv run python - <<'PY'
+    import collections, json, pathlib
+
+    status = {0: "survived", 1: "killed", 3: "killed", 5: "no tests", 33: "no tests", None: "not checked"}
+    for meta in sorted(pathlib.Path("mutants/src/gitea/project").glob("*.py.meta")):
+        codes = json.loads(meta.read_text())["exit_code_by_key"]
+        counts = collections.Counter(status.get(c, f"exit {c}") for c in codes.values())
+        if counts:
+            print(f"{meta.name:24} {dict(counts)}")
+    PY
+    ```
+
+    ```text
+    async_project.py.meta    {'killed': 620, 'survived': 16}
+    base.py.meta             {'not checked': 215}
+    project.py.meta          {'killed': 620, 'survived': 16}
+    ```
+
+    That is the output of a run scoped to the two project resource modules: 636
+    mutants each, 1,240 of the 1,272 killed, and the 215 of a module outside the
+    scope sitting unchecked. Start from `rm -rf mutants` when a run has to stand
+    on its own, since the verdicts of one run are otherwise carried into the
+    next.
+
+    To scope what is _written_ as well, and get a counter whose denominator is
+    the scope, point `source_paths` at the modules and let `also_copy` carry the
+    rest of the package that the tests import. Scoped to the same two modules as
+    above, that run reports mutating two files and counts `1272/1272`:
+
+    ```toml
+    [tool.mutmut]
+    source_paths = [
+      "src/gitea/project/project.py",
+      "src/gitea/project/async_project.py",
+    ]
+    also_copy = ["scripts/", "src/"]
+    ```
+
 8. Open a Pull Request
 
     Clearly describe the motivation and scope of your change. Link it to the relevant issue if applicable.
