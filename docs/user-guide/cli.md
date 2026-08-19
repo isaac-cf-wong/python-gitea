@@ -65,7 +65,7 @@ command:
 
 - API commands report `status_code`.
 - Commands that page through the API add counts, such as `column_count` and
-  `issue_count` for `project issues`.
+  `issue_count` for `project issues` and `project show`.
 - `config` commands report `config_path`.
 - It is `{}` when the command made no call at all.
 
@@ -91,7 +91,8 @@ which command fetched it.
 
 A field the API cannot send is added only where it carries something the API has
 no way of saying, and is documented with the command that adds it: `column_id`
-on the project entries of `issue get` is the one today. It is never a second
+on the project entries of `issue get`, and `issue_count` and `issue_ids` on the
+columns of `project show`, are the ones today. Such a field is never a second
 name for a field already in the payload.
 
 Two consequences worth knowing:
@@ -305,6 +306,8 @@ gitea-cli project list --owner my-org --repository my-repo  # that repository's 
     - Optional: `--description`, `--card-type`, `--template-type`
 - `gitea-cli project list --owner <owner> [--repository <repo>]`
 - `gitea-cli project get --owner <owner> [--repository <repo>] --project-id <id>`
+- `gitea-cli project show --owner <owner> [--repository <repo>] --project-id <id>`
+    - Optional: `--full`
 - `gitea-cli project edit --owner <owner> [--repository <repo>] --project-id <id>`
     - Optional: `--title`, `--description`, `--state`, `--card-type`
 - `gitea-cli project delete --owner <owner> [--repository <repo>] --project-id <id>`
@@ -563,6 +566,30 @@ Show every card on a project together with the column it is in:
 ```bash
 gitea-cli project issues --owner my-org --project-id 1
 ```
+
+Read a board's shape in one call - the project, its columns, and how many cards
+sit in each of them. `project get` answers with the project alone, which says
+nothing about where the cards are:
+
+```console
+$ gitea-cli --output json project show --owner my-org --project-id 31
+{
+  "data": {
+    "project": { "id": 31, "title": "Board", "state": "open", ... },
+    "columns": [
+      { "id": 117, "title": "Working", ..., "issue_count": 2, "issue_ids": [1873, 1874] }
+    ]
+  },
+  "metadata": { "status_code": 200, "column_count": 1, "issue_count": 2 }
+}
+```
+
+Each column is the columns endpoint's own object with `issue_count` and
+`issue_ids` added to it, and `issue_ids` holds the global issue IDs the project
+endpoints take - `--issue-id` without `--issue-repository`. Add `--full` to have
+each column carry its issues themselves, under `issues`, rather than their IDs
+alone. Every page of columns, and of each column's issues, is walked, so the
+counts describe the whole board.
 
 Report what changed across two repositories and a board since the last run,
 quietly enough to be worth a `cron` entry:

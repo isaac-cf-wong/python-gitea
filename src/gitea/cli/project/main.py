@@ -31,10 +31,12 @@ def register_commands() -> None:
     from gitea.cli.project.issue.remove import remove_issue_command  # noqa: PLC0415
     from gitea.cli.project.issues import list_project_issues_command  # noqa: PLC0415
     from gitea.cli.project.list import list_command  # noqa: PLC0415
+    from gitea.cli.project.show import show_command  # noqa: PLC0415
 
     project_app.command("create", help="Create a project.")(create_command)
     project_app.command("list", help="List projects.")(list_command)
     project_app.command("get", help="Get a project.")(get_command)
+    project_app.command("show", help="Show a project with its columns and their card counts.")(show_command)
     project_app.command("edit", help="Edit a project.")(edit_command)
     project_app.command("delete", help="Delete a project.")(delete_command)
     project_app.command("issues", help="List a project's issues, grouped by column.")(list_project_issues_command)
