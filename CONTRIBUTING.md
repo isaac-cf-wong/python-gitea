@@ -120,7 +120,7 @@ submitting a pull request—this guide will help you get started.
     uv run python - <<'PY'
     import collections, json, pathlib
 
-    status = {0: "survived", 1: "killed", 3: "killed", 5: "no tests", None: "not checked"}
+    status = {0: "survived", 1: "killed", 3: "killed", 5: "no tests", 33: "no tests", None: "not checked"}
     for meta in sorted(pathlib.Path("mutants/src/gitea/project").glob("*.py.meta")):
         codes = json.loads(meta.read_text())["exit_code_by_key"]
         counts = collections.Counter(status.get(c, f"exit {c}") for c in codes.values())
@@ -143,11 +143,15 @@ submitting a pull request—this guide will help you get started.
 
     To scope what is _written_ as well, and get a counter whose denominator is
     the scope, point `source_paths` at the modules and let `also_copy` carry the
-    rest of the package that the tests import:
+    rest of the package that the tests import. Scoped to the same two modules as
+    above, that run reports mutating two files and counts `1272/1272`:
 
     ```toml
     [tool.mutmut]
-    source_paths = ["src/gitea/project/project.py"]
+    source_paths = [
+      "src/gitea/project/project.py",
+      "src/gitea/project/async_project.py",
+    ]
     also_copy = ["scripts/", "src/"]
     ```
 
