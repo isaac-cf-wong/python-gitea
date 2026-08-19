@@ -117,8 +117,8 @@ alias is never emitted, so it cannot appear in the JSON above.
 
 ## Option naming
 
-Every resource command addresses its target the same way, so an invocation can
-be written without reading `--help` first:
+Every command that addresses something an account owns names its target the same
+way, so an invocation can be written without reading `--help` first:
 
 | Option          | Meaning                                                  |
 | --------------- | -------------------------------------------------------- |
@@ -156,6 +156,11 @@ are required together because there is no scope for them to fall back to:
 `notification` is the one family where `--owner` is optional as well: given
 neither `--owner` nor `--repository` it acts on the authenticated user's
 notifications, and the two must be passed together or not at all.
+
+A command whose target is an account rather than something an account owns takes
+no `--owner` at all, and names the account with `--username` instead: `org list`
+lists an account's organizations and `user get` reads an account's profile, both
+answering for the account the token belongs to when `--username` is omitted.
 
 `repo list` is the one command where the _kind_ of owner matters: Gitea serves
 an organization's repositories and a user's at different endpoints, so
