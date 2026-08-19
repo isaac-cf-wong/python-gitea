@@ -38,8 +38,8 @@ from typer.testing import CliRunner
 from gitea.cli.main import app
 from gitea.watch.state import STATE_FILE_ENV
 from tests.cli.envelope import parse_envelope
-from tests.cli.transport import NO_CONTENT, RoutedSession
 from tests.cli.tree import leaf_commands
+from tests.transport import NO_CONTENT, RoutedSession
 
 runner = CliRunner()
 

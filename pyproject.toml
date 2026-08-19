@@ -88,13 +88,17 @@ packages = ["src/gitea"]
 source_paths = ["src/gitea/"]
 also_copy = ["scripts/"]
 # mutmut runs the suite against a rewritten copy of each module, in which every
-# mutated function is replaced by a table of its variants. A test asserting on the
-# *text* of a module therefore reads the instrumentation rather than the code, and
-# fails for every mutant - a red baseline, which reports every mutant as killed.
-# The one such test is deselected here, and is run by `pytest` as usual.
+# mutated function is replaced by a table of its variants. A test reading a module
+# rather than calling it therefore reads the instrumentation rather than the code,
+# and fails for every mutant - a red baseline, which reports every mutant as
+# killed. Two do: one asserts on the *text* of a module, the other enumerates the
+# methods of a class, which the variants are bound to as members of. Both are
+# deselected here, and are run by `pytest` as usual.
 pytest_add_cli_args = [
   "--deselect",
   "tests/utils/test_utils_pagination.py::TestEndOfListing::test_the_walkers_decide_nothing_of_their_own",
+  "--deselect",
+  "tests/project/test_project_requests.py::test_every_project_method_is_declared",
 ]
 # A mutant is judged to hang when its tests exceed `timeout_multiplier` times what
 # they took clean, plus this constant. Most tests here take a millisecond or two,

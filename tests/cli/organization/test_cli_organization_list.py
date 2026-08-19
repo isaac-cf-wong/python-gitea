@@ -18,7 +18,7 @@ from typer.testing import CliRunner
 from gitea.cli.main import app
 from gitea.cli.organization.list import list_command
 from tests.cli.envelope import parse_envelope
-from tests.cli.transport import RecordingSession
+from tests.transport import RecordingSession
 
 runner = CliRunner()
 

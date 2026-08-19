@@ -12,7 +12,7 @@ from gitea.cli.main import app
 from gitea.cli.notification.list import list_command
 from gitea.cli.notification.read import read_command
 from tests.cli.rendering import unrendered
-from tests.cli.transport import RecordingSession
+from tests.transport import RecordingSession
 
 runner = CliRunner()
 
