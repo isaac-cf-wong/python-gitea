@@ -224,19 +224,59 @@ def find_card_column_id(
             column_id = _identifier(column)
             if column_id is None:
                 continue
-            for issues, _ in iter_pages(
-                lambda page, column_id=column_id: client.project.list_project_column_issues(
-                    owner=owner,
-                    repository=repository,
-                    project_id=project_id,
-                    column_id=column_id,
-                    page=page,
-                    limit=PAGE_SIZE,
-                )
+            if column_holds_card(
+                client=client,
+                owner=owner,
+                repository=repository,
+                project_id=project_id,
+                column_id=column_id,
+                issue_id=issue_id,
             ):
-                if _holds_issue(issues, issue_id):
-                    return column_id
+                return column_id
     return None
+
+
+def column_holds_card(
+    *,
+    client: Gitea,
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    column_id: int,
+    issue_id: int,
+) -> bool:
+    """Report whether one column of a project holds an issue's card.
+
+    The single column the board walk above asks about, asked on its own: a caller
+    that already knows which column it means - one confirming a card arrived
+    where it was sent - pays for that column's listing rather than the board's.
+
+    Args:
+        client: The Gitea client used for the lookup.
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        column_id: The ID of the column.
+        issue_id: The global ID of the issue.
+
+    Returns:
+        True when a card for the issue is in that column.
+
+    """
+    for issues, _ in iter_pages(
+        lambda page: client.project.list_project_column_issues(
+            owner=owner,
+            repository=repository,
+            project_id=project_id,
+            column_id=column_id,
+            page=page,
+            limit=PAGE_SIZE,
+        )
+    ):
+        if _holds_issue(issues, issue_id):
+            return True
+    return False
 
 
 async def resolve_async_project_column_ids(
@@ -328,16 +368,52 @@ async def find_async_card_column_id(
             column_id = _identifier(column)
             if column_id is None:
                 continue
-            async for issues, _ in iter_async_pages(
-                lambda page, column_id=column_id: client.project.list_project_column_issues(
-                    owner=owner,
-                    repository=repository,
-                    project_id=project_id,
-                    column_id=column_id,
-                    page=page,
-                    limit=PAGE_SIZE,
-                )
+            if await async_column_holds_card(
+                client=client,
+                owner=owner,
+                repository=repository,
+                project_id=project_id,
+                column_id=column_id,
+                issue_id=issue_id,
             ):
-                if _holds_issue(issues, issue_id):
-                    return column_id
+                return column_id
     return None
+
+
+async def async_column_holds_card(
+    *,
+    client: AsyncGitea,
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    column_id: int,
+    issue_id: int,
+) -> bool:
+    """Report whether one column of a project holds an issue's card.
+
+    Args:
+        client: The asynchronous Gitea client used for the lookup.
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        column_id: The ID of the column.
+        issue_id: The global ID of the issue.
+
+    Returns:
+        True when a card for the issue is in that column.
+
+    """
+    async for issues, _ in iter_async_pages(
+        lambda page: client.project.list_project_column_issues(
+            owner=owner,
+            repository=repository,
+            project_id=project_id,
+            column_id=column_id,
+            page=page,
+            limit=PAGE_SIZE,
+        )
+    ):
+        if _holds_issue(issues, issue_id):
+            return True
+    return False

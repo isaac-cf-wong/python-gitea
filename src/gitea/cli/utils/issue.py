@@ -17,6 +17,15 @@ of which there is none, and Gitea answers that with a success and an empty body.
 `run_project_issue_move` therefore finds the card before moving it, and reports
 its absence itself - a success that moved nothing is the one failure a caller
 cannot see.
+
+Looking before the move is what makes the failure legible; reading the card back
+afterwards is what makes the success true. The status code says only that the
+request was accepted, so the move is followed by a listing of the target column,
+and the command exits zero having seen the card there rather than having assumed
+it. Neither half makes the pair atomic - Gitea has no conditional move, so a card
+taken off the board between the two reads is still a card the command has
+reported on - and the messages say which of "no card", "not where it was sent"
+and "could not be confirmed" happened rather than collapsing them into one.
 """
 
 from __future__ import annotations
@@ -27,7 +36,7 @@ from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError, RequestException, Timeout
 
 from gitea.cli.utils.errors import CommandError, request_failed_message, unreachable_message
-from gitea.issue.project_column import find_card_column_id
+from gitea.issue.project_column import column_holds_card, find_card_column_id
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -323,6 +332,55 @@ def _issue_label(owner: str, issue_number: int, issue_id: int, issue_repository:
     return f"issue #{issue_number} of {owner}/{issue_repository} (global ID {issue_id})"
 
 
+def _repository_option(repository: str | None) -> str:
+    """Render the option naming the repository holding the board, for a suggested command.
+
+    Args:
+        repository: The name of the repository holding the project, or None for
+            an organization project, which the option is absent for.
+
+    Returns:
+        The option, ready to append to a command line, or the empty string.
+
+    """
+    return f" --repository {repository}" if repository is not None else ""
+
+
+def _add_command(
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    column_id: int,
+    issue_number: int,
+    issue_repository: str | None,
+) -> str:
+    """Build the `project issue add` command line a message tells the user to run.
+
+    Built in one place because two messages suggest it, and an option missing
+    from one of them - the repository holding the board, or the one holding the
+    issue, without which `--issue-id` is read as a global ID - is a command line
+    that addresses something other than what the message just named.
+
+    Args:
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        column_id: The column to add the issue to.
+        issue_number: The value the user passed as --issue-id.
+        issue_repository: The name of the repository holding the issue, if known.
+
+    Returns:
+        The command line, without a shell quoting of its own.
+
+    """
+    issue_repository_option = f" --issue-repository {issue_repository}" if issue_repository is not None else ""
+    return (
+        f"gitea-cli project issue add --owner {owner}{_repository_option(repository)} "
+        f"--project-id {project_id} --column-id {column_id} --issue-id {issue_number}{issue_repository_option}"
+    )
+
+
 def _not_on_board_message(
     owner: str,
     repository: str | None,
@@ -348,14 +406,12 @@ def _not_on_board_message(
         The message describing the failure and how to act on it.
 
     """
-    repository_option = f" --repository {repository}" if repository is not None else ""
-    issue_repository_option = f" --issue-repository {issue_repository}" if issue_repository is not None else ""
     return (
         f"No column of project {project_id} holds {_issue_label(owner, issue_number, issue_id, issue_repository)}, "
         f"so there is no card to move. Gitea's move endpoint answers such a call with a success and does nothing, "
         f"which is why this is reported here rather than passed on. "
-        f"Put the issue on the board with 'gitea-cli project issue add --owner {owner}{repository_option} "
-        f"--project-id {project_id} --column-id {column_id} --issue-id {issue_number}{issue_repository_option}', "
+        f"Put the issue on the board with "
+        f"'{_add_command(owner, repository, project_id, column_id, issue_number, issue_repository)}', "
         f"or pass --add-if-missing to have this command do that when there is no card yet."
     )
 
@@ -397,7 +453,7 @@ def _unreadable_board_message(
         f"The board's columns and their cards are listed to find the card before it is moved, because Gitea's move "
         f"endpoint reports success without doing anything when there is no card to move. "
         f"Check that --project-id names a project of {where} and that the account may read it; "
-        f"run 'gitea-cli project list --owner {owner}' to see the projects in use."
+        f"run 'gitea-cli project list --owner {owner}{_repository_option(repository)}' to see the projects in use."
     )
 
 
@@ -407,6 +463,8 @@ def _sorting_unavailable_message(
     project_id: int,
     column_id: int,
     issue_number: int,
+    issue_id: int,
+    issue_repository: str | None,
 ) -> str:
     """Build the error message for a --sorting the add this move fell back to cannot carry.
 
@@ -424,18 +482,19 @@ def _sorting_unavailable_message(
         project_id: The ID of the project.
         column_id: The column the move was to.
         issue_number: The value the user passed as --issue-id.
+        issue_id: The global issue ID the board was searched for.
+        issue_repository: The name of the repository holding the issue, if known.
 
     Returns:
         The message describing the failure and how to act on it.
 
     """
-    repository_option = f" --repository {repository}" if repository is not None else ""
     return (
-        f"--sorting cannot be applied while putting issue {issue_number} on project {project_id}: it positions a "
+        f"--sorting cannot be applied while putting "
+        f"{_issue_label(owner, issue_number, issue_id, issue_repository)} on project {project_id}: it positions a "
         f"card among the cards already in a column, and the endpoint that puts one on a board takes no position. "
-        f"Run 'gitea-cli project issue add --owner {owner}{repository_option} --project-id {project_id} "
-        f"--column-id {column_id} --issue-id {issue_number}' and then this command with --sorting, or drop "
-        f"--sorting to have the card placed where the instance puts it."
+        f"Run '{_add_command(owner, repository, project_id, column_id, issue_number, issue_repository)}' and then "
+        f"this command with --sorting, or drop --sorting to have the card placed where the instance puts it."
     )
 
 
@@ -492,6 +551,185 @@ def _card_column_id(
         raise CommandError(request_failed_message(e, client.base_url)) from e
 
 
+def _card_absent_message(
+    action: str,
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    column_id: int,
+    issue_number: int,
+    issue_id: int,
+    issue_repository: str | None,
+) -> str:
+    """Build the error message for a call that reported success and left no card behind.
+
+    Args:
+        action: The verb describing the call that was made.
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        column_id: The column the card was sent to.
+        issue_number: The value the user passed as --issue-id.
+        issue_id: The global issue ID the call was made with.
+        issue_repository: The name of the repository holding the issue, if known.
+
+    Returns:
+        The message describing the failure and how to act on it.
+
+    """
+    return (
+        f"Gitea reported the {action} of {_issue_label(owner, issue_number, issue_id, issue_repository)} on project "
+        f"{project_id} as a success, but column {column_id} holds no card for it afterwards, so the card is not "
+        f"where it was sent. A success that changed nothing is what this endpoint answers with when there was "
+        f"nothing for it to do: --column-id may name a column of another project, or the card may have been taken "
+        f"off the board while the command ran. "
+        f"Check the board's columns with 'gitea-cli project column list --owner {owner}"
+        f"{_repository_option(repository)} --project-id {project_id}'."
+    )
+
+
+def _unconfirmed_card_message(
+    detail: str,
+    action: str,
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    column_id: int,
+    issue_number: int,
+    issue_id: int,
+    issue_repository: str | None,
+) -> str:
+    """Build the error message for a call that was made and could not then be confirmed.
+
+    The call is reported as unconfirmed rather than as failed, because it was
+    made and answered: what is not known is whether it did anything. Saying it
+    failed would be as wrong as the success this check exists to distrust, in the
+    other direction, so the message says which of the two is unknown and names
+    the command that settles it.
+
+    Args:
+        detail: The description of the failure of the confirming lookup.
+        action: The verb describing the call that was made.
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        column_id: The column the card was sent to.
+        issue_number: The value the user passed as --issue-id.
+        issue_id: The global issue ID the call was made with.
+        issue_repository: The name of the repository holding the issue, if known.
+
+    Returns:
+        The message describing the failure and how to act on it.
+
+    """
+    return (
+        f"The {action} of {_issue_label(owner, issue_number, issue_id, issue_repository)} on project {project_id} "
+        f"was made and reported success, but the card could not then be confirmed in column {column_id}: {detail}. "
+        f"Whether the card is there is therefore unknown, not known to be wrong. "
+        f"Read the column with 'gitea-cli project column issues --owner {owner}{_repository_option(repository)} "
+        f"--project-id {project_id} --column-id {column_id}' before repeating the command."
+    )
+
+
+def _confirm_card_in_column(
+    *,
+    client: Gitea,
+    action: str,
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    column_id: int,
+    issue_number: int,
+    issue_id: int,
+    issue_repository: str | None,
+) -> None:
+    """Confirm the card reached the column it was sent to.
+
+    The status code of the call is not evidence that it did anything: this
+    endpoint answers a move it had nothing to move with a success, which is the
+    whole reason the commands here look before they leap. Looking afterwards is
+    the other half of it, and the stronger half - it is the card's position that
+    was asked for, and reading it back is the only thing that establishes it.
+    Between them, a command that exits zero has had the card's presence in the
+    target column confirmed rather than inferred.
+
+    What this cannot do is make the call and the confirmation one operation.
+    Gitea offers no conditional move, so a card taken off the board after the
+    confirming read is a card the command has already reported on; the window is
+    narrowed to that read, not closed. Nothing here pretends otherwise.
+
+    Args:
+        client: The Gitea client used for the lookup.
+        action: The verb describing the call that was made.
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        column_id: The column the card was sent to.
+        issue_number: The value the user passed as --issue-id.
+        issue_id: The global issue ID the call was made with.
+        issue_repository: The name of the repository holding the issue, if known.
+
+    Raises:
+        CommandError: If the column holds no card for the issue, or if the
+            lookup that would have confirmed one could not be made.
+
+    """
+    try:
+        landed = column_holds_card(
+            client=client,
+            owner=owner,
+            repository=repository,
+            project_id=project_id,
+            column_id=column_id,
+            issue_id=issue_id,
+        )
+    except HTTPError as e:
+        detail = _describe(_status_code_of(e), e)
+        raise CommandError(
+            _unconfirmed_card_message(
+                detail, action, owner, repository, project_id, column_id, issue_number, issue_id, issue_repository
+            )
+        ) from e
+    except (RequestsConnectionError, Timeout) as e:
+        raise CommandError(
+            _unconfirmed_card_message(
+                f"the instance at {client.base_url} could not be reached ({e})",
+                action,
+                owner,
+                repository,
+                project_id,
+                column_id,
+                issue_number,
+                issue_id,
+                issue_repository,
+            )
+        ) from e
+    except RequestException as e:
+        raise CommandError(
+            _unconfirmed_card_message(
+                f"the request did not complete ({type(e).__name__}: {e})",
+                action,
+                owner,
+                repository,
+                project_id,
+                column_id,
+                issue_number,
+                issue_id,
+                issue_repository,
+            )
+        ) from e
+
+    if not landed:
+        raise CommandError(
+            _card_absent_message(
+                action, owner, repository, project_id, column_id, issue_number, issue_id, issue_repository
+            )
+        )
+
+
 def run_project_issue_move(
     *,
     client: Gitea,
@@ -504,7 +742,7 @@ def run_project_issue_move(
     issue_repository: str | None,
     add_if_missing: bool,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Move an issue's card to a column of a project, having first found the card.
+    """Move an issue's card to a column of a project, and confirm it arrived.
 
     Gitea's move endpoint moves the row relating an issue to a project, and an
     issue that is not on the project has no such row: the endpoint answers the
@@ -515,6 +753,13 @@ def run_project_issue_move(
     the command either says so or, with `add_if_missing`, puts the issue in the
     target column instead - which is what `project issue add` does, and the only
     way to get a card there in one call.
+
+    Whichever call was made, the target column is then read back, because the
+    success it answered with is the thing this endpoint has already been shown
+    not to mean. Returning normally therefore says the card was seen in
+    `column_id`, not that Gitea accepted a request to put it there. It does not
+    say the card is still there: the two reads are separate requests, and no
+    conditional move exists to make them one.
 
     Args:
         client: The Gitea client to call.
@@ -537,8 +782,9 @@ def run_project_issue_move(
     Raises:
         CommandError: If the issue could not be resolved, the board could not be
             read, the issue has no card on the project and `add_if_missing` is
-            not set, the call was refused, the instance could not be reached, or
-            the request failed without reaching a response.
+            not set, the call was refused, the card is not in `column_id`
+            afterwards or could not be confirmed there, the instance could not be
+            reached, or the request failed without reaching a response.
 
     """
     issue_id = resolve_issue_id(client=client, owner=owner, repository=issue_repository, issue_number=issue_number)
@@ -583,7 +829,11 @@ def run_project_issue_move(
             )
     else:
         if sorting is not None:
-            raise CommandError(_sorting_unavailable_message(owner, repository, project_id, column_id, issue_number))
+            raise CommandError(
+                _sorting_unavailable_message(
+                    owner, repository, project_id, column_id, issue_number, issue_id, issue_repository
+                )
+            )
         action = "add"
 
         def call(resolved_issue_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -604,7 +854,7 @@ def run_project_issue_move(
                 issue_id=resolved_issue_id,
             )
 
-    return _run_resolved_call(
+    data, metadata = _run_resolved_call(
         client=client,
         call=call,
         action=action,
@@ -614,3 +864,15 @@ def run_project_issue_move(
         issue_id=issue_id,
         issue_repository=issue_repository,
     )
+    _confirm_card_in_column(
+        client=client,
+        action=action,
+        owner=owner,
+        repository=repository,
+        project_id=project_id,
+        column_id=column_id,
+        issue_number=issue_number,
+        issue_id=issue_id,
+        issue_repository=issue_repository,
+    )
+    return data, metadata

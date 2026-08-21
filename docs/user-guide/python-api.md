@@ -117,6 +117,11 @@ the row relating an issue to a project, and for an issue that is not on the
 project there is none to move, so the call comes back a success having done
 nothing.
 
+`column_holds_card` is the same question about a single named column, at the
+cost of that column's listing rather than the board's — which is what the walk
+above asks per column, and what the same command asks again after the move to
+confirm the card arrived. `async_column_holds_card` is its `await`-based twin.
+
 ## Asynchronous Client
 
 The `AsyncGitea` client has the same structure but `await`-based, and it uses

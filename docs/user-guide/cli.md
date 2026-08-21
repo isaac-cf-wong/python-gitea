@@ -321,9 +321,10 @@ gitea-cli project list --owner my-org --repository my-repo  # that repository's 
     - Optional: `--issue-repository`
 - `gitea-cli project issue move --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
     - Optional: `--sorting`, `--issue-repository`, `--add-if-missing`
-    - Moves the card the issue already has on the project. An issue with no card
-      there is reported as an error naming `project issue add`;
-      `--add-if-missing` has this command put it in `--column-id` instead.
+    - Moves the card the issue already has on the project, and confirms it
+      arrived in `--column-id`. An issue with no card there is reported as an
+      error naming `project issue add`; `--add-if-missing` has this command put
+      it in `--column-id` instead.
 - `gitea-cli project issue remove --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
     - Optional: `--issue-repository`
 
@@ -364,6 +365,16 @@ created in `--column-id` when it does not. `--sorting` is refused on that second
 path rather than dropped, since the endpoint putting a card on a board takes no
 position within the column. A board that cannot be read is reported as such and
 stops the move: a failed lookup is not evidence that the issue has no card.
+
+Whichever call is made, `--column-id` is then read back, because the success the
+endpoint answers with has already been shown not to mean the card went anywhere.
+A zero exit status therefore says the card was seen in that column, rather than
+that Gitea accepted a request to put it there - and the three ways that can fail
+are reported apart: the issue has no card at all, the card is not in the column
+it was sent to, or the reading back could not be done and it is unknown which.
+It does not say the card is still there: the calls are separate requests, and
+Gitea has no conditional move to make them one, so a card taken off the board
+after the command read it is outside what any client can report on.
 
 The global ID the command used comes back as `metadata.resolved_issue_id`. A
 number the repository does not have, and a call the project endpoint refuses,
