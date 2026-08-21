@@ -320,7 +320,10 @@ gitea-cli project list --owner my-org --repository my-repo  # that repository's 
 - `gitea-cli project issue add --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
     - Optional: `--issue-repository`
 - `gitea-cli project issue move --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
-    - Optional: `--sorting`, `--issue-repository`
+    - Optional: `--sorting`, `--issue-repository`, `--add-if-missing`
+    - Moves the card the issue already has on the project. An issue with no card
+      there is reported as an error naming `project issue add`;
+      `--add-if-missing` has this command put it in `--column-id` instead.
 - `gitea-cli project issue remove --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
     - Optional: `--issue-repository`
 
@@ -337,6 +340,30 @@ for you:
   address the issue by number; without it, `--issue-id` is read as the global
   ID. `--issue-repository` also overrides `--repository`, for the case of a
   repository project holding an issue from elsewhere.
+
+`add` and `move` are not two ways of doing the same thing. `add` puts an issue
+on a board, giving it a card in a column; `move` relocates the card it already
+has there, and an issue with no card has nothing to relocate. Gitea's move
+endpoint does not say so - it moves the row relating the issue to the project,
+of which there is none, and answers with a success and an empty body having
+moved nothing - so the command finds the card first and reports its absence
+itself:
+
+```console
+$ gitea-cli project issue move --owner my-org --project-id 1 --column-id 2 \
+      --issue-repository my-repo --issue-id 42
+No column of project 1 holds issue #42 of my-org/my-repo (global ID 1854), so there is
+no card to move. [...] Put the issue on the board with 'gitea-cli project issue add
+--owner my-org --project-id 1 --column-id 2 --issue-id 42 --issue-repository my-repo',
+or pass --add-if-missing to have this command do that when there is no card yet.
+```
+
+`--add-if-missing` makes the one call do either, which is what a script
+advancing cards through columns wants: the card is moved when it exists and
+created in `--column-id` when it does not. `--sorting` is refused on that second
+path rather than dropped, since the endpoint putting a card on a board takes no
+position within the column. A board that cannot be read is reported as such and
+stops the move: a failed lookup is not evidence that the issue has no card.
 
 The global ID the command used comes back as `metadata.resolved_issue_id`. A
 number the repository does not have, and a call the project endpoint refuses,
@@ -527,8 +554,8 @@ gitea-cli issue create \
     --milestone 3
 ```
 
-Move an issue into a project column, addressing it by the number shown in the
-web UI:
+Put an issue on a project board, in a column of it, addressing the issue by the
+number shown in the web UI:
 
 ```bash
 gitea-cli project issue add \
@@ -539,8 +566,9 @@ gitea-cli project issue add \
     --issue-id 42
 ```
 
-Move `my-repo#42` on an organization project, where the repository holding the
-issue has to be named separately:
+Move the card of `my-repo#42` on an organization project, where the repository
+holding the issue has to be named separately, and put it on the board if it is
+not there yet:
 
 ```bash
 gitea-cli project issue move \
@@ -548,7 +576,8 @@ gitea-cli project issue move \
     --project-id 1 \
     --column-id 2 \
     --issue-repository my-repo \
-    --issue-id 42
+    --issue-id 42 \
+    --add-if-missing
 ```
 
 List the issues sitting in one column of an organization project (omit

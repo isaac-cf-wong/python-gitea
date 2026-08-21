@@ -425,6 +425,9 @@ CONTRACTS = (
         path=("project", "issue", "move"),
         args=(*BOARD, "--column-id", "117", "--issue-id", "1873"),
         payload=NO_CONTENT,
+        # The board is walked before the move: an issue with no card on the
+        # project has nothing to move, and Gitea reports that as a success.
+        routes=BOARD_ROUTES,
         data={},
     ),
     Contract(

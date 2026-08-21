@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from requests import ConnectionError as RequestsConnectionError
-from requests import HTTPError
+from requests import HTTPError, RequestException
 from typer.testing import CliRunner
 
 from gitea.cli.main import app
@@ -20,7 +20,9 @@ from gitea.cli.project.issue.move import move_issue_command
 from gitea.cli.project.issue.remove import remove_issue_command
 from gitea.cli.project.list import list_command
 from gitea.cli.utils.errors import CommandError
+from tests.board import paged_columns, paged_issues
 from tests.cli.rendering import unrendered
+from tests.transport import RoutedSession
 
 runner = CliRunner()
 
@@ -36,6 +38,44 @@ ISSUE_COMMANDS = [
 def make_ctx():
     """Create a mock context object."""
     return SimpleNamespace(obj={"config_path": "/tmp/config"})
+
+
+def board(client, cards, *, project_id=1):
+    """Answer the client's board listings with the given columns and the cards on them.
+
+    `project issue move` finds the issue's card before moving it, so a client
+    standing in for the instance has to describe a board and not only answer the
+    move: a `MagicMock` whose listings answer with mocks describes none.
+
+    Args:
+        client: The mock client to attach the listings to.
+        cards: Mapping of column ID to the global IDs of the issues carded in it.
+        project_id: The project the columns belong to.
+
+    """
+    client.project.list_project_columns.side_effect = paged_columns(
+        {project_id: [[{"id": column_id} for column_id in cards]]}
+    )
+    client.project.list_project_column_issues.side_effect = paged_issues(
+        {column_id: [[{"id": issue_id} for issue_id in issue_ids]] for column_id, issue_ids in cards.items()}
+    )
+
+
+# The column a card starts in, which is never the column the commands under test
+# move it to: a move within one column would pass whether or not it was made.
+CARDED_COLUMN = 5
+
+
+def carded(client, issue_id, *, project_id=1):
+    """Answer the board listings with a project one column of which holds the issue's card.
+
+    Args:
+        client: The mock client to attach the listings to.
+        issue_id: The global ID of the issue whose card is on the board.
+        project_id: The project holding the card.
+
+    """
+    board(client, {CARDED_COLUMN: (issue_id,)}, project_id=project_id)
 
 
 def make_http_error(status_code):
@@ -379,6 +419,7 @@ def test_move_issue_command(mock_gitea, mock_get_auth_params, mock_execute):
     client = MagicMock()
     client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
     client.project.move_project_issue.return_value = ({}, {"status_code": 204})
+    carded(client, 1854)
     mock_gitea.return_value.__enter__.return_value = client
 
     move_issue_command(
@@ -453,6 +494,7 @@ def test_move_issue_command_org(mock_gitea, mock_get_auth_params, mock_execute):
 
     client = MagicMock()
     client.project.move_project_issue.return_value = ({}, {"status_code": 204})
+    carded(client, 1854)
     mock_gitea.return_value.__enter__.return_value = client
 
     move_issue_command(
@@ -549,6 +591,7 @@ def test_move_issue_command_api_failure(mock_gitea, mock_get_auth_params, mock_e
     client = MagicMock()
     client.issue.get_issue.return_value = ({"id": 1854, "number": 15}, {"status_code": 200})
     client.project.move_project_issue.side_effect = make_http_error(404)
+    carded(client, 1854)
     mock_gitea.return_value.__enter__.return_value = client
 
     move_issue_command(
@@ -636,6 +679,7 @@ def test_move_issue_command_org_with_issue_repository(mock_gitea, mock_get_auth_
     client = MagicMock()
     client.issue.get_issue.return_value = ({"id": 1877, "number": 38}, {"status_code": 200})
     client.project.move_project_issue.return_value = ({}, {"status_code": 204})
+    carded(client, 1877)
     mock_gitea.return_value.__enter__.return_value = client
 
     move_issue_command(
@@ -674,6 +718,7 @@ def test_issue_command_issue_repository_overrides_repository(
     client = MagicMock()
     client.issue.get_issue.return_value = ({"id": 1877, "number": 38}, {"status_code": 200})
     getattr(client.project, method).return_value = ({}, {"status_code": status_code})
+    carded(client, 1877)
     mock_gitea.return_value.__enter__.return_value = client
 
     command(
@@ -709,6 +754,7 @@ def test_move_issue_command_org_failure_suggests_issue_repository(mock_gitea, mo
 
     client = MagicMock()
     client.project.move_project_issue.side_effect = make_http_error(404)
+    carded(client, 38)
     mock_gitea.return_value.__enter__.return_value = client
 
     move_issue_command(
@@ -755,6 +801,7 @@ def test_move_issue_reports_failures_without_a_traceback(
     client.base_url = "https://gitea.example.com"
     client.issue.get_issue.return_value = ({"id": 1877, "number": 38}, {"status_code": 200})
     client.project.move_project_issue.side_effect = error
+    carded(client, 1877)
     mock_gitea.return_value.__enter__.return_value = client
 
     result = runner.invoke(
@@ -794,3 +841,278 @@ def test_move_issue_reports_failures_without_a_traceback(
     # unhandled-exception path would add.
     assert "Traceback" not in result.stderr
     assert unrendered("Error executing") not in message
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_reports_an_issue_with_no_card(mock_gitea, mock_get_auth_params, mock_execute):
+    """move_issue_command should refuse to move an issue that has no card on the project.
+
+    Gitea's move endpoint moves the row relating the issue to the project, and
+    an issue that is not on the project has none: the call comes back `200` with
+    an empty body having moved nothing, so a caller reading the status believes a
+    card is on a board that has none. The move is therefore not attempted at all.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    # What the endpoint really answers a move of an uncarded issue with: a
+    # success and an empty body, having moved nothing. Answering it here is what
+    # makes this test about the no-op rather than about an unstubbed call.
+    client.project.move_project_issue.return_value = ({}, {"status_code": 200})
+    # The board has a column and the column has a card, but not this issue's.
+    board(client, {CARDED_COLUMN: (1900,)})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        issue_id=100,
+        column_id=6,
+        sorting=None,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError) as error:
+        mock_execute.call_args[1]["api_call"]()
+
+    message = str(error.value)
+    # The issue as the user addressed it, and the two ways out: the command that
+    # puts an issue on a board, and the option that has this one do it.
+    assert "#100 of owner/repo" in message
+    assert "global ID 1854" in message
+    assert "project issue add" in message
+    assert "--add-if-missing" in message
+    client.project.move_project_issue.assert_not_called()
+    client.project.add_issue_to_project_column.assert_not_called()
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_adds_the_issue_when_it_has_no_card(mock_gitea, mock_get_auth_params, mock_execute):
+    """--add-if-missing should put an uncarded issue in the target column instead of failing."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    client.project.add_issue_to_project_column.return_value = ({}, {"status_code": 201})
+    client.project.move_project_issue.return_value = ({}, {"status_code": 200})
+    board(client, {CARDED_COLUMN: (1900,)})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        issue_id=100,
+        column_id=6,
+        sorting=None,
+        add_if_missing=True,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    result = mock_execute.call_args[1]["api_call"]()
+    # The column the move was to, which is where the card has to end up: adding
+    # it to the column it came from would be the no-op under another name.
+    client.project.add_issue_to_project_column.assert_called_once_with(
+        owner="owner", repository="repo", project_id=1, column_id=6, issue_id=1854
+    )
+    client.project.move_project_issue.assert_not_called()
+    assert result == ({}, {"status_code": 201, "resolved_issue_id": 1854})
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_moves_a_carded_issue_with_add_if_missing(mock_gitea, mock_get_auth_params, mock_execute):
+    """--add-if-missing should not change what happens to an issue that does have a card."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    client.project.move_project_issue.return_value = ({}, {"status_code": 204})
+    carded(client, 1854)
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        issue_id=100,
+        column_id=6,
+        sorting=2,
+        add_if_missing=True,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    result = mock_execute.call_args[1]["api_call"]()
+    client.project.move_project_issue.assert_called_once_with(
+        owner="owner", repository="repo", project_id=1, issue_id=1854, column_id=6, sorting=2
+    )
+    client.project.add_issue_to_project_column.assert_not_called()
+    assert result == ({}, {"status_code": 204, "resolved_issue_id": 1854})
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_refuses_a_sorting_the_add_cannot_carry(mock_gitea, mock_get_auth_params, mock_execute):
+    """--sorting should be refused rather than dropped when there is no card and one is added.
+
+    `--sorting` positions a card among the cards already in a column, and the
+    endpoint that puts a card on a board takes no position. Accepting the option
+    and adding the card anyway would report a request carried out that was not.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    client.project.move_project_issue.return_value = ({}, {"status_code": 200})
+    client.project.add_issue_to_project_column.return_value = ({}, {"status_code": 201})
+    board(client, {CARDED_COLUMN: (1900,)})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        issue_id=100,
+        column_id=6,
+        sorting=3,
+        add_if_missing=True,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError, match="--sorting"):
+        mock_execute.call_args[1]["api_call"]()
+    client.project.add_issue_to_project_column.assert_not_called()
+    client.project.move_project_issue.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        pytest.param(make_http_error(403), "Gitea returned HTTP 403", id="refused"),
+        pytest.param(
+            RequestsConnectionError("Failed to establish a new connection: [Errno 111] Connection refused"),
+            "Could not reach the Gitea API",
+            id="unreachable",
+        ),
+        pytest.param(
+            RequestException("Invalid URL 'columns': No scheme supplied"),
+            "Could not complete the request to the Gitea API",
+            id="incomplete",
+        ),
+    ],
+)
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_move_issue_command_reports_a_board_it_could_not_read(
+    mock_gitea, mock_get_auth_params, mock_execute, error, expected
+):
+    """A board that could not be read should be reported as such, and stop the move.
+
+    The two answers have to stay apart: a lookup that failed says nothing about
+    whether the issue has a card, so reporting it as uncarded would be a claim
+    the failure does not support, and moving anyway would be the silent no-op the
+    lookup is there to prevent.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.base_url = "https://gitea.example.com"
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    client.project.move_project_issue.return_value = ({}, {"status_code": 200})
+    client.project.list_project_columns.side_effect = error
+    mock_gitea.return_value.__enter__.return_value = client
+
+    move_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        issue_id=100,
+        column_id=6,
+        sorting=None,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError) as raised:
+        mock_execute.call_args[1]["api_call"]()
+
+    message = str(raised.value)
+    assert expected in message
+    assert "project issue add" not in message
+    client.project.move_project_issue.assert_not_called()
+    client.project.add_issue_to_project_column.assert_not_called()
+
+
+@patch("gitea.client.gitea.requests.Session")
+def test_move_issue_sends_no_move_request_for_an_issue_with_no_card(mock_session):
+    """No request should reach the move endpoint for an issue the board has no card for.
+
+    The assertions above are made against a client; this one is made against the
+    session the real client builds its requests on, so what is pinned is that the
+    request Gitea would have answered with a success and a no-op is never sent.
+    """
+    session = RoutedSession(
+        routes=(
+            # A column of the board, holding a card - for another issue.
+            (f"/columns/{CARDED_COLUMN}/issues", [{"id": 1900}]),
+            ("/columns", [{"id": CARDED_COLUMN}]),
+        ),
+        # What the issue lookup is answered with: the global ID of `#100`.
+        payload={"id": 1854, "number": 100},
+    )
+    mock_session.return_value = session
+
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "issue",
+            "move",
+            "--owner",
+            "owner",
+            "--repository",
+            "repo",
+            "--project-id",
+            "1",
+            "--column-id",
+            "6",
+            "--issue-id",
+            "100",
+            "--token",
+            "tok",
+            "--base-url",
+            "https://gitea.invalid",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert not [url for url in session.urls if url.endswith("/move")], session.urls

@@ -27,6 +27,13 @@ lookup - a refusal, a transport error, a timeout - is logged and leaves that
 project's ``column_id`` at None instead of failing the issue whose payload the
 caller already has in hand. ``column_id`` is therefore always present on a
 project entry, and None means "not resolved" as much as it means "no card".
+
+That last part is the enrichment's choice and not the walk's: ``find_card_column_id``
+raises what the lookup raised and returns None only for a board no column of which
+lists the issue. It is the answer to "has this issue a card on this project, and
+where" wherever that has to be told apart from "the board could not be read" -
+the project issue commands ask it before moving a card, because Gitea's move
+endpoint reports success without doing anything when there is no card to move.
 """
 
 from __future__ import annotations
@@ -165,7 +172,7 @@ def resolve_project_column_ids(
         project_id = _identifier(project)
         if project_id is not None and issue_id is not None:
             try:
-                column_id = _find_column_id(
+                column_id = find_card_column_id(
                     client=client,
                     owner=owner,
                     repository=_column_scope_repository(project, repository),
@@ -181,7 +188,7 @@ def resolve_project_column_ids(
     return {**issue, "projects": projects}
 
 
-def _find_column_id(
+def find_card_column_id(
     *,
     client: Gitea,
     owner: str,
@@ -269,7 +276,7 @@ async def resolve_async_project_column_ids(
         project_id = _identifier(project)
         if project_id is not None and issue_id is not None:
             try:
-                column_id = await _find_async_column_id(
+                column_id = await find_async_card_column_id(
                     client=client,
                     owner=owner,
                     repository=_column_scope_repository(project, repository),
@@ -285,7 +292,7 @@ async def resolve_async_project_column_ids(
     return {**issue, "projects": projects}
 
 
-async def _find_async_column_id(
+async def find_async_card_column_id(
     *,
     client: AsyncGitea,
     owner: str,

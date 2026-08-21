@@ -48,8 +48,18 @@ def register_commands() -> None:
     project_app.add_typer(column_app, name="column", help="Commands for managing project columns.")
 
     issue_app = typer.Typer(name="issue", help="Commands for managing project issues.", rich_markup_mode="rich")
-    issue_app.command("add", help="Add an issue to a project column.")(add_issue_command)
-    issue_app.command("move", help="Move an issue between a project's columns.")(move_issue_command)
+    issue_app.command(
+        "add",
+        help="Add an issue to a project column. This is what puts an issue on a board that has no card for it.",
+    )(add_issue_command)
+    issue_app.command(
+        "move",
+        help=(
+            "Move an issue's card between a project's columns. The issue has to be on the project already, "
+            "since a move relocates the card it has there; pass --add-if-missing to put it in the target column "
+            "when it has none."
+        ),
+    )(move_issue_command)
     issue_app.command("remove", help="Remove an issue from a project column.")(remove_issue_command)
     project_app.add_typer(issue_app, name="issue", help="Commands for managing project issues.")
 

@@ -195,6 +195,40 @@ class _StubGitea:
         """
         return {"id": 1}, {"status_code": 200}
 
+    def list_project_columns(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Return the single column of the board the walk's project has.
+
+        Declared for the same reason as `get_issue`: `project issue move` finds
+        the issue's card before moving it, and a board with no columns holds no
+        card, so an empty listing would fail that command for a reason that has
+        nothing to do with the command under test.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Returns:
+            One column and its metadata.
+
+        """
+        return [{"id": 1}], {"status_code": 200}
+
+    def list_project_column_issues(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Return the single card the board's column holds.
+
+        Its ID is the one `get_issue` answers with, so the card is the issue the
+        `project issue` commands resolved.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Returns:
+            One issue and its metadata.
+
+        """
+        return [{"id": 1}], {"status_code": 200}
+
     def __enter__(self) -> Self:
         """Enter the client context manager.
 
@@ -256,6 +290,36 @@ class _UnreachableGitea(_StubGitea):
         The base stub answers issue lookups with a payload, which would let a
         command past the lookup and leave the walk testing the endpoint after it
         rather than the one it reached first.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Returns:
+            Never; the call always raises.
+
+        """
+        return self(*args, **kwargs)
+
+    def list_project_columns(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Fail as every other endpoint of an unreachable instance does.
+
+        Overridden for the same reason as `get_issue`: the base stub describes a
+        board, which would carry a command that walks one past the listing and
+        leave the walk testing whichever endpoint it reached next.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Returns:
+            Never; the call always raises.
+
+        """
+        return self(*args, **kwargs)
+
+    def list_project_column_issues(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Fail as every other endpoint of an unreachable instance does.
 
         Args:
             *args: Ignored.

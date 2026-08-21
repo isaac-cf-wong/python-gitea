@@ -90,6 +90,33 @@ Both are best-effort, and `column_id` should be read with that in mind:
 - The columns of a user-owned (individual) project live under endpoints this
   library does not wrap, so such a project's `column_id` is always `None`.
 
+That last point is about the enrichment and not about the walk itself.
+`find_card_column_id` is the walk on its own — one project, one issue, the
+column holding its card or `None` when no column of the board lists it — and it
+raises what the lookup raised rather than logging it, for a caller that has to
+tell "no card" apart from "could not be read":
+
+```python
+from gitea.client.gitea import Gitea
+from gitea.issue import find_card_column_id
+
+with Gitea(token="TOKEN", base_url="https://gitea.example.com") as client:
+    column_id = find_card_column_id(
+        client=client,
+        owner="my-org",
+        repository=None,  # the organization's own project; a repository's names it
+        project_id=1,
+        issue_id=1854,  # the global ID, which is what the columns list their issues by
+    )
+    print("not on the board" if column_id is None else column_id)
+```
+
+`find_async_card_column_id` is its `await`-based twin. Asking this before moving
+a card is what `gitea-cli project issue move` does: Gitea's move endpoint moves
+the row relating an issue to a project, and for an issue that is not on the
+project there is none to move, so the call comes back a success having done
+nothing.
+
 ## Asynchronous Client
 
 The `AsyncGitea` client has the same structure but `await`-based, and it uses
