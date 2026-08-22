@@ -621,6 +621,227 @@ def test_remove_issue_command(mock_gitea, mock_get_auth_params, mock_execute):
 @patch("gitea.cli.utils.api.execute_api_command")
 @patch("gitea.cli.utils.auth.get_auth_params")
 @patch("gitea.client.gitea.Gitea")
+def test_remove_issue_command_finds_the_column_holding_the_card(mock_gitea, mock_get_auth_params, mock_execute):
+    """remove_issue_command should remove from the card's own column when none is given.
+
+    The removal endpoint takes the column the card is in, which is not a column
+    the caller is choosing but a fact about the board - so it is asked of the
+    board rather than of the caller. The card is deliberately not in the first
+    column of this one, and the column before it is not empty either, so a
+    command reporting the first column, or the first column with any card in it,
+    is not one this passes.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    board(client, {TARGET_COLUMN: (1900,), CARDED_COLUMN: (1854,)})
+    client.project.remove_issue_from_project_column.return_value = ({}, {"status_code": 204})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    remove_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        column_id=None,
+        issue_id=100,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    result = mock_execute.call_args[1]["api_call"]()
+    client.project.remove_issue_from_project_column.assert_called_once_with(
+        owner="owner", repository="repo", project_id=1, column_id=CARDED_COLUMN, issue_id=1854
+    )
+    # The column the card came off is reported, since it was this command's
+    # answer rather than the caller's: a removal that says nothing about where
+    # the card was leaves the caller unable to put it back.
+    assert result == (
+        {},
+        {"status_code": 204, "resolved_issue_id": 1854, "resolved_column_id": CARDED_COLUMN},
+    )
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_remove_issue_command_reports_an_issue_with_no_card(mock_gitea, mock_get_auth_params, mock_execute):
+    """remove_issue_command should refuse an issue the board has no card for, rather than guess a column."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    uncarded(client)
+    client.project.remove_issue_from_project_column.return_value = ({}, {"status_code": 204})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    remove_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        column_id=None,
+        issue_id=100,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError) as error:
+        mock_execute.call_args[1]["api_call"]()
+
+    message = str(error.value)
+    # The issue as the user addressed it, what was looked for, and why: an issue
+    # with no card is not a removal that can be addressed to any column.
+    assert "no card to remove" in message
+    assert "#100 of owner/repo" in message
+    assert "global ID 1854" in message
+    assert "--column-id" in message
+    client.project.remove_issue_from_project_column.assert_not_called()
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_remove_issue_command_keeps_the_column_it_was_given(mock_gitea, mock_get_auth_params, mock_execute):
+    """A --column-id that was passed should be used as it stands, with no board read at all.
+
+    The column is given here for a card that is somewhere else, which is a
+    removal Gitea answers with a success having removed nothing. That is the
+    caller's call to make: looking the card up and quietly removing it from the
+    column it is really in would carry out something other than what was asked.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    carded(client, 1854)
+    client.project.remove_issue_from_project_column.return_value = ({}, {"status_code": 204})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    remove_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        column_id=TARGET_COLUMN,
+        issue_id=100,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    result = mock_execute.call_args[1]["api_call"]()
+    client.project.remove_issue_from_project_column.assert_called_once_with(
+        owner="owner", repository="repo", project_id=1, column_id=TARGET_COLUMN, issue_id=1854
+    )
+    client.project.list_project_columns.assert_not_called()
+    client.project.list_project_column_issues.assert_not_called()
+    # No resolved column comes back: the column was the caller's, and reporting
+    # it as resolved would claim a lookup that was never made.
+    assert result == ({}, {"status_code": 204, "resolved_issue_id": 1854})
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_remove_issue_command_reports_a_board_it_could_not_read(mock_gitea, mock_get_auth_params, mock_execute):
+    """A board that could not be read should stop a removal that needed it to name a column.
+
+    The lookup failing says nothing about whether the issue has a card, so
+    neither reporting it as uncarded nor removing it from a column of guesswork
+    is available: the failure is what is reported, and it says why the board was
+    being read.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.base_url = "https://gitea.example.com"
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    client.project.list_project_columns.side_effect = make_http_error(403)
+    client.project.remove_issue_from_project_column.return_value = ({}, {"status_code": 204})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    remove_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        column_id=None,
+        issue_id=100,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError) as error:
+        mock_execute.call_args[1]["api_call"]()
+
+    message = str(error.value)
+    assert "Could not tell which column of project 1 holds" in message
+    assert "HTTP 403" in message
+    # Why the board was read at all, which is not the reason the move reads it.
+    assert "--column-id was not passed" in message
+    assert "no card to move" not in message
+    client.project.remove_issue_from_project_column.assert_not_called()
+
+
+@patch("gitea.client.gitea.requests.Session")
+def test_remove_issue_deletes_the_card_of_the_column_holding_it(mock_session):
+    """The CLI should accept a removal naming no column and delete the card from the column holding it.
+
+    The assertions above are made against a client, which is reached with
+    `--column-id` already resolved to None by the caller; this one goes through
+    the command line, so what is pinned is that the option really is optional
+    there and that the request built for it addresses the card's own column.
+    """
+    session = RoutedSession(
+        routes=(
+            # The card of another issue, in the column listed first.
+            (f"/columns/{TARGET_COLUMN}/issues", [{"id": 1900}]),
+            (f"/columns/{CARDED_COLUMN}/issues", [{"id": 1854}]),
+            ("/columns", [{"id": TARGET_COLUMN}, {"id": CARDED_COLUMN}]),
+        ),
+        # What the issue lookup is answered with: the global ID of `#100`.
+        payload={"id": 1854, "number": 100},
+    )
+    mock_session.return_value = session
+
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "issue",
+            "remove",
+            "--owner",
+            "owner",
+            "--repository",
+            "repo",
+            "--project-id",
+            "1",
+            "--issue-id",
+            "100",
+            "--token",
+            "tok",
+            "--base-url",
+            "https://gitea.invalid",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    deleted = [url for method, url in session.requests if method == "DELETE"]
+    assert deleted == [f"https://gitea.invalid/api/v1/repos/owner/repo/projects/1/columns/{CARDED_COLUMN}/issues/1854"]
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
 def test_move_issue_command_org(mock_gitea, mock_get_auth_params, mock_execute):
     """move_issue_command should pass --issue-id through unresolved for organization projects."""
     ctx = make_ctx()

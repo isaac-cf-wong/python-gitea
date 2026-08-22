@@ -11,7 +11,7 @@ def add_issue_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
     project_id: Annotated[int, typer.Option("--project-id", help="ID of the project.")],
-    column_id: Annotated[int, typer.Option("--column-id", help="ID of the column.")],
+    column_id: Annotated[int, typer.Option("--column-id", help="ID of the column to put the issue in.")],
     issue_id: Annotated[
         int,
         typer.Option(

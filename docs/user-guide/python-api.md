@@ -115,7 +115,9 @@ with Gitea(token="TOKEN", base_url="https://gitea.example.com") as client:
 a card is what `gitea-cli project issue move` does: Gitea's move endpoint moves
 the row relating an issue to a project, and for an issue that is not on the
 project there is none to move, so the call comes back a success having done
-nothing.
+nothing. `gitea-cli project issue remove` asks it for the other reason — the
+removal endpoint takes the column the card is in, and this is what answers that
+when the caller passes no `--column-id`.
 
 `column_holds_card` is the same question about a single named column, at the
 cost of that column's listing rather than the board's — which is what the walk

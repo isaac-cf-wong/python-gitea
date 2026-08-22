@@ -11,7 +11,6 @@ def remove_issue_command(
     ctx: typer.Context,
     owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
     project_id: Annotated[int, typer.Option("--project-id", help="ID of the project.")],
-    column_id: Annotated[int, typer.Option("--column-id", help="ID of the column.")],
     issue_id: Annotated[
         int,
         typer.Option(
@@ -19,6 +18,16 @@ def remove_issue_command(
             help="Issue number shown in the web UI, or the global ID of the issue when the repository holding it is unknown.",
         ),
     ],
+    column_id: Annotated[
+        int | None,
+        typer.Option(
+            "--column-id",
+            help=(
+                "ID of the column holding the issue's card. Omit to have the column found on the board, unlike "
+                "'add' and 'move', whose --column-id is the column the card is going to."
+            ),
+        ),
+    ] = None,
     repository: Annotated[
         str | None,
         typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
@@ -52,14 +61,25 @@ def remove_issue_command(
         ),
     ] = None,
 ) -> None:
-    """Remove an issue from a project column.
+    """Take an issue's card off a project.
+
+    --column-id is the column holding the card, which is where the two other
+    'project issue' commands differ from this one: theirs is the column the card
+    is going to, and is therefore something only the caller can say, while this
+    one is where the card already is, and is something the board can be asked.
+    Omit it and the project's columns are walked to find the card; an issue with
+    no card on the project is reported as having none, and the column that was
+    found comes back as metadata.resolved_column_id. Pass it and it is used as
+    given - a column that does not hold the card is a removal Gitea answers with
+    a success, having removed nothing.
 
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
         repository: The name of the repository, or None for organization projects.
         project_id: The ID of the project.
-        column_id: The ID of the column.
+        column_id: The ID of the column holding the card, or None to find it by
+            walking the project's columns.
         issue_id: The issue number of the repository holding the issue, or the
             global issue ID when that repository is not known.
         issue_repository: The name of the repository holding the issue,
@@ -73,7 +93,7 @@ def remove_issue_command(
 
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
-    from gitea.cli.utils.issue import run_project_issue_call  # noqa: PLC0415
+    from gitea.cli.utils.issue import run_project_issue_remove  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -91,19 +111,13 @@ def remove_issue_command(
 
         """
         with Gitea(token=token, base_url=base_url) as client:
-            return run_project_issue_call(
+            return run_project_issue_remove(
                 client=client,
-                call=lambda resolved_issue_id: client.project.remove_issue_from_project_column(
-                    owner=owner,
-                    repository=repository,
-                    project_id=project_id,
-                    column_id=column_id,
-                    issue_id=resolved_issue_id,
-                ),
-                action="remove",
                 owner=owner,
+                repository=repository,
                 project_id=project_id,
                 issue_number=issue_id,
+                column_id=column_id,
                 issue_repository=issue_repository or repository,
             )
 

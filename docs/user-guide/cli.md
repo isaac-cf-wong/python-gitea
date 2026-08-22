@@ -325,8 +325,11 @@ gitea-cli project list --owner my-org --repository my-repo  # that repository's 
       arrived in `--column-id`. An issue with no card there is reported as an
       error naming `project issue add`; `--add-if-missing` has this command put
       it in `--column-id` instead.
-- `gitea-cli project issue remove --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
-    - Optional: `--issue-repository`
+- `gitea-cli project issue remove --owner <owner> [--repository <repo>] --project-id <id> --issue-id <id>`
+    - Optional: `--column-id`, `--issue-repository`
+    - Takes the issue's card off the project. `--column-id` is the column the
+      card is in, and is found on the board when it is omitted; an issue with no
+      card there is reported as having none.
 
 The project endpoints identify an issue by its global ID, which is not the
 number shown in the web UI: `my-org/my-repo#15` may well be global ID `1854`.
@@ -341,6 +344,24 @@ for you:
   address the issue by number; without it, `--issue-id` is read as the global
   ID. `--issue-repository` also overrides `--repository`, for the case of a
   repository project holding an issue from elsewhere.
+
+`--column-id` does not mean the same thing to all three commands. For `add` and
+`move` it is where the card is going, which only the caller can say. For
+`remove` it is where the card already is, which the board can be asked - so the
+option is optional there, and omitting it has the project's columns walked to
+find the card:
+
+```console
+$ gitea-cli project issue remove --owner my-org --project-id 1 \
+      --issue-repository my-repo --issue-id 42
+```
+
+The column the card was taken off comes back as `metadata.resolved_column_id`,
+and an issue with no card on the project is reported as having none rather than
+removed from a column chosen for it. A `--column-id` that is passed is used as
+it stands: a column that does not hold the card is a removal Gitea answers with
+a success having removed nothing, and that is the caller's call to make rather
+than something quietly corrected here.
 
 `add` and `move` are not two ways of doing the same thing. `add` puts an issue
 on a board, giving it a card in a column; `move` relocates the card it already
