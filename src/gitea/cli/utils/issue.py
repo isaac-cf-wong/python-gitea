@@ -18,6 +18,14 @@ of which there is none, and Gitea answers that with a success and an empty body.
 its absence itself - a success that moved nothing is the one failure a caller
 cannot see.
 
+The same walk answers a different question for `run_project_issue_remove`. The
+removal endpoint takes the column the card is in, which is not a column the
+caller is choosing but one the board already knows, so `--column-id` is optional
+there and the walk supplies it - and an issue with no card is reported as having
+none rather than removed from a column picked for it. This is what makes the
+option mean two things across the commands: a destination for `add` and `move`,
+the card's present whereabouts for `remove`.
+
 Looking before the move is what makes the failure legible; reading the card back
 afterwards is what makes the success true. The status code says only that the
 request was accepted, so the move is followed by a listing of the target column,
@@ -416,8 +424,63 @@ def _not_on_board_message(
     )
 
 
+# Why each command walks the board, for the message reporting a board it could
+# not walk. The move reads it to keep a call it cannot see the failure of from
+# being made; the remove reads it because the column is what the removal takes
+# and the caller did not name one.
+_BOARD_WALK_REASONS = {
+    "move": (
+        "The board's columns and their cards are listed to find the card before it is moved, because Gitea's move "
+        "endpoint reports success without doing anything when there is no card to move."
+    ),
+    "remove": (
+        "The board's columns and their cards are listed because --column-id was not passed: a removal takes the "
+        "column holding the card, and this command looks that up rather than asking for it."
+    ),
+}
+
+
+def _nothing_to_remove_message(
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    issue_number: int,
+    issue_id: int,
+    issue_repository: str | None,
+) -> str:
+    """Build the error message for a remove whose issue has no card to remove.
+
+    Reported only for a removal that was not given a column: one that was is
+    passed on to Gitea as the caller wrote it, so this says the board was walked
+    and had nothing on it for the issue, which is the one thing the walk can
+    conclude.
+
+    Args:
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        issue_number: The value the user passed as --issue-id.
+        issue_id: The global issue ID the board was searched for.
+        issue_repository: The name of the repository holding the issue, if known.
+
+    Returns:
+        The message describing the failure and how to act on it.
+
+    """
+    return (
+        f"No column of project {project_id} holds {_issue_label(owner, issue_number, issue_id, issue_repository)}, "
+        f"so there is no card to remove. --column-id was not passed, so the column holding the card was looked for "
+        f"on the board and no column of it lists the issue: the issue is not on this project, or its card is "
+        f"already off it. "
+        f"See what the board holds with 'gitea-cli project issues --owner {owner}"
+        f"{_repository_option(repository)} --project-id {project_id}'."
+    )
+
+
 def _unreadable_board_message(
     detail: str,
+    action: str,
     owner: str,
     repository: str | None,
     project_id: int,
@@ -427,13 +490,15 @@ def _unreadable_board_message(
 ) -> str:
     """Build the error message for a board whose columns could not be read.
 
-    A move is only made once the card is known to exist, so a board that cannot
+    The call is only made once the card is known to exist, so a board that cannot
     be read stops the command: carrying on would be the silent no-op the check
     is there to prevent, and reporting the issue as not on the board would be a
     claim the failed lookup does not support.
 
     Args:
         detail: The description of the failure.
+        action: The verb describing the call the board was being read for, which
+            selects the sentence saying why it was read.
         owner: The owner of the repository or organization holding the project.
         repository: The name of the repository holding the project, or None for
             an organization project.
@@ -450,8 +515,7 @@ def _unreadable_board_message(
     return (
         f"Could not tell which column of project {project_id} holds "
         f"{_issue_label(owner, issue_number, issue_id, issue_repository)}: {detail}. "
-        f"The board's columns and their cards are listed to find the card before it is moved, because Gitea's move "
-        f"endpoint reports success without doing anything when there is no card to move. "
+        f"{_BOARD_WALK_REASONS[action]} "
         f"Check that --project-id names a project of {where} and that the account may read it; "
         f"run 'gitea-cli project list --owner {owner}{_repository_option(repository)}' to see the projects in use."
     )
@@ -501,6 +565,7 @@ def _sorting_unavailable_message(
 def _card_column_id(
     *,
     client: Gitea,
+    action: str,
     owner: str,
     repository: str | None,
     project_id: int,
@@ -512,6 +577,8 @@ def _card_column_id(
 
     Args:
         client: The Gitea client used for the lookups.
+        action: The verb describing the call the card is being looked for, for
+            the message reporting a board that could not be read.
         owner: The owner of the repository or organization holding the project.
         repository: The name of the repository holding the project, or None for
             an organization project.
@@ -537,6 +604,7 @@ def _card_column_id(
         raise CommandError(
             _unreadable_board_message(
                 _describe(_status_code_of(e), e),
+                action,
                 owner,
                 repository,
                 project_id,
@@ -791,6 +859,7 @@ def run_project_issue_move(
     on_board = (
         _card_column_id(
             client=client,
+            action="move",
             owner=owner,
             repository=repository,
             project_id=project_id,
@@ -875,4 +944,107 @@ def run_project_issue_move(
         issue_id=issue_id,
         issue_repository=issue_repository,
     )
+    return data, metadata
+
+
+def run_project_issue_remove(
+    *,
+    client: Gitea,
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    issue_number: int,
+    column_id: int | None,
+    issue_repository: str | None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Take an issue's card off a project, from the column it is in.
+
+    Gitea's removal endpoint takes the column the card is in, not a column the
+    caller is choosing: unlike the `--column-id` of `add` and `move`, which says
+    where the card is to end up, this one says where it already is. That is
+    something the board can be asked, so `column_id` may be None, and the column
+    holding the card is then found by walking the project's columns - the same
+    walk the move makes before moving a card. An issue with no card on the
+    project is reported as having none, rather than removed from a column chosen
+    for it.
+
+    A `column_id` that was given is passed on as it stands. Nothing is looked up
+    for it, and no claim is made that the card was there: this is a removal the
+    caller addressed, and Gitea answers one naming the wrong column with a
+    success, so the column it was told to use is the column it uses.
+
+    Args:
+        client: The Gitea client to call.
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        issue_number: The value the user passed as --issue-id.
+        column_id: The column holding the card, or None to find it on the board.
+        issue_repository: The name of the repository holding the issue, or None
+            when it is not known and `issue_number` is therefore a global ID.
+
+    Returns:
+        A tuple containing the payload and the metadata, the latter carrying the
+        resolved global issue ID whenever the number was resolved, and the column
+        the card was removed from whenever that was looked up.
+
+    Raises:
+        CommandError: If the issue could not be resolved, the board could not be
+            read, the issue has no card on the project, the call was refused, the
+            instance could not be reached, or the request failed without reaching
+            a response.
+
+    """
+    issue_id = resolve_issue_id(client=client, owner=owner, repository=issue_repository, issue_number=issue_number)
+    carded_column_id = column_id
+    if carded_column_id is None:
+        carded_column_id = _card_column_id(
+            client=client,
+            action="remove",
+            owner=owner,
+            repository=repository,
+            project_id=project_id,
+            issue_number=issue_number,
+            issue_id=issue_id,
+            issue_repository=issue_repository,
+        )
+        if carded_column_id is None:
+            raise CommandError(
+                _nothing_to_remove_message(owner, repository, project_id, issue_number, issue_id, issue_repository)
+            )
+
+    def call(resolved_issue_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Take the card off the column holding it.
+
+        Args:
+            resolved_issue_id: The global ID of the issue.
+
+        Returns:
+            A tuple containing the response data and metadata.
+
+        """
+        return client.project.remove_issue_from_project_column(
+            owner=owner,
+            repository=repository,
+            project_id=project_id,
+            column_id=carded_column_id,
+            issue_id=resolved_issue_id,
+        )
+
+    data, metadata = _run_resolved_call(
+        client=client,
+        call=call,
+        action="remove",
+        owner=owner,
+        project_id=project_id,
+        issue_number=issue_number,
+        issue_id=issue_id,
+        issue_repository=issue_repository,
+    )
+    if column_id is None:
+        # The column was this command's answer rather than the caller's, so it is
+        # reported: a removal that says nothing about where the card was leaves
+        # the caller unable to put it back.
+        return data, {**metadata, "resolved_column_id": carded_column_id}
     return data, metadata

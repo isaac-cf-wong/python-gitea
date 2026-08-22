@@ -60,7 +60,14 @@ def register_commands() -> None:
             "when it has none."
         ),
     )(move_issue_command)
-    issue_app.command("remove", help="Remove an issue from a project column.")(remove_issue_command)
+    issue_app.command(
+        "remove",
+        help=(
+            "Take an issue's card off a project. --column-id is the column the card is in, and is found on the "
+            "board when it is omitted - where the --column-id of 'add' and 'move' is the column the card is "
+            "going to."
+        ),
+    )(remove_issue_command)
     project_app.add_typer(issue_app, name="issue", help="Commands for managing project issues.")
 
 
