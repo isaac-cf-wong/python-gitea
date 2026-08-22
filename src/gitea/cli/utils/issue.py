@@ -30,10 +30,18 @@ Looking before the move is what makes the failure legible; reading the card back
 afterwards is what makes the success true. The status code says only that the
 request was accepted, so the move is followed by a listing of the target column,
 and the command exits zero having seen the card there rather than having assumed
-it. Neither half makes the pair atomic - Gitea has no conditional move, so a card
-taken off the board between the two reads is still a card the command has
-reported on - and the messages say which of "no card", "not where it was sent"
-and "could not be confirmed" happened rather than collapsing them into one.
+it. A removal whose column the walk supplied is read back as well, and against
+the whole board rather than that column: the column named holds no card whether
+the removal took it off or the card had already moved elsewhere, so only a walk
+finding none anywhere tells the two apart. What that walk establishes is the
+card's absence rather than the request's fate - an instance may refuse a removal
+naming a column that does not hold the card, and one tried by hand answers it
+with a 404, but a status code is an answer about the call and never about the
+card. Neither half makes either pair atomic - Gitea has no conditional move and
+no conditional delete, so a card taken off the board, or put back on it, between
+the two reads is still a card the command has reported on - and the messages say
+which of "no card", "not where it was sent", "still on the board" and "could not
+be confirmed" happened rather than collapsing them into one.
 """
 
 from __future__ import annotations
@@ -701,6 +709,87 @@ def _unconfirmed_card_message(
     )
 
 
+def _card_still_on_board_message(
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    column_id: int,
+    holding_column_id: int,
+    issue_number: int,
+    issue_id: int,
+    issue_repository: str | None,
+) -> str:
+    """Build the error message for a removal that reported success and left the card on the board.
+
+    Args:
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        column_id: The column the removal was addressed to.
+        holding_column_id: The column found to hold the card afterwards.
+        issue_number: The value the user passed as --issue-id.
+        issue_id: The global issue ID the call was made with.
+        issue_repository: The name of the repository holding the issue, if known.
+
+    Returns:
+        The message describing the failure and how to act on it.
+
+    """
+    return (
+        f"Gitea reported the removal of {_issue_label(owner, issue_number, issue_id, issue_repository)} from column "
+        f"{column_id} of project {project_id} as a success, but column {holding_column_id} of it holds a card for "
+        f"the issue afterwards, so the issue is still on the board. The column removed from was the one the board "
+        f"listed the card under, and the two calls are separate requests: the card was moved between them, leaving "
+        f"the removal addressed to a column it had left, or the removal did not take. Either way the status code "
+        f"answered the request and not the question, which is why it is read back. "
+        f"Repeat the command to take the card off the column holding it now, and see what the board "
+        f"holds with 'gitea-cli project issues --owner {owner}{_repository_option(repository)} "
+        f"--project-id {project_id}'."
+    )
+
+
+def _unconfirmed_removal_message(
+    detail: str,
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    column_id: int,
+    issue_number: int,
+    issue_id: int,
+    issue_repository: str | None,
+) -> str:
+    """Build the error message for a removal that was made and could not then be confirmed.
+
+    As with the move, the removal is reported as unconfirmed rather than as
+    failed: it was made and answered, and what the failed read leaves unknown is
+    whether it did anything. The message says which of the two is unknown and
+    names the command that settles it.
+
+    Args:
+        detail: The description of the failure of the confirming walk.
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        column_id: The column the removal was addressed to.
+        issue_number: The value the user passed as --issue-id.
+        issue_id: The global issue ID the call was made with.
+        issue_repository: The name of the repository holding the issue, if known.
+
+    Returns:
+        The message describing the failure and how to act on it.
+
+    """
+    return (
+        f"The removal of {_issue_label(owner, issue_number, issue_id, issue_repository)} from column {column_id} of "
+        f"project {project_id} was made and reported success, but the board could not then be read back to confirm "
+        f"the card is off it: {detail}. Whether the issue is still on the board is therefore unknown, not known to "
+        f"be wrong. See what the board holds with 'gitea-cli project issues --owner {owner}"
+        f"{_repository_option(repository)} --project-id {project_id}' before repeating the command."
+    )
+
+
 def _confirm_card_in_column(
     *,
     client: Gitea,
@@ -794,6 +883,117 @@ def _confirm_card_in_column(
         raise CommandError(
             _card_absent_message(
                 action, owner, repository, project_id, column_id, issue_number, issue_id, issue_repository
+            )
+        )
+
+
+def _confirm_card_off_board(
+    *,
+    client: Gitea,
+    owner: str,
+    repository: str | None,
+    project_id: int,
+    column_id: int,
+    issue_number: int,
+    issue_id: int,
+    issue_repository: str | None,
+) -> None:
+    """Confirm a removal took the card off the board.
+
+    The column a removal is addressed to is the one the board was walked for, and
+    the board can be edited between that walk and the call: a card moved in
+    between leaves the removal naming a column that no longer holds it, which is
+    a removal this endpoint has nothing to do for. Reading back is what
+    establishes that the card is gone, rather than that Gitea accepted a request
+    to take it off a column it had already left. An instance is free to refuse
+    such a call, and one tried by hand answers it with a 404, which the command
+    reports as a failed removal - but that is one instance's answer to one shape
+    of the race, and an answer about the request either way. The card's absence
+    is what the caller is told, so the card's absence is what is read.
+
+    What is read back is the whole board rather than the column the removal
+    named. That column holds no card either way - the card was taken off it, or
+    it had already left it - so a single column's listing cannot tell the removal
+    from the race. Success here is no column of the project holding a card for
+    the issue, which is a walk that never stops early: it costs the board's
+    listings, where the move's confirmation costs one column's.
+
+    As with the move, this narrows the window rather than closing it. Gitea has
+    no conditional delete, so a card put back on the board after the confirming
+    walk is a card the command has already reported on.
+
+    Args:
+        client: The Gitea client used for the walk.
+        owner: The owner of the repository or organization holding the project.
+        repository: The name of the repository holding the project, or None for
+            an organization project.
+        project_id: The ID of the project.
+        column_id: The column the removal was addressed to.
+        issue_number: The value the user passed as --issue-id.
+        issue_id: The global issue ID the call was made with.
+        issue_repository: The name of the repository holding the issue, if known.
+
+    Raises:
+        CommandError: If a column of the project still holds a card for the
+            issue, or if the walk that would have confirmed none does could not
+            be made.
+
+    """
+    try:
+        holding_column_id = find_card_column_id(
+            client=client, owner=owner, repository=repository, project_id=project_id, issue_id=issue_id
+        )
+    except HTTPError as e:
+        raise CommandError(
+            _unconfirmed_removal_message(
+                _describe(_status_code_of(e), e),
+                owner,
+                repository,
+                project_id,
+                column_id,
+                issue_number,
+                issue_id,
+                issue_repository,
+            )
+        ) from e
+    except (RequestsConnectionError, Timeout) as e:
+        raise CommandError(
+            _unconfirmed_removal_message(
+                f"the instance at {client.base_url} could not be reached ({e})",
+                owner,
+                repository,
+                project_id,
+                column_id,
+                issue_number,
+                issue_id,
+                issue_repository,
+            )
+        ) from e
+    except RequestException as e:
+        raise CommandError(
+            _unconfirmed_removal_message(
+                f"the request did not complete ({type(e).__name__}: {e})",
+                owner,
+                repository,
+                project_id,
+                column_id,
+                issue_number,
+                issue_id,
+                issue_repository,
+            )
+        ) from e
+
+    if holding_column_id is not None:
+        raise CommandError(
+            _card_still_on_board_message(
+                owner,
+                repository,
+                project_id,
+                column_id,
+                holding_column_id,
+                issue_number,
+                issue_id,
+                issue_repository,
             )
         )
 
@@ -968,10 +1168,25 @@ def run_project_issue_remove(
     project is reported as having none, rather than removed from a column chosen
     for it.
 
+    A column this command found is one it also checks: the board is walked again
+    after the removal, and the command exits zero having seen no column of the
+    project holding a card for the issue. The two calls are separate requests
+    against a board anything may edit, so a card moved between the walk and the
+    removal leaves the removal addressed to the column the card has left, which
+    is a removal with nothing to do. Whether the instance refuses that call or
+    answers it with a success is the instance's business: what a caller is told
+    here is that no column of the project holds the card, which is the claim the
+    exit status makes and the one only a read can support. It is a narrower
+    window and not a closed one - Gitea has no conditional delete, so a card put
+    back on the board after the confirming walk is a card this command has
+    already reported on.
+
     A `column_id` that was given is passed on as it stands. Nothing is looked up
-    for it, and no claim is made that the card was there: this is a removal the
-    caller addressed, and Gitea answers one naming the wrong column with a
-    success, so the column it was told to use is the column it uses.
+    for it, before or after: this is a removal the caller addressed, so the
+    column it was told to use is the column it uses, whether or not the card is
+    there, and reading the board back would be checking a claim the command never
+    made. What the instance makes of such a call - a refusal, or a success that
+    removed nothing - is reported as it came.
 
     Args:
         client: The Gitea client to call.
@@ -991,9 +1206,10 @@ def run_project_issue_remove(
 
     Raises:
         CommandError: If the issue could not be resolved, the board could not be
-            read, the issue has no card on the project, the call was refused, the
-            instance could not be reached, or the request failed without reaching
-            a response.
+            read, the issue has no card on the project, the call was refused, a
+            column of the project still holds the card afterwards or that could
+            not be confirmed, the instance could not be reached, or the request
+            failed without reaching a response.
 
     """
     issue_id = resolve_issue_id(client=client, owner=owner, repository=issue_repository, issue_number=issue_number)
@@ -1043,6 +1259,16 @@ def run_project_issue_remove(
         issue_repository=issue_repository,
     )
     if column_id is None:
+        _confirm_card_off_board(
+            client=client,
+            owner=owner,
+            repository=repository,
+            project_id=project_id,
+            column_id=carded_column_id,
+            issue_number=issue_number,
+            issue_id=issue_id,
+            issue_repository=issue_repository,
+        )
         # The column was this command's answer rather than the caller's, so it is
         # reported: a removal that says nothing about where the card was leaves
         # the caller unable to put it back.

@@ -117,7 +117,10 @@ the row relating an issue to a project, and for an issue that is not on the
 project there is none to move, so the call comes back a success having done
 nothing. `gitea-cli project issue remove` asks it for the other reason — the
 removal endpoint takes the column the card is in, and this is what answers that
-when the caller passes no `--column-id`.
+when the caller passes no `--column-id`. That command asks it a second time
+after removing the card, expecting no column at all: a card moved between the
+two calls leaves the removal naming a column that no longer holds it, and the
+whole board has to be walked to tell that from a removal that worked.
 
 `column_holds_card` is the same question about a single named column, at the
 cost of that column's listing rather than the board's — which is what the walk
