@@ -69,9 +69,14 @@ def remove_issue_command(
     one is where the card already is, and is something the board can be asked.
     Omit it and the project's columns are walked to find the card; an issue with
     no card on the project is reported as having none, and the column that was
-    found comes back as metadata.resolved_column_id. Pass it and it is used as
-    given - a column that does not hold the card is a removal Gitea answers with
-    a success, having removed nothing.
+    found comes back as metadata.resolved_column_id. The board is then walked
+    again after the removal, so exiting zero says no column of the project holds
+    a card for the issue rather than that a request was accepted: a card moved
+    between the two calls leaves the removal naming a column it has left, and a
+    status code answers the request and not the question. Pass --column-id and it
+    is used as given, with nothing read back for it - a column that does not hold
+    the card is the caller's call to make, and whatever the instance answers such
+    a removal with is reported as it came.
 
     Args:
         ctx: The Typer context.

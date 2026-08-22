@@ -22,7 +22,7 @@ from gitea.cli.project.list import list_command
 from gitea.cli.utils.errors import CommandError
 from tests.board import paged_columns
 from tests.cli.rendering import unrendered
-from tests.transport import RoutedSession
+from tests.transport import NO_CONTENT, RecordedResponse, RoutedSession
 
 runner = CliRunner()
 
@@ -80,6 +80,14 @@ class FakeBoard:
     `moves=False` is Gitea as this change exists because of: the move endpoint
     answers with a success and leaves the card where it was. A command that
     trusted the status code cannot tell that from a move.
+
+    Removals are answered from the same table, and only ever take a card off the
+    column the call names. A removal addressed to a column not holding the card
+    is answered here with a success having removed nothing - which is the
+    instance `project issue remove` reads the board back for, and not every
+    instance: one tried by hand refused that call with a 404. The lenient answer
+    is the one worth modelling, since it is the one a status code cannot be told
+    apart from a removal that worked.
     """
 
     def __init__(self, cards, *, project_id=1, moves=True):
@@ -119,6 +127,7 @@ class FakeBoard:
         )
         client.project.move_project_issue.side_effect = self._move
         client.project.add_issue_to_project_column.side_effect = self._add
+        client.project.remove_issue_from_project_column.side_effect = self._remove
         return self
 
     def _move(self, **kwargs):
@@ -150,6 +159,60 @@ class FakeBoard:
         self._place(kwargs["issue_id"], kwargs["column_id"])
         return {}, {"status_code": 201}
 
+    def _remove(self, **kwargs):
+        """Take a card off the column named, as the removal endpoint does.
+
+        Only that column is touched, which is the whole point of it: the row
+        relating the issue to the column it was given is what a removal removes,
+        and a column that does not hold the card has no such row - so the card
+        stays where it really is, and the call answers with a success rather than
+        with the refusal an instance is also free to answer it with.
+
+        Args:
+            **kwargs: The call's arguments, of which the issue and the column are
+                read.
+
+        Returns:
+            The empty payload and the metadata the endpoint answers with.
+
+        """
+        issue_ids = self.cards.get(kwargs["column_id"], [])
+        if kwargs["issue_id"] in issue_ids:
+            issue_ids.remove(kwargs["issue_id"])
+        return {}, {"status_code": 204}
+
+    def moving_removal(self, issue_id, column_id):
+        """Build a removal side effect that moves the card just before answering.
+
+        The race the confirming walk exists for, in the one place it can be
+        expressed: the card leaves the column the board was walked for after the
+        walk and before the removal, so the removal is addressed to a column that
+        no longer holds it and answers with a success having removed nothing.
+
+        Args:
+            issue_id: The global ID of the issue whose card the edit moves.
+            column_id: The column the card is moved to.
+
+        Returns:
+            The side effect to attach to the removal call.
+
+        """
+
+        def _side_effect(**kwargs):
+            """Move the card, then answer the removal against the board as it now is.
+
+            Args:
+                **kwargs: The call's arguments, passed on to the removal.
+
+            Returns:
+                The empty payload and the metadata the endpoint answers with.
+
+            """
+            self._place(issue_id, column_id)
+            return self._remove(**kwargs)
+
+        return _side_effect
+
     def _place(self, issue_id, column_id):
         """Move a card to a column of the board, taking it off any other.
 
@@ -162,6 +225,60 @@ class FakeBoard:
             if issue_id in issue_ids:
                 issue_ids.remove(issue_id)
         self.cards.setdefault(column_id, []).append(issue_id)
+
+
+class BoardSession(RoutedSession):
+    """A routed session whose listings a `DELETE` really edits.
+
+    `project issue remove` walks the board again after removing a card, so a
+    session answering every listing from a fixed table reports the card as still
+    on the board and turns a removal that worked into a failure. Here the
+    column's listing loses the card its `DELETE` names, which is what the read
+    after it has to see, and the `DELETE` is answered with the `204` and no body
+    that the real endpoint answers with.
+    """
+
+    def __init__(self, cards_by_column, payload):
+        """Lay out the board this session answers for.
+
+        Args:
+            cards_by_column: Mapping of column ID to the global IDs of the cards
+                in it, in the order the columns are listed.
+            payload: Body every request the board does not answer is given,
+                which is the issue lookup.
+
+        """
+        self.listings = {
+            column_id: [{"id": issue_id} for issue_id in issue_ids] for column_id, issue_ids in cards_by_column.items()
+        }
+        # The per-column listings first: the fragment of the columns listing is
+        # part of every one of their URLs, and the first match answers.
+        routes = [(f"/columns/{column_id}/issues", listing) for column_id, listing in self.listings.items()]
+        routes.append(("/columns", [{"id": column_id} for column_id in self.listings]))
+        super().__init__(routes, payload)
+
+    def request(self, method, url, **kwargs):
+        """Record a request, and let a `DELETE` take the card it names off the board.
+
+        Args:
+            method: HTTP method the client asked for.
+            url: Full URL the client built.
+            **kwargs: The headers, query parameters and JSON body, as recorded by
+                the session this extends.
+
+        Returns:
+            The recorded response.
+
+        """
+        if method != "DELETE":
+            return super().request(method, url, **kwargs)
+        self._record(method, url, **kwargs)
+        for column_id, listing in self.listings.items():
+            prefix = f"/columns/{column_id}/issues/"
+            if prefix in url:
+                removed = url.rsplit("/", 1)[-1]
+                listing[:] = [card for card in listing if str(card["id"]) != removed]
+        return RecordedResponse(NO_CONTENT)
 
 
 def board(client, cards, *, project_id=1, moves=True):
@@ -636,8 +753,9 @@ def test_remove_issue_command_finds_the_column_holding_the_card(mock_gitea, mock
 
     client = MagicMock()
     client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
-    board(client, {TARGET_COLUMN: (1900,), CARDED_COLUMN: (1854,)})
-    client.project.remove_issue_from_project_column.return_value = ({}, {"status_code": 204})
+    # The board answers the removal, since the removal is read back against it:
+    # a fixed answer would leave the card on the board and fail the confirmation.
+    fake = board(client, {TARGET_COLUMN: (1900,), CARDED_COLUMN: (1854,)})
     mock_gitea.return_value.__enter__.return_value = client
 
     remove_issue_command(
@@ -663,6 +781,10 @@ def test_remove_issue_command_finds_the_column_holding_the_card(mock_gitea, mock
         {},
         {"status_code": 204, "resolved_issue_id": 1854, "resolved_column_id": CARDED_COLUMN},
     )
+    # Exiting normally is a claim about the board, so the board is what it is
+    # checked against: no column of it holds a card for the issue afterwards, and
+    # the card that was not this issue's is still there.
+    assert fake.cards == {TARGET_COLUMN: [1900], CARDED_COLUMN: []}
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -711,8 +833,8 @@ def test_remove_issue_command_keeps_the_column_it_was_given(mock_gitea, mock_get
     """A --column-id that was passed should be used as it stands, with no board read at all.
 
     The column is given here for a card that is somewhere else, which is a
-    removal Gitea answers with a success having removed nothing. That is the
-    caller's call to make: looking the card up and quietly removing it from the
+    removal with nothing to remove - and whatever the instance answers it with is
+    the caller's to see. Looking the card up and quietly removing it from the
     column it is really in would carry out something other than what was asked.
     """
     ctx = make_ctx()
@@ -745,6 +867,124 @@ def test_remove_issue_command_keeps_the_column_it_was_given(mock_gitea, mock_get
     # No resolved column comes back: the column was the caller's, and reporting
     # it as resolved would claim a lookup that was never made.
     assert result == ({}, {"status_code": 204, "resolved_issue_id": 1854})
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_remove_issue_command_reports_a_card_moved_before_the_removal(mock_gitea, mock_get_auth_params, mock_execute):
+    """A card moved between the column lookup and the removal should be reported, not called removed.
+
+    The column a removal is addressed to is the one the board was walked for, and
+    the walk and the removal are separate requests: a card moved in between
+    leaves the removal naming a column that no longer holds it, which Gitea
+    answers with a success having removed nothing - the lenient answer of the two
+    an instance may give, and the one a caller cannot tell from a removal that
+    worked. The card is still on the board, and only a walk of the whole board
+    says so: the column the removal named is empty whether the removal took the
+    card off it or the card had already left.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    fake = carded(client, 1854)
+    # The board is edited between the walk that finds the card and the removal
+    # addressed to what it found.
+    client.project.remove_issue_from_project_column.side_effect = fake.moving_removal(1854, TARGET_COLUMN)
+    mock_gitea.return_value.__enter__.return_value = client
+
+    remove_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        column_id=None,
+        issue_id=100,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError) as error:
+        mock_execute.call_args[1]["api_call"]()
+
+    message = str(error.value)
+    # Which column was removed from, which one holds the card now, and that the
+    # issue is still on the board - the thing a zero exit status would have
+    # denied.
+    assert f"from column {CARDED_COLUMN} of project 1 as a success" in message
+    assert f"column {TARGET_COLUMN} of it holds a card" in message
+    assert "still on the board" in message
+    assert "#100 of owner/repo" in message
+    assert "global ID 1854" in message
+    # The removal really was made, and made against the column the walk found:
+    # this is its answer being distrusted, not the call being skipped.
+    client.project.remove_issue_from_project_column.assert_called_once_with(
+        owner="owner", repository="repo", project_id=1, column_id=CARDED_COLUMN, issue_id=1854
+    )
+    assert fake.cards[TARGET_COLUMN] == [1854]
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        pytest.param(make_http_error(403), "Gitea returned HTTP 403", id="refused"),
+        pytest.param(
+            RequestsConnectionError("Failed to establish a new connection: [Errno 111] Connection refused"),
+            "could not be reached",
+            id="unreachable",
+        ),
+        pytest.param(RequestException("Invalid URL 'columns'"), "the request did not complete", id="incomplete"),
+    ],
+)
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_remove_issue_command_reports_a_removal_it_could_not_confirm(
+    mock_gitea, mock_get_auth_params, mock_execute, error, expected
+):
+    """A removal that could not be confirmed should be reported as unconfirmed, not as failed.
+
+    The removal was made and answered; what the failed walk leaves unknown is
+    whether it did anything, so reporting it as a failure would be as wrong as
+    reporting it as a success.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.base_url = "https://gitea.example.com"
+    client.issue.get_issue.return_value = ({"id": 1854, "number": 100}, {"status_code": 200})
+    carded(client, 1854)
+    # The board is readable up to the removal and unreadable after it.
+    client.project.remove_issue_from_project_column.side_effect = lambda **kwargs: setattr_and_return(
+        client.project.list_project_columns, "side_effect", error
+    )
+    mock_gitea.return_value.__enter__.return_value = client
+
+    remove_issue_command(
+        ctx=ctx,
+        owner="owner",
+        repository="repo",
+        project_id=1,
+        column_id=None,
+        issue_id=100,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    with pytest.raises(CommandError) as raised:
+        mock_execute.call_args[1]["api_call"]()
+
+    message = str(raised.value)
+    assert expected in message
+    assert "was made and reported success" in message
+    assert "not known to be wrong" in message
+    assert f"from column {CARDED_COLUMN} of project 1" in message
+    assert "project issues" in message
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -801,13 +1041,9 @@ def test_remove_issue_deletes_the_card_of_the_column_holding_it(mock_session):
     the command line, so what is pinned is that the option really is optional
     there and that the request built for it addresses the card's own column.
     """
-    session = RoutedSession(
-        routes=(
-            # The card of another issue, in the column listed first.
-            (f"/columns/{TARGET_COLUMN}/issues", [{"id": 1900}]),
-            (f"/columns/{CARDED_COLUMN}/issues", [{"id": 1854}]),
-            ("/columns", [{"id": TARGET_COLUMN}, {"id": CARDED_COLUMN}]),
-        ),
+    session = BoardSession(
+        # The card of another issue is in the column listed first.
+        {TARGET_COLUMN: (1900,), CARDED_COLUMN: (1854,)},
         # What the issue lookup is answered with: the global ID of `#100`.
         payload={"id": 1854, "number": 100},
     )
@@ -837,6 +1073,13 @@ def test_remove_issue_deletes_the_card_of_the_column_holding_it(mock_session):
     assert result.exit_code == 0, result.stdout
     deleted = [url for method, url in session.requests if method == "DELETE"]
     assert deleted == [f"https://gitea.invalid/api/v1/repos/owner/repo/projects/1/columns/{CARDED_COLUMN}/issues/1854"]
+    # And the board is walked again afterwards, which is what the zero exit
+    # status rests on: the columns and their cards are read after the DELETE, not
+    # only before it.
+    methods = [method for method, _ in session.requests]
+    after = session.requests[methods.index("DELETE") + 1 :]
+    assert [url for method, url in after if method == "GET"] != []
+    assert all("/columns" in url for _, url in after)
 
 
 @patch("gitea.cli.utils.api.execute_api_command")

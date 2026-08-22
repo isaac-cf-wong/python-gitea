@@ -156,6 +156,7 @@ class _StubGitea:
             **kwargs: Ignored.
 
         """
+        self._removed_card_ids: set[int] = set()
 
     def __getattr__(self, name: str) -> Self:
         """Resolve any resource or endpoint name to this same stub.
@@ -214,7 +215,7 @@ class _StubGitea:
         return [{"id": 1}], {"status_code": 200}
 
     def list_project_column_issues(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        """Return the single card the board's column holds.
+        """Return the single card the board's column holds, until a removal takes it off.
 
         Its ID is the one `get_issue` answers with, so the card is the issue the
         `project issue` commands resolved.
@@ -224,10 +225,36 @@ class _StubGitea:
             **kwargs: Ignored.
 
         Returns:
-            One issue and its metadata.
+            One issue and its metadata, or an empty listing once that issue's
+            card has been removed.
 
         """
-        return [{"id": 1}], {"status_code": 200}
+        cards = [] if 1 in self._removed_card_ids else [{"id": 1}]
+        return cards, {"status_code": 200}
+
+    def remove_issue_from_project_column(
+        self, *args: Any, **kwargs: Any
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Take a card off the board, as the removal endpoint does.
+
+        Declared for the mirror image of the reason `list_project_columns` is:
+        `project issue remove` walks the board again after removing a card and
+        reports a card still on it, so a stub answering the removal and then
+        going on listing the card would fail that command for a reason that has
+        nothing to do with the command under test.
+
+        Args:
+            *args: Ignored.
+            **kwargs: The call's arguments, of which the issue is read.
+
+        Returns:
+            The empty payload and the metadata the endpoint answers with.
+
+        """
+        issue_id = kwargs.get("issue_id")
+        if isinstance(issue_id, int):
+            self._removed_card_ids.add(issue_id)
+        return [], {"status_code": 204}
 
     def __enter__(self) -> Self:
         """Enter the client context manager.
@@ -270,6 +297,26 @@ class _UnreachableGitea(_StubGitea):
         """
         super().__init__(*args, **kwargs)
         self.base_url = base_url
+
+    def remove_issue_from_project_column(
+        self, *args: Any, **kwargs: Any
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Fail as the removal endpoint does when the connection cannot be established.
+
+        Declared because the stub this extends answers removals with a method of
+        its own, which the failing `__call__` below would otherwise never be
+        reached for: an endpoint answering on an instance that cannot be reached
+        is not the instance this stands in for.
+
+        Args:
+            *args: Passed on to the failing call.
+            **kwargs: Passed on to the failing call.
+
+        Returns:
+            Nothing: the call this delegates to raises.
+
+        """
+        return self(*args, **kwargs)
 
     def __call__(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Fail as an endpoint does when the connection cannot be established.

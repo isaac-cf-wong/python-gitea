@@ -358,10 +358,25 @@ $ gitea-cli project issue remove --owner my-org --project-id 1 \
 
 The column the card was taken off comes back as `metadata.resolved_column_id`,
 and an issue with no card on the project is reported as having none rather than
-removed from a column chosen for it. A `--column-id` that is passed is used as
-it stands: a column that does not hold the card is a removal Gitea answers with
-a success having removed nothing, and that is the caller's call to make rather
-than something quietly corrected here.
+removed from a column chosen for it.
+
+A column found that way is read back as well: the board is walked again after
+the removal, and a zero exit status says that no column of the project holds a
+card for the issue afterwards, rather than that a request to take one off was
+accepted. The walk and the removal are separate requests, so a card moved in
+between leaves the removal addressed to a column the card has left, which is a
+removal with nothing to do — and whether the instance refuses that call or
+answers it with a success, the status code is an answer about the request and
+not about the card. It is the whole board that is read back rather than the
+column the removal named, because that column holds no card whether the removal
+took it off or the card had already moved elsewhere. The window is narrowed and
+not closed: Gitea has no conditional delete, so a card put back on the board
+after the confirming walk is one the command has already reported on.
+
+A `--column-id` that is passed is used as it stands, and nothing is read back
+for it: a column that does not hold the card is the caller's call to make rather
+than something quietly corrected here, and whatever the instance answers such a
+removal with is reported as it came.
 
 `add` and `move` are not two ways of doing the same thing. `add` puts an issue
 on a board, giving it a card in a column; `move` relocates the card it already
