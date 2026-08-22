@@ -23,6 +23,13 @@ def move_issue_command(
         int | None,
         typer.Option("--sorting", help="Position within the column, ascending."),
     ] = None,
+    add_if_missing: Annotated[
+        bool,
+        typer.Option(
+            "--add-if-missing",
+            help="Put the issue in the target column when it has no card on the project yet, instead of failing.",
+        ),
+    ] = False,
     repository: Annotated[
         str | None,
         typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
@@ -56,7 +63,14 @@ def move_issue_command(
         ),
     ] = None,
 ) -> None:
-    """Move an issue between a project's columns.
+    """Move an issue's card between a project's columns.
+
+    The issue has to be on the project already: a move relocates the card the
+    issue has there, and an issue with no card has nothing to relocate. Gitea
+    answers such a call with a success all the same, so the card is looked for
+    first and its absence is reported as an error naming 'project issue add',
+    which is the command that puts an issue on a board. Pass --add-if-missing to
+    have this command do that itself when there is no card yet.
 
     Args:
         ctx: The Typer context.
@@ -67,6 +81,8 @@ def move_issue_command(
             global issue ID when that repository is not known.
         column_id: The target column ID.
         sorting: The position within the column, ascending.
+        add_if_missing: Whether to put the issue in the target column when it has
+            no card on the project yet, rather than reporting that it has none.
         issue_repository: The name of the repository holding the issue,
             defaulting to the repository holding the project.
         account_name: Name of the account to use for authentication.
@@ -78,7 +94,7 @@ def move_issue_command(
 
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
-    from gitea.cli.utils.issue import run_project_issue_call  # noqa: PLC0415
+    from gitea.cli.utils.issue import run_project_issue_move  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -96,21 +112,16 @@ def move_issue_command(
 
         """
         with Gitea(token=token, base_url=base_url) as client:
-            return run_project_issue_call(
+            return run_project_issue_move(
                 client=client,
-                call=lambda resolved_issue_id: client.project.move_project_issue(
-                    owner=owner,
-                    repository=repository,
-                    project_id=project_id,
-                    issue_id=resolved_issue_id,
-                    column_id=column_id,
-                    sorting=sorting,
-                ),
-                action="move",
                 owner=owner,
+                repository=repository,
                 project_id=project_id,
                 issue_number=issue_id,
+                column_id=column_id,
+                sorting=sorting,
                 issue_repository=issue_repository or repository,
+                add_if_missing=add_if_missing,
             )
 
     execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli project issue move")

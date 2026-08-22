@@ -54,6 +54,12 @@ def add_issue_command(
 ) -> None:
     """Add an issue to a project column.
 
+    This is the command for putting an issue on a board, where 'project issue
+    move' relocates a card the issue already has on the project. An issue with
+    none is not something a move can act on, so this is what runs for it -
+    either on its own, or as what 'project issue move --add-if-missing' falls
+    back to when it finds no card.
+
     Args:
         ctx: The Typer context.
         owner: The owner of the repository.
