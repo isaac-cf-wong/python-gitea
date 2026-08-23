@@ -129,10 +129,22 @@ all of them stays in one `base.py`, so every URL the resource can address is in
 one place.
 
 That package's `__init__.py` re-exports nothing, unlike its neighbours'. With
-thirteen modules a re-export would make `import gitea.actions.scope` execute all
-of them, and would put each in an import cycle: importing a submodule imports
-its package, so a package that imports its submodules is one they import back.
-`tests/actions/test_actions_imports.py` pins both properties.
+thirteen modules an eager re-export would make `import gitea.actions.scope`
+execute all of them, and would put each in an import cycle: importing a
+submodule imports its package, so a package that imports its submodules is one
+they import back. `tests/actions/test_actions_imports.py` pins both properties.
+
+The neighbours keep their re-exports and avoid the same two costs by resolving
+them on first read instead, through a module-level `__getattr__` (PEP 562) that
+`gitea._lazy.lazy_reexports` builds from a table of name against origin module.
+`from gitea.issue import Issue` works exactly as it did, while
+`import gitea.issue.base` no longer executes either client - and the package no
+longer imports the submodules that import it back, which is where 44 of the
+import cycles in this tree came from. Each such package keeps a `TYPE_CHECKING`
+block naming the same imports, so editors and type checkers still resolve the
+names statically; that block does not execute, so it reintroduces no cycle.
+`tests/test_lazy_reexports.py` pins the public names, the laziness, and the
+absence of any module-level import cycle anywhere in `gitea`.
 
 ## CLI Layer
 

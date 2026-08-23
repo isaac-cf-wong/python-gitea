@@ -171,10 +171,17 @@ and an async class (e.g. `gitea.issue.AsyncIssue`); some modules re-export them
 from the package `__init__` (e.g. `from gitea.issue import Issue`). See the
 [API Reference](../reference/index.md) for the full method list and signatures.
 
+Those package-level re-exports are resolved when the name is first read rather
+than when the package is imported, so both spellings work and neither costs more
+than it needs to: `from gitea.issue import Issue` imports `gitea.issue.issue` at
+that moment, and `import gitea.issue.base` imports neither class. The only way
+to notice is by introspection - a name is absent from the package's `__dict__`
+until something reads it, though `dir()` still lists it.
+
 `gitea.actions` is the one package that re-exports nothing, so import its two
 classes from the modules they live in -
 `from gitea.actions.actions import Actions`. It is thirteen modules where the
-others are three, and a re-export would make `import gitea.actions.scope`
+others are three, and an eager re-export would make `import gitea.actions.scope`
 execute all thirteen.
 
 ## Actions
