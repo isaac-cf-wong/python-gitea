@@ -2,7 +2,7 @@
 
 `gitea/actions/__init__.py` re-exports nothing, and that is load-bearing rather
 than an oversight. This package is thirteen modules where every other resource is
-three, so a re-export there would mean two things:
+three, so an eager re-export there would mean two things:
 
 * `import gitea.actions.scope` - a module that depends on nothing - would execute
   every family module and both clients on the way in.
@@ -24,7 +24,7 @@ import sys
 
 import pytest
 
-# The modules a re-export in `__init__.py` would drag in, and which importing one
+# The modules an eager re-export in `__init__.py` would drag in, and which importing one
 # leaf must therefore not load. `actions` and `async_actions` are the two the
 # re-export named; the families are what those two import in turn.
 FAMILY_MODULES = [
@@ -68,7 +68,7 @@ def test_importing_a_leaf_module_loads_only_what_it_needs(module: str) -> None:
 
     `scope` depends on nothing and `base` depends only on `scope`, so a fresh
     interpreter asked for either has no reason to load a client or a family - and
-    would load all of them if the package re-exported its classes.
+    would load all of them if the package re-exported its classes eagerly.
     """
     loaded = loaded_after_importing(module)
 
