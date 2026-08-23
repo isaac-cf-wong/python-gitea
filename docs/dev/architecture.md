@@ -35,7 +35,15 @@ src/gitea/
 │   └── manager.py           # ConfigManager (load/save/CRUD accounts)
 ├── resource/                # Resource base class
 │   └── resource.py          # Shared request helpers for resources
-├── actions/                 # Actions resource (sync + async)
+├── actions/                 # Actions resource (sync + async), composed per family
+│   ├── base.py              # Every Actions path and query parameter
+│   ├── scope.py             # Which scope a set of coordinates addresses
+│   ├── actions.py           # Workflows, runs, jobs; composes the families below
+│   ├── run_management.py    # Cancel, approve, rerun, delete a run
+│   ├── artifact.py          # The files a run produced, archive included
+│   ├── secret.py            # Write-only secrets of a scope
+│   ├── variable.py          # Their readable counterpart
+│   └── runner.py            # Runners of a scope, and the registration token
 ├── issue/                   # Issue resource (sync + async)
 ├── pull_request/            # Pull request resource (sync + async)
 ├── repository/              # Repository resource (sync + async)
@@ -49,7 +57,7 @@ src/gitea/
 ├── cli/                     # Typer CLI application
 │   ├── main.py              # gitea-cli entry point, command registration
 │   ├── config/              # config commands
-│   ├── actions/             # actions workflow, run, and job commands
+│   ├── actions/             # actions workflow, run, job, artifact, secret, variable, runner commands
 │   ├── issue/               # issue + issue dependency commands
 │   ├── pull_request/        # pull-request commands
 │   ├── comment/             # comment commands
@@ -109,6 +117,22 @@ Work that spans several endpoints lives beside the resource rather than inside
 it, so the resource methods stay one-to-one with the API. For example,
 `gitea.issue.project_column` resolves the board column an issue's card sits in,
 which Gitea only reveals through the project's column listings.
+
+`actions` is the one resource split further, into a module per family - runs,
+artifacts, secrets, variables, runners - which `Actions` and `AsyncActions`
+compose. Gitea's Actions API is large enough that one class per client would be
+a file nobody reads end to end, and the families differ from each other in ways
+worth writing down beside their own methods: which listings answer with an
+object and which with a bare array, which endpoints answer with a file rather
+than a document, and which scopes each family exists at. The path building for
+all of them stays in one `base.py`, so every URL the resource can address is in
+one place.
+
+That package's `__init__.py` re-exports nothing, unlike its neighbours'. With
+thirteen modules a re-export would make `import gitea.actions.scope` execute all
+of them, and would put each in an import cycle: importing a submodule imports
+its package, so a package that imports its submodules is one they import back.
+`tests/actions/test_actions_imports.py` pins both properties.
 
 ## CLI Layer
 

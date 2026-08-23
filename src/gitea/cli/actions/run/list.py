@@ -1,4 +1,16 @@
-"""List the Actions workflow runs of a repository."""
+"""List the Actions workflow runs of a repository, an organization, an account or the instance.
+
+The same endpoint exists at four scopes, so which one is asked for follows the
+usual convention - `--owner` with `--repository` for a repository, `--owner` alone
+for an organization, neither for the authenticated account - and `--admin` asks
+for the instance.
+
+Two options belong to the repository form alone. `--workflow-id` narrows to one
+workflow, which only a repository has, and `--exclude-pull-requests` is a
+parameter only the repository listing takes. Passing either outside a repository
+is reported rather than quietly ignored, since a filter that silently does nothing
+answers with runs the caller did not ask for.
+"""
 
 from __future__ import annotations
 
@@ -6,7 +18,7 @@ from typing import Annotated
 
 import typer
 
-from gitea.cli.utils.options import REPOSITORY_REQUIRED_HELP, WORKFLOW_ID_HELP
+from gitea.cli.utils.options import ADMIN_HELP, OWNER_SCOPE_HELP, REPOSITORY_SCOPE_HELP, WORKFLOW_ID_HELP
 
 COMMAND_NAME = "gitea-cli actions run list"
 
@@ -15,11 +27,15 @@ STATUS_HELP = "Status of the runs to list: pending, queued, in_progress, failure
 
 def list_runs_command(
     ctx: typer.Context,
-    owner: Annotated[str, typer.Option("--owner", help="Owner of the repository.")],
-    repository: Annotated[str | None, typer.Option("--repository", help=REPOSITORY_REQUIRED_HELP)] = None,
+    owner: Annotated[str | None, typer.Option("--owner", help=OWNER_SCOPE_HELP)] = None,
+    repository: Annotated[str | None, typer.Option("--repository", help=REPOSITORY_SCOPE_HELP)] = None,
+    admin: Annotated[bool, typer.Option("--admin", help=ADMIN_HELP)] = False,
     workflow_id: Annotated[
         str | None,
-        typer.Option("--workflow-id", help=f"List the runs of this workflow alone. {WORKFLOW_ID_HELP}"),
+        typer.Option(
+            "--workflow-id",
+            help=f"List the runs of this workflow alone, which only a repository has. {WORKFLOW_ID_HELP}",
+        ),
     ] = None,
     event: Annotated[
         str | None,
@@ -33,7 +49,10 @@ def list_runs_command(
         bool,
         typer.Option(
             "--exclude-pull-requests",
-            help="Leave the pull_requests field of each run empty, which makes a long listing much smaller.",
+            help=(
+                "Leave the pull_requests field of each run empty, which makes a long listing much smaller. "
+                "Only the repository listing takes it."
+            ),
         ),
     ] = False,
     page: Annotated[int | None, typer.Option("--page", help="The page number for pagination.")] = None,
@@ -60,7 +79,7 @@ def list_runs_command(
         ),
     ] = None,
 ) -> None:
-    """List the Actions workflow runs of a repository.
+    """List the Actions workflow runs of a repository, an organization, an account or the instance.
 
     The listing is the object the endpoint answers with: `total_count` and
     `workflow_runs`, rather than a bare array as the other listings in this CLI
@@ -69,8 +88,9 @@ def list_runs_command(
 
     Args:
         ctx: The Typer context.
-        owner: The owner of the repository.
-        repository: The name of the repository, which this command requires.
+        owner: The owner of the repository, or the organization itself.
+        repository: The name of the repository, to narrow the owner to one of its repositories.
+        admin: Whether to list the runs of the whole instance.
         workflow_id: The file name of the workflow to list the runs of.
         event: The event that triggered the run.
         branch: The branch the run is on.
@@ -89,7 +109,7 @@ def list_runs_command(
 
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
-    from gitea.cli.utils.options import require_repository  # noqa: PLC0415
+    from gitea.cli.utils.options import reporting_scope_errors  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -106,13 +126,12 @@ def list_runs_command(
             A tuple containing the run listing and metadata.
 
         """
-        target_repository = require_repository(repository, command=COMMAND_NAME)
-
-        with Gitea(token=token, base_url=base_url) as client:
+        with reporting_scope_errors(COMMAND_NAME), Gitea(token=token, base_url=base_url) as client:
             return client.actions.list_workflow_runs(
                 owner=owner,
-                repository=target_repository,
+                repository=repository,
                 workflow_id=workflow_id,
+                admin=admin,
                 event=event,
                 branch=branch,
                 status=status,

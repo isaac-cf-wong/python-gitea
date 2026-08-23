@@ -39,7 +39,7 @@ from gitea.cli.main import app
 from gitea.watch.state import STATE_FILE_ENV
 from tests.cli.envelope import parse_envelope
 from tests.cli.tree import leaf_commands
-from tests.transport import NO_CONTENT, RawBody, RoutedSession
+from tests.transport import NO_CONTENT, RawBody, RawBytes, RoutedSession
 
 runner = CliRunner()
 
@@ -232,6 +232,43 @@ WORKFLOW_JOBS = {"total_count": 1, "jobs": [WORKFLOW_JOB]}
 # A log as the endpoint sends it: the file itself, not a document describing it.
 JOB_LOGS = "::group::Run\nbuilding\n::endgroup::\n"
 
+ARTIFACT = {
+    "id": 9,
+    "name": "dist",
+    "size_in_bytes": 12,
+    "expired": False,
+    "archive_download_url": f"{BASE_URL}/api/v1/repos/o/r/actions/artifacts/9/zip",
+}
+
+ARTIFACTS = {"total_count": 1, "artifacts": [ARTIFACT]}
+
+# An archive as the endpoint sends it: the zip, not a document describing it, and
+# not text either. The bytes are not valid UTF-8 on purpose.
+ARTIFACT_ARCHIVE = b"PK\x03\x04\xff\xfe zip \x00"
+
+# The two listings of this API that answer with a bare array. Their contracts are
+# lists where their neighbours' are objects, which is the difference being pinned.
+SECRET = {"name": "DEPLOY_TOKEN", "description": "for deploys", "created_at": "2026-08-23T10:00:00+02:00"}
+
+VARIABLE = {"name": "ENVIRONMENT", "data": "staging", "description": "", "owner_id": 23, "repo_id": 254}
+
+RUNNER = {
+    "id": 7,
+    "name": "runner-1",
+    "status": "online",
+    "busy": False,
+    "disabled": False,
+    "ephemeral": False,
+    "labels": [{"id": 1, "name": "ubuntu-latest", "type": "docker"}],
+}
+
+RUNNERS = {"total_count": 1, "runners": [RUNNER]}
+
+# Spelled so that it reads as a fixture rather than as a credential: the
+# secret scanner in the pre-commit suite flags anything that looks like one,
+# and it is right to.
+REGISTRATION_TOKEN = {"token": "a-fake-registration-token"}
+
 USER_SETTINGS = {
     "full_name": "Someone",
     "theme": "gitea",
@@ -330,6 +367,12 @@ BOARD = ("--owner", "o", "--project-id", "31")
 WORKFLOW_ARGS = ("--workflow-id", "build.yml")
 RUN_ARGS = ("--run-id", "42")
 JOB_ARGS = ("--job-id", "118")
+ARTIFACT_ARGS = ("--artifact-id", "9")
+RUNNER_ARGS = ("--runner-id", "7")
+
+# The two entities Gitea addresses by name rather than by number.
+SECRET_ARGS = ("--secret-name", "DEPLOY_TOKEN")
+VARIABLE_ARGS = ("--variable-name", "ENVIRONMENT")
 
 CONTRACTS = (
     # --- config: the CLI's own objects, not the API's ----------------------
@@ -448,6 +491,71 @@ CONTRACTS = (
         payload=RawBody(JOB_LOGS),
         data={"job_id": 118, "logs": JOB_LOGS},
     ),
+    # The commands that act on a run. Each answers with the run or the job it
+    # acted on, so what they emit is the same object the listings emit - which is
+    # the point of pinning them: a command rebuilding a summary of its own would
+    # be a second shape for the same thing.
+    Contract(path=("actions", "run", "cancel"), args=(*REPO, *RUN_ARGS), payload=WORKFLOW_RUN),
+    Contract(path=("actions", "run", "force-cancel"), args=(*REPO, *RUN_ARGS), payload=WORKFLOW_RUN),
+    Contract(path=("actions", "run", "approve"), args=(*REPO, *RUN_ARGS), payload=WORKFLOW_RUN),
+    Contract(path=("actions", "run", "rerun"), args=(*REPO, *RUN_ARGS), payload=WORKFLOW_RUN),
+    Contract(path=("actions", "run", "delete"), args=(*REPO, *RUN_ARGS), payload=NO_CONTENT, data={}),
+    Contract(path=("actions", "job", "rerun"), args=(*REPO, *RUN_ARGS, *JOB_ARGS), payload=WORKFLOW_JOB),
+    Contract(path=("actions", "job", "list"), args=REPO, payload=WORKFLOW_JOBS),
+    # --- actions: artifacts ------------------------------------------------
+    Contract(path=("actions", "artifact", "list"), args=REPO, payload=ARTIFACTS),
+    Contract(path=("actions", "artifact", "get"), args=(*REPO, *ARTIFACT_ARGS), payload=ARTIFACT),
+    Contract(
+        path=("actions", "artifact", "download"),
+        args=(*REPO, *ARTIFACT_ARGS, "--file", "dist.zip"),
+        # The second endpoint answering with a file, and the only one answering
+        # with bytes that are not text. The archive goes to the path rather than
+        # into the envelope, so what is emitted is where it went and how large it
+        # was - neither of which the response has a field for.
+        payload=RawBytes(ARTIFACT_ARCHIVE),
+        data={"artifact_id": 9, "path": "dist.zip", "size_in_bytes": len(ARTIFACT_ARCHIVE)},
+    ),
+    Contract(path=("actions", "artifact", "delete"), args=(*REPO, *ARTIFACT_ARGS), payload=NO_CONTENT, data={}),
+    # --- actions: secrets, variables, runners ------------------------------
+    #
+    # The secret and variable listings answer with a bare array, where every other
+    # Actions listing answers with a `total_count` object. That is Gitea's, and a
+    # command wrapping one to match its neighbours would break a consumer reading
+    # the array; these entries are what says which is which.
+    Contract(path=("actions", "secret", "list"), args=REPO, payload=[SECRET]),
+    Contract(
+        path=("actions", "secret", "set"),
+        args=(*REPO, *SECRET_ARGS, "--data", "hunter2"),
+        # One endpoint creates and replaces, and answers `201` or `204` with no
+        # body either way, so an empty object is what a secret that was set emits.
+        payload=NO_CONTENT,
+        data={},
+    ),
+    Contract(path=("actions", "secret", "delete"), args=(*REPO, *SECRET_ARGS), payload=NO_CONTENT, data={}),
+    Contract(path=("actions", "variable", "list"), args=REPO, payload=[VARIABLE]),
+    Contract(path=("actions", "variable", "get"), args=(*REPO, *VARIABLE_ARGS), payload=VARIABLE),
+    Contract(
+        path=("actions", "variable", "create"),
+        args=(*REPO, *VARIABLE_ARGS, "--value", "staging"),
+        payload=NO_CONTENT,
+        data={},
+    ),
+    Contract(
+        path=("actions", "variable", "update"),
+        args=(*REPO, *VARIABLE_ARGS, "--value", "staging"),
+        payload=NO_CONTENT,
+        data={},
+    ),
+    Contract(path=("actions", "variable", "delete"), args=(*REPO, *VARIABLE_ARGS), payload=NO_CONTENT, data={}),
+    Contract(path=("actions", "runner", "list"), args=REPO, payload=RUNNERS),
+    Contract(path=("actions", "runner", "get"), args=(*REPO, *RUNNER_ARGS), payload=RUNNER),
+    Contract(
+        path=("actions", "runner", "update"),
+        args=(*REPO, *RUNNER_ARGS, "--state", "disabled"),
+        payload=RUNNER,
+    ),
+    Contract(path=("actions", "runner", "delete"), args=(*REPO, *RUNNER_ARGS), payload=NO_CONTENT, data={}),
+    Contract(path=("actions", "runner", "registration-token"), args=REPO, payload=REGISTRATION_TOKEN),
     # --- org, repo: discovering what an instance holds ----------------------
     Contract(path=("org", "list"), payload=[ORGANIZATION]),
     Contract(path=("repo", "list"), args=("--owner", "o"), payload=[REPOSITORY]),
@@ -631,6 +739,11 @@ def test_subcommand_emits_the_declared_data(
 ) -> None:
     """Every subcommand should emit the envelope its contract declares, exactly."""
     monkeypatch.setenv(STATE_FILE_ENV, str(tmp_path / "watch-state.json"))
+    # One command writes a file: `actions artifact download` saves the archive to
+    # the path it was given, and its entry gives a relative one so that the path
+    # it emits can be pinned. The working directory is moved so that the file
+    # lands in the throwaway one rather than wherever the suite was started from.
+    monkeypatch.chdir(tmp_path)
     config_path = tmp_path / "config.yaml"
     write_config(config_path)
 

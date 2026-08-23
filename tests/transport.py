@@ -24,6 +24,10 @@ request whose endpoint really answers `204` is not tested against a body the API
 never sends, and `RawBody` answers with bytes rather than with JSON, for the
 endpoints - a job's logs - that send a file rather than a document.
 
+`RawBytes` is its sibling for a body that is not text at all - the zip archive of
+an artifact - so that a byte sequence no encoding would decode reaches the client
+as itself, and a method that decoded it would be seen to.
+
 `AsyncRecordingSession` is the same stand-in for the asynchronous client, which
 builds an `aiohttp` session rather than a `requests` one and awaits both the
 request and the reading of its body. It records what the synchronous one records,
@@ -88,6 +92,34 @@ class RawBody:
         return f"RawBody({self.text!r})"
 
 
+class RawBytes:
+    """A body an endpoint sends as bytes that are not text.
+
+    The archive of an Actions artifact is a zip file, and the point of handing it
+    back undecoded is that decoding it would corrupt it. A payload declared as one
+    of these carries the bytes exactly, invalid UTF-8 included, so a method that
+    decoded them replaces those bytes and the assertion sees it.
+    """
+
+    def __init__(self, body: bytes) -> None:
+        """Hold the bytes this body carries.
+
+        Args:
+            body: The body, as the endpoint sends it.
+
+        """
+        self.body = body
+
+    def __repr__(self) -> str:
+        """Name the body in a test failure.
+
+        Returns:
+            The body, spelled as it was declared.
+
+        """
+        return f"RawBytes({self.body!r})"
+
+
 class RecordedResponse:
     """The answer the recording session gives, shaped like the response a request returns.
 
@@ -102,8 +134,9 @@ class RecordedResponse:
 
         Args:
             payload: JSON-serializable body to answer with, `NO_CONTENT` to
-                answer as an endpoint that succeeds without a body does, or a
-                `RawBody` to answer with bytes rather than with JSON.
+                answer as an endpoint that succeeds without a body does, a
+                `RawBody` to answer with text rather than with JSON, or a
+                `RawBytes` to answer with bytes that are not text.
 
         """
         if isinstance(payload, NoContent):
@@ -112,6 +145,9 @@ class RecordedResponse:
         elif isinstance(payload, RawBody):
             self.status_code = 200
             self.content = payload.text.encode()
+        elif isinstance(payload, RawBytes):
+            self.status_code = 200
+            self.content = payload.body
         else:
             self.status_code = 200
             self.content = json.dumps(payload).encode()
@@ -268,8 +304,9 @@ class AsyncRecordedResponse:
 
         Args:
             payload: JSON-serializable body to answer with, `NO_CONTENT` to
-                answer as an endpoint that succeeds without a body does, or a
-                `RawBody` to answer with bytes rather than with JSON.
+                answer as an endpoint that succeeds without a body does, a
+                `RawBody` to answer with text rather than with JSON, or a
+                `RawBytes` to answer with bytes that are not text.
 
         """
         if isinstance(payload, NoContent):
@@ -278,6 +315,9 @@ class AsyncRecordedResponse:
         elif isinstance(payload, RawBody):
             self.status = 200
             self.body = payload.text.encode()
+        elif isinstance(payload, RawBytes):
+            self.status = 200
+            self.body = payload.body
         else:
             self.status = 200
             self.body = json.dumps(payload).encode()

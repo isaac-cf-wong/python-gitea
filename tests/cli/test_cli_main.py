@@ -30,10 +30,18 @@ runner = CliRunner()
 _STUB = "stub"
 
 # Leaf commands for which no harmless no-op invocation exists - one that could
-# not get past argument validation without a live server, say. Empty today; add
-# a path here together with the reason rather than weakening the assertions in
+# not get past argument validation without a live server, say. Add a path here
+# together with the reason rather than weakening the assertions in
 # `test_json_mode_routes_every_subcommand_through_a_structured_path`.
-_NO_NOOP_INVOCATION: frozenset[tuple[str, ...]] = frozenset()
+#
+# `actions artifact download` is here because its endpoint answers with the zip
+# archive rather than with a document, and the command writes it to the path
+# `--file` names. A synthesized invocation would do two things this walk must not:
+# write a file called `stub` into the working directory, and hand the stub
+# client's listing to `Path.write_bytes`. Its own tests cover it instead, and
+# `test_every_subcommand_module_wires_the_structured_output_path` still checks
+# that it routes through `emit`.
+_NO_NOOP_INVOCATION: frozenset[tuple[str, ...]] = frozenset({("actions", "artifact", "download")})
 
 # Options the CLI's naming convention declares optional at the parser level so
 # that omitting one asks for the owner-wide target, and which a command whose
