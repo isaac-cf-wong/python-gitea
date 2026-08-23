@@ -29,7 +29,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "ruff>=0.16.3",
+  "ruff>=0.16.4",
   # The mutation runner, in the environment `uv run` resolves, so that
   # `uv run mutmut run` reaches the same interpreter as `uv run pytest` and finds
   # the pytest plugins the suite's own options need. Run from a tool environment
