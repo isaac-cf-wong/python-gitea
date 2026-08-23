@@ -126,9 +126,18 @@ way, so an invocation can be written without reading `--help` first:
 | `--owner`       | The user or organization that owns the target. Required. |
 | `--repository`  | Narrows the target to one repository of that owner.      |
 | `--<entity>-id` | Names the entity acted on.                               |
+| `--admin`       | Asks for the instance-wide form, where one exists.       |
 
-The entity options are `--issue-id`, `--project-id`, `--column-id`, `--label-id`
-and `--comment-id`.
+The entity options are `--issue-id`, `--project-id`, `--column-id`,
+`--label-id`, `--comment-id`, `--workflow-id`, `--run-id`, `--job-id`,
+`--artifact-id` and `--runner-id`. Two entities Gitea addresses by name rather
+than by number - an Actions secret and an Actions variable - are named by
+`--secret-name` and `--variable-name`, since `--secret-id` would promise a
+number the API does not have.
+
+`--admin` is offered by the Actions commands whose endpoint has an instance-wide
+form. It belongs to no owner, so it cannot be combined with `--owner`, and it
+needs an administrator's token. See [the Actions scopes](#actions-scopes).
 
 Omitting `--repository` asks for the target that belongs to the owner itself
 rather than to one of its repositories. The `project` commands have both forms:
@@ -137,6 +146,9 @@ rather than to one of its repositories. The `project` commands have both forms:
 gitea-cli project get --owner my-org --project-id 1                      # organization project
 gitea-cli project get --owner my-org --repository my-repo --project-id 1  # repository project
 ```
+
+Most of the Actions commands have both forms too, and some have four: see
+[the Actions scopes](#actions-scopes) for the table.
 
 The other families have no owner-wide endpoint - an issue, a comment, a label, a
 milestone and a pull request all live in a repository - so omitting
@@ -205,11 +217,14 @@ endpoint to serve it with, so they answer by naming the option to pass.
     - Under `--output json` the confirmation prompt is written to stderr so that
       stdout stays parsable; pass `--force` to skip it entirely.
 
-### Actions - run and inspect workflows
+### Actions - run, inspect and configure workflows
 
 A workflow is the file in the repository and what is dispatched, a run is one
-execution of it and what carries the status, and a job is a part of a run and
-what carries the logs. The commands are grouped that way.
+execution of it and what carries the status, a job is a part of a run and what
+carries the logs, and an artifact is a file a job produced. The commands are
+grouped that way. Three further groups configure Actions rather than watch it: a
+`secret` and a `variable` are what a workflow reads at run time, and a `runner`
+is a machine that executes jobs.
 
 `--workflow-id` is the workflow's **file name** - `build.yml` - and not a
 number: that is what Gitea's endpoint takes. `--run-id` and `--job-id` are IDs,
@@ -233,12 +248,15 @@ as everywhere else.
       `--input query=a=b` sets `query` to `a=b`. An input given twice with two
       different values is refused rather than one of them silently kept.
 - `gitea-cli actions run list --owner <owner> --repository <repo>`
-    - Optional: `--workflow-id`, `--event`, `--branch`, `--status`, `--actor`,
-      `--head-sha`, `--exclude-pull-requests`, `--page`, `--limit`
+    - Optional: `--workflow-id`, `--admin`, `--event`, `--branch`, `--status`,
+      `--actor`, `--head-sha`, `--exclude-pull-requests`, `--page`, `--limit`
     - `--status` is one of `pending`, `queued`, `in_progress`, `failure`,
       `success`, `skipped`.
     - `--workflow-id` asks a different endpoint - the workflow's own runs -
       rather than filtering the repository's.
+    - This listing exists at four [scopes](#actions-scopes). `--workflow-id` and
+      `--exclude-pull-requests` belong to the repository form alone, and passing
+      either outside a repository is refused rather than quietly ignored.
 - `gitea-cli actions run get --owner <owner> --repository <repo> --run-id <id>`
     - `status` says how far the run has got, `conclusion` how it ended. A run
       still going has no conclusion yet.
@@ -252,14 +270,170 @@ as everywhere else.
       like the file it is; `--output json` wraps it in the envelope instead,
       with the log as a string under `logs` and `job_id` alongside it. A job
       that has produced nothing yet prints nothing.
+- `gitea-cli actions job list --owner <owner> --repository <repo>`
+    - Optional: `--admin`, `--status`, `--page`, `--limit`
+    - A different endpoint from `run jobs`: it answers with **every** job of the
+      scope rather than the jobs of one run, so `--status queued` finds what is
+      waiting for a runner without walking the runs to reach it. Exists at four
+      [scopes](#actions-scopes).
 
-The three listings here answer with an **object** and not with the bare array
-the other listings in this CLI return: `total_count` alongside `workflows`,
+These listings answer with an **object** and not with the bare array the other
+listings in this CLI return: `total_count` alongside `workflows`,
 `workflow_runs` or `jobs`. That is the shape Gitea's Actions endpoints send, and
 [the field-name convention](#field-names) is why it is passed through rather
 than flattened. So a script reads `.data.workflow_runs[]` where it would read
 `.data[]` for issues. One page is fetched per invocation; `--page` and `--limit`
 walk a long history.
+
+#### Acting on a run
+
+- `gitea-cli actions run cancel --owner <owner> --repository <repo> --run-id <id>`
+    - Asks the run's jobs to stop and waits for them to notice. A job whose
+      runner has gone away never does, and the run then stays `in_progress`.
+- `gitea-cli actions run force-cancel --owner <owner> --repository <repo> --run-id <id>`
+    - Marks the run cancelled regardless, which is what clears a stuck one. It
+      is a different endpoint and not a retry of `cancel`: a job that really is
+      still running somewhere is disowned rather than stopped, so cancel first
+      and reach for this when that has not taken effect.
+- `gitea-cli actions run approve --owner <owner> --repository <repo> --run-id <id>`
+    - A run triggered by a first-time contributor's pull request waits for
+      someone with write access and shows as `blocked` until then.
+- `gitea-cli actions run rerun --owner <owner> --repository <repo> --run-id <id>`
+    - Optional: `--failed-jobs`
+    - `--failed-jobs` reruns only the jobs that failed, which is a different
+      endpoint and the one for a long run that failed on one flaky job: the jobs
+      that succeeded keep their results. It answers without a body, so an empty
+      `data` there is a rerun that started.
+- `gitea-cli actions job rerun --owner <owner> --repository <repo> --run-id <id> --job-id <id>`
+    - Reruns one named job. This is the one job command that takes the run as
+      well, because Gitea addresses the rerun through the run.
+- `gitea-cli actions run delete --owner <owner> --repository <repo> --run-id <id>`
+    - Deletes the run **and** the jobs, logs and artifacts it produced, which is
+      how a repository is cleared of those rather than only of the run's entry.
+      A run that has not finished cannot be deleted; cancel it first.
+
+Cancelling, approving and rerunning answer with the run as it now stands, so
+`.data.status` says what the request did rather than only that it was taken.
+
+#### Artifacts
+
+An artifact is a file a job uploaded. Uploading one is not offered here and is
+not an omission: Gitea has no REST endpoint for it - an artifact is uploaded
+from inside a running job, by the runner, over the Actions protocol.
+
+- `gitea-cli actions artifact list --owner <owner> --repository <repo>`
+    - Optional: `--run-id`, `--name`
+    - `--run-id` asks the run's own artifacts, a different endpoint rather than
+      a filter. `--name` narrows rather than identifies: a run uploading one
+      artifact per job has several of the same name.
+    - Answers with an object: `total_count` alongside `artifacts`.
+- `gitea-cli actions artifact get --owner <owner> --repository <repo> --artifact-id <id>`
+    - `size_in_bytes` sizes a download and `expired` says whether there is an
+      archive left to download at all.
+- `gitea-cli actions artifact download --owner <owner> --repository <repo> --artifact-id <id> --file <path>`
+    - Optional: `--force`
+    - Writes the zip to `--file`; it is never written to stdout, since a zip
+      interleaved with the JSON envelope would be neither. `--force` overwrites
+      an existing file, and without it an existing path is refused. An artifact
+      whose archive has expired is reported rather than saved as a zero-byte
+      file.
+    - `data` names where the archive went and how large it was - `path` and
+      `size_in_bytes` - since the response itself carries no field saying
+      either.
+- `gitea-cli actions artifact delete --owner <owner> --repository <repo> --artifact-id <id>`
+    - Deletes the archive; the run it belongs to stays, and keeps its logs.
+
+#### Secrets, variables and runners
+
+<a id="actions-scopes"></a> These three, and the `run list` and `job list`
+commands, exist at more than one **scope**, and which one is asked for follows
+[the naming convention](#option-naming):
+
+| Coordinates                  | Scope                     | Path                                |
+| ---------------------------- | ------------------------- | ----------------------------------- |
+| `--owner` and `--repository` | that repository           | `/repos/{owner}/{repo}/actions/...` |
+| `--owner` alone              | that organization         | `/orgs/{owner}/actions/...`         |
+| neither                      | the authenticated account | `/user/actions/...`                 |
+| `--admin`                    | the whole instance        | `/admin/actions/...`                |
+
+`--owner` alone is the **organization** form, not a generic owner form: Gitea
+answers it only for an organization. `--admin` needs an administrator's token
+and cannot be combined with `--owner`.
+
+Not every group offers every scope. A secret cannot be _listed_ for the
+authenticated account, and neither secrets nor variables have an instance-wide
+form. Asking for a scope that does not exist is refused by name rather than
+answered with an empty listing, which is what the missing endpoint would
+otherwise look like.
+
+- `gitea-cli actions secret list --owner <owner> [--repository <repo>]`
+    - Optional: `--page`, `--limit`
+    - A secret's value is never listed: Gitea stores it write-only, so the
+      entries carry the name, the description and when it was set. Answers with
+      a **bare array**, unlike the other Actions listings.
+    - A job sees the secrets of every scope above it, so a repository's listing
+      is not the set of secrets its workflows can read.
+- `gitea-cli actions secret set --secret-name <name> --data <value> [--owner <owner>] [--repository <repo>]`
+    - Optional: `--description`
+    - `--data -` reads the value from **stdin**, which is the spelling to use
+      anywhere the value matters: a value on the command line is in the shell
+      history and in the process list of the machine it ran on. Exactly one
+      trailing newline is stripped, so `echo` and `printf` both send what they
+      look like they send.
+    - One endpoint creates and replaces. Gitea answers `201` when the secret was
+      new and `204` when it replaced one, so `.metadata.status_code` is what
+      says which happened; both are success.
+    - Omitting `--description` leaves the existing one rather than clearing it.
+- `gitea-cli actions secret delete --secret-name <name> [--owner <owner>] [--repository <repo>]`
+- `gitea-cli actions variable list [--owner <owner>] [--repository <repo>]`
+    - Optional: `--page`, `--limit`
+    - The readable counterpart of a secret: the value comes back, under `data`.
+      Anything a workflow must not print belongs in a secret instead. Answers
+      with a bare array.
+- `gitea-cli actions variable get --variable-name <name> [--owner <owner>] [--repository <repo>]`
+- `gitea-cli actions variable create --variable-name <name> --value <value> [--owner <owner>] [--repository <repo>]`
+    - Optional: `--description`
+    - A name that already exists is a conflict rather than an overwrite, so this
+      is safe to retry against a name believed to be free.
+- `gitea-cli actions variable update --variable-name <name> --value <value> [--owner <owner>] [--repository <repo>]`
+    - Optional: `--new-name`, `--description`
+    - `--value` is required even by an update that only means to rename: Gitea
+      requires the value in the body, so read it with `variable get` first
+      rather than guessing it. `--new-name` is the rename; omitting it leaves
+      the name alone.
+- `gitea-cli actions variable delete --variable-name <name> [--owner <owner>] [--repository <repo>]`
+- `gitea-cli actions runner list [--owner <owner>] [--repository <repo>] [--admin]`
+    - Optional: `--state enabled|disabled`
+    - A runner is registered to one scope and then runs the jobs of everything
+      under it, so a scope's listing shows the runners registered **there** -
+      not every runner that could pick up its jobs. A repository whose jobs all
+      run on an organization runner has an empty listing of its own, and that is
+      not a repository with nowhere to run.
+    - `status` says whether the runner is reachable and `busy` whether it is
+      running something; both are independent of `--state`, since a runner can
+      be online and disabled at once and then takes no jobs. Answers with an
+      object: `total_count` alongside `runners`.
+- `gitea-cli actions runner get --runner-id <id> [--owner <owner>] [--repository <repo>] [--admin]`
+    - `labels` is what a job's `runs-on` is matched against, and is the usual
+      reason a job sits queued while a runner sits idle.
+    - A runner is addressed through the scope it is registered to, so a real
+      runner asked for through another scope is reported as not found.
+- `gitea-cli actions runner update --runner-id <id> --state enabled|disabled [--owner <owner>] [--repository <repo>] [--admin]`
+    - `--state` is Gitea's `disabled` field, named rather than offered as a
+      flag: there is no partial update of a runner, so an update says which of
+      the two states it means rather than defaulting to one. Disabling is the
+      reversible alternative to `runner delete`.
+- `gitea-cli actions runner delete --runner-id <id> [--owner <owner>] [--repository <repo>] [--admin]`
+    - Removes the registration. A runner process still running keeps trying to
+      poll and is refused, so a machine meant to come back has to re-register.
+- `gitea-cli actions runner registration-token [--owner <owner>] [--repository <repo>] [--admin]`
+    - The token `act_runner register` is given. Registering a runner is not
+      something this API does: take the token here, register the machine out of
+      band, then list what appeared.
+    - The token belongs to the **scope** and not to one runner, and it is a
+      credential: anything holding it can attach a machine that will execute the
+      scope's jobs. It is printed, so redirect it rather than leaving it in a
+      shell history or a CI log.
 
 ### Issue - manage issues
 
@@ -727,6 +901,53 @@ gitea-cli --output json actions run jobs \
     jq -r '.data.jobs[] | select(.conclusion == "failure") | .id' |
     while read -r job; do
         gitea-cli actions job logs --owner my-org --repository my-repo --job-id "$job"
+    done
+```
+
+Rerun only the jobs that failed, then wait for the run to settle:
+
+```bash
+gitea-cli actions run rerun \
+    --owner my-org --repository my-repo --run-id 42 --failed-jobs
+
+until [ "$(gitea-cli --output json actions run get \
+    --owner my-org --repository my-repo --run-id 42 |
+    jq -r '.data.status')" != "in_progress" ]; do
+    sleep 10
+done
+```
+
+Set a secret without putting it in the shell history or the process list:
+
+```bash
+read -rs -p 'token: ' token
+printf %s "$token" |
+    gitea-cli actions secret set \
+        --owner my-org --repository my-repo \
+        --secret-name DEPLOY_TOKEN --data - --description 'staging deploys'
+unset token
+```
+
+Find the jobs that are waiting for a runner across a whole organization, and the
+runners that could take them:
+
+```bash
+gitea-cli --output json actions job list --owner my-org --status queued |
+    jq -r '.data.jobs[] | "\(.id)\t\(.name)"'
+
+gitea-cli --output json actions runner list --owner my-org |
+    jq -r '.data.runners[] | "\(.name)\t\(.status)\t\([.labels[].name] | join(","))"'
+```
+
+Download the artifacts of a run, skipping the ones whose archive is gone:
+
+```bash
+gitea-cli --output json actions artifact list \
+    --owner my-org --repository my-repo --run-id 42 |
+    jq -r '.data.artifacts[] | select(.expired == false) | "\(.id)\t\(.name)"' |
+    while IFS=$'\t' read -r id name; do
+        gitea-cli actions artifact download \
+            --owner my-org --repository my-repo --artifact-id "$id" --file "$name.zip"
     done
 ```
 

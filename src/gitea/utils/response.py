@@ -119,3 +119,48 @@ async def process_async_text_response(response: ClientResponse, default: str = "
         if body:
             return body.decode("utf-8", errors="replace"), status_code
     return default, status_code
+
+
+def process_binary_response(response: Response, default: bytes = b"") -> tuple[bytes, int]:
+    """Process a synchronous HTTP response whose body is a file rather than a document.
+
+    An Actions artifact is a zip archive, so there is nothing to parse and
+    nothing to decode: handing back the bytes is the whole of it. Decoding them
+    as text - as the log endpoints are decoded - would replace every byte that is
+    not valid UTF-8 and produce an archive that no longer opens, which is why
+    this exists alongside `process_text_response` rather than reusing it.
+
+    Args:
+        response: The HTTP response object.
+        default: The value to return when the response carries no body.
+
+    Returns:
+        A tuple containing the response body and status code.
+
+    """
+    status_code = response.status_code
+    if 200 <= status_code < 300 and response.content:  # noqa: PLR2004
+        return response.content, cast(int, status_code)
+    return default, cast(int, status_code)
+
+
+async def process_async_binary_response(response: ClientResponse, default: bytes = b"") -> tuple[bytes, int]:
+    """Process an asynchronous HTTP response whose body is a file rather than a document.
+
+    Handed back as `process_binary_response` hands it back, so an artifact
+    downloaded through either client is the same archive.
+
+    Args:
+        response: The asynchronous HTTP response object.
+        default: The value to return when the response carries no body.
+
+    Returns:
+        A tuple containing the response body and status code.
+
+    """
+    status_code = response.status
+    if 200 <= status_code < 300:  # noqa: PLR2004
+        body = await response.read()
+        if body:
+            return body, status_code
+    return default, status_code

@@ -5,8 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from gitea.utils.response import (
+    process_async_binary_response,
     process_async_response,
     process_async_text_response,
+    process_binary_response,
     process_response,
     process_text_response,
 )
@@ -261,3 +263,119 @@ class TestProcessAsyncTextResponse:
 
         assert await process_async_text_response(mock_response) == ("", 404)
         mock_response.read.assert_not_called()
+
+
+# A zip as Gitea sends one: the local file header, then bytes that no encoding
+# would decode. They are the point of these tests - the text path would replace
+# them, and an archive that has been through that no longer opens.
+ARCHIVE = b"PK\x03\x04\xff\xfe not text \x00"
+
+
+class TestProcessBinaryResponse:
+    """Test cases for process_binary_response, which reads a body that is a file."""
+
+    def test_the_bytes_are_handed_back_as_they_arrived(self):
+        """A body is returned unchanged, byte for byte."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = ARCHIVE
+
+        assert process_binary_response(mock_response) == (ARCHIVE, 200)
+
+    def test_invalid_utf8_survives(self):
+        """Bytes that are not valid UTF-8 are not replaced, where the text path replaces them.
+
+        This is the whole reason the binary path exists beside the text one. The
+        comparison is against `process_text_response` on the same bytes, so the
+        two are seen to differ rather than asserted to in a comment.
+        """
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = ARCHIVE
+
+        binary, _ = process_binary_response(mock_response)
+        text, _ = process_text_response(mock_response)
+
+        assert binary == ARCHIVE
+        assert text.encode() != ARCHIVE
+
+    def test_an_empty_body_gives_the_default(self):
+        """A response with no body answers with the default, which is the empty bytes.
+
+        An expired artifact answers exactly this way, so the default has to be
+        bytes: a caller writing the result to a file meets a `TypeError` otherwise.
+        """
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = b""
+
+        assert process_binary_response(mock_response) == (b"", 200)
+
+    def test_no_content_gives_the_default(self):
+        """A 204 answers with the default rather than with an empty archive."""
+        mock_response = MagicMock()
+        mock_response.status_code = 204
+        mock_response.content = b""
+
+        assert process_binary_response(mock_response, default=b"none") == (b"none", 204)
+
+    def test_an_error_status_gives_the_default(self):
+        """A failure answers with the default and reports the status."""
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.content = b"not found"
+
+        assert process_binary_response(mock_response) == (b"", 404)
+
+
+class TestProcessAsyncBinaryResponse:
+    """Test cases for process_async_binary_response."""
+
+    @pytest.mark.asyncio
+    async def test_the_bytes_are_handed_back_as_they_arrived(self):
+        """A body is returned unchanged, byte for byte."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read = AsyncMock(return_value=ARCHIVE)
+
+        assert await process_async_binary_response(mock_response) == (ARCHIVE, 200)
+
+    @pytest.mark.asyncio
+    async def test_both_clients_hand_back_the_same_archive(self):
+        """The two paths should agree, so an artifact is the same file from either client."""
+        synchronous = MagicMock()
+        synchronous.status_code = 200
+        synchronous.content = ARCHIVE
+
+        asynchronous = MagicMock()
+        asynchronous.status = 200
+        asynchronous.read = AsyncMock(return_value=ARCHIVE)
+
+        assert process_binary_response(synchronous)[0] == (await process_async_binary_response(asynchronous))[0]
+
+    @pytest.mark.asyncio
+    async def test_an_empty_body_gives_the_default(self):
+        """A response with no body answers with the default."""
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read = AsyncMock(return_value=b"")
+
+        assert await process_async_binary_response(mock_response) == (b"", 200)
+
+    @pytest.mark.asyncio
+    async def test_no_content_gives_the_default(self):
+        """A 204 answers with the default and never reads the body."""
+        mock_response = MagicMock()
+        mock_response.status = 204
+        mock_response.read = AsyncMock(return_value=b"")
+
+        assert await process_async_binary_response(mock_response, default=b"none") == (b"none", 204)
+
+    @pytest.mark.asyncio
+    async def test_an_error_status_gives_the_default(self):
+        """A failure answers with the default and reports the status."""
+        mock_response = MagicMock()
+        mock_response.status = 404
+        mock_response.read = AsyncMock(return_value=b"not found")
+
+        assert await process_async_binary_response(mock_response) == (b"", 404)

@@ -152,38 +152,41 @@ is simpler and sufficient.
 
 ## Available Resources
 
-| Client attribute      | Gitea domain                          |
-| --------------------- | ------------------------------------- |
-| `client.actions`      | Actions workflows, runs, and job logs |
-| `client.issue`        | Issues and issue dependencies         |
-| `client.pull_request` | Pull requests                         |
-| `client.repository`   | Repositories                          |
-| `client.user`         | Users and user settings               |
-| `client.comment`      | Issue comments                        |
-| `client.label`        | Issue labels                          |
-| `client.milestone`    | Milestones                            |
-| `client.notification` | Notifications                         |
-| `client.project`      | Projects, columns, and project issues |
-| `client.organization` | Organizations                         |
+| Client attribute      | Gitea domain                                                           |
+| --------------------- | ---------------------------------------------------------------------- |
+| `client.actions`      | Actions: workflows, runs, jobs, artifacts, secrets, variables, runners |
+| `client.issue`        | Issues and issue dependencies                                          |
+| `client.pull_request` | Pull requests                                                          |
+| `client.repository`   | Repositories                                                           |
+| `client.user`         | Users and user settings                                                |
+| `client.comment`      | Issue comments                                                         |
+| `client.label`        | Issue labels                                                           |
+| `client.milestone`    | Milestones                                                             |
+| `client.notification` | Notifications                                                          |
+| `client.project`      | Projects, columns, and project issues                                  |
+| `client.organization` | Organizations                                                          |
 
 Each resource is implemented in a synchronous class (e.g. `gitea.issue.Issue`)
 and an async class (e.g. `gitea.issue.AsyncIssue`); some modules re-export them
 from the package `__init__` (e.g. `from gitea.issue import Issue`). See the
 [API Reference](../reference/index.md) for the full method list and signatures.
 
-## Actions Workflows, Runs, and Logs
+## Actions
 
-`client.actions` wraps the Actions endpoints: the workflows of a repository,
-dispatching one, the runs and their status, and the jobs of a run with their
-logs.
+`client.actions` wraps the Actions endpoints: the workflows of a repository and
+dispatching one, the runs and their status, the jobs of a run with their logs,
+the artifacts a run produced, and the secrets, variables and runners a workflow
+runs against.
 
-Two things about it differ from every other resource here, both because the
+Four things about it differ from every other resource here, all because the
 endpoints themselves differ:
 
-**A listing answers with an object, not an array.** `total_count` sits alongside
-`workflows`, `workflow_runs` or `jobs`, which is what Gitea sends, so it is what
-these methods hand back - keyed as the API keys it, as
-[the field-name convention](#field-names) requires.
+**Most listings answer with an object, not an array.** `total_count` sits
+alongside `workflows`, `workflow_runs`, `jobs`, `artifacts` or `runners`, which
+is what Gitea sends, so it is what these methods hand back - keyed as the API
+keys it, as [the field-name convention](#field-names) requires. The secret and
+variable listings are the exception: those two really do answer with a bare
+array, so they hand back a list and fall back to the empty one.
 
 ```python
 runs, _ = client.actions.list_workflow_runs(
@@ -194,17 +197,76 @@ for run in runs["workflow_runs"]:
     print(run["run_number"], run["status"], run["conclusion"])
 ```
 
-**A job's logs are text.** `get_workflow_job_logs` is the one method here whose
-payload is not a parsed body: the endpoint answers with the log file, so the
-method hands back the log as a string, decoded as UTF-8, and the empty string
-for a job that has produced no output yet.
+**Two endpoints answer with a file.** `get_workflow_job_logs` hands back the log
+as a string, decoded as UTF-8, and the empty string for a job that has produced
+no output yet. `download_artifact` hands back the zip archive as **bytes**,
+undecoded: decoding it would replace every byte that is not valid UTF-8 and
+produce an archive that no longer opens.
 
 ```python
-logs, metadata = client.actions.get_workflow_job_logs(
-    owner="my-org", repository="my-repo", job_id=118
-)
+logs, metadata = client.actions.get_workflow_job_logs(owner="my-org", repository="my-repo", job_id=118)
 print(logs, end="")
+
+from pathlib import Path
+
+archive, metadata = client.actions.download_artifact(owner="my-org", repository="my-repo", artifact_id=9)
+Path("dist.zip").write_bytes(archive)
 ```
+
+An artifact whose archive has expired answers with no body, so empty bytes mean
+the archive is gone rather than empty; `expired` on the artifact itself is what
+says which. Uploading an artifact is not offered, and is not an omission: Gitea
+has no REST endpoint for it - an artifact is uploaded from inside a running job,
+by the runner, over the Actions protocol.
+
+<a id="actions-scopes"></a> **Most of the API exists at four scopes.** Secrets,
+variables, runners and the run and job listings belong to a repository, to an
+organization, to the authenticated account or to the instance, at paths that
+differ while the request does not. Which one a call means is decided by the
+coordinates it was given, not by the method name:
+
+| Arguments                | Scope                     | Path                                |
+| ------------------------ | ------------------------- | ----------------------------------- |
+| `owner` and `repository` | that repository           | `/repos/{owner}/{repo}/actions/...` |
+| `owner` alone            | that organization         | `/orgs/{owner}/actions/...`         |
+| neither                  | the authenticated account | `/user/actions/...`                 |
+| `admin=True`             | the whole instance        | `/admin/actions/...`                |
+
+```python
+client.actions.list_runners(owner="my-org", repository="my-repo")  # the repository's own
+client.actions.list_runners(owner="my-org")  # the organization's
+client.actions.list_runners()  # the authenticated account's
+client.actions.list_runners(admin=True)  # the instance's
+```
+
+`owner` alone is the **organization** form, not a generic owner form: Gitea
+answers it only for an organization.
+
+Not every family offers every scope. A secret cannot be _listed_ for the
+authenticated account, and neither secrets nor variables have an instance-wide
+form. Asking for one that does not exist raises `ValueError` naming the scopes
+that would have worked, rather than reaching a URL that answers `404` - which
+would read as "no secrets" instead of "no such endpoint".
+
+**Several endpoints answer without a body.** Setting a secret answers `201` when
+it was new and `204` when it replaced one; deleting anything answers `204`;
+rerunning only the failed jobs of a run answers `201` with nothing. In each case
+the payload is the empty object and `metadata["status_code"]` is what says what
+happened.
+
+```python
+_, metadata = client.actions.create_or_update_secret(
+    secret_name="DEPLOY_TOKEN", data=token, owner="my-org", repository="my-repo"
+)
+created = metadata["status_code"] == 201
+```
+
+A secret is write-only: nothing reads its value back, which is why there is no
+`get_secret`. A variable is its readable counterpart, with the value under
+`data` - and where a secret has one endpoint that both creates and replaces, a
+variable has two: `create_variable` refuses a name that exists, and
+`update_variable` replaces one that does. `update_variable` requires the value
+even when only the name is changing, so read it first rather than guessing it.
 
 Dispatching answers `204` with no body, which says the request was accepted but
 not which run it started. Ask for the run to be named when you mean to follow
@@ -222,6 +284,25 @@ details, metadata = client.actions.dispatch_workflow(
 )
 run_id = details.get("workflow_run_id")
 ```
+
+Cancelling a run has two endpoints and not one, chosen by an argument rather
+than by a method of its own: `cancel_workflow_run` asks the run's jobs to stop
+and waits for them to notice, which a job whose runner has gone away never does,
+and `force=True` marks the run cancelled regardless. Rerunning is the same
+shape: `failed_jobs_only=True` is a different endpoint, and the one to reach for
+when a long run failed on one flaky job.
+
+```python
+run, _ = client.actions.cancel_workflow_run(owner="my-org", repository="my-repo", run_id=42)
+print(run["status"])  # says whether the cancellation has taken effect yet
+
+client.actions.cancel_workflow_run(owner="my-org", repository="my-repo", run_id=42, force=True)
+client.actions.rerun_workflow_run(owner="my-org", repository="my-repo", run_id=42, failed_jobs_only=True)
+```
+
+`delete_workflow_run` deletes the run's jobs, logs and artifacts with it, which
+is how a repository is cleared of those rather than only of the run's entry; a
+run that has not finished cannot be deleted.
 
 ## Field Names
 

@@ -1,4 +1,8 @@
-"""Asynchronous Gitea Actions resource."""
+"""Asynchronous Gitea Actions resource.
+
+The asynchronous mirror of `gitea.actions.actions`, which is the module to read
+for what the resource covers and where each family of endpoints lives.
+"""
 
 from __future__ import annotations
 
@@ -6,12 +10,19 @@ from typing import Any, cast
 
 from aiohttp import ClientResponse
 
+from gitea.actions.async_artifact import AsyncArtifacts
+from gitea.actions.async_run_management import AsyncRunManagement
+from gitea.actions.async_runner import AsyncRunners
+from gitea.actions.async_secret import AsyncSecrets
+from gitea.actions.async_variable import AsyncVariables
 from gitea.actions.base import BaseActions
 from gitea.resource.async_resource import AsyncResource
 from gitea.utils.response import process_async_response, process_async_text_response
 
 
-class AsyncActions(BaseActions, AsyncResource):
+class AsyncActions(
+    AsyncRunManagement, AsyncArtifacts, AsyncSecrets, AsyncVariables, AsyncRunners, BaseActions, AsyncResource
+):
     """Asynchronous Gitea Actions resource."""
 
     async def _list_workflows(self, owner: str, repository: str, **kwargs: Any) -> ClientResponse:
@@ -164,9 +175,10 @@ class AsyncActions(BaseActions, AsyncResource):
 
     async def _list_workflow_runs(
         self,
-        owner: str,
-        repository: str,
+        owner: str | None = None,
+        repository: str | None = None,
         workflow_id: str | None = None,
+        admin: bool = False,
         event: str | None = None,
         branch: str | None = None,
         status: str | None = None,
@@ -180,9 +192,15 @@ class AsyncActions(BaseActions, AsyncResource):
         """List the workflow runs of a repository.
 
         Args:
-            owner: The owner of the repository.
-            repository: The name of the repository.
-            workflow_id: The workflow's file name, to list its runs alone.
+            owner: The owner of the repository, or the organization whose runs
+                are listed.
+            repository: The name of the repository, to list its runs alone.
+                Omitting it lists the organization's runs, and omitting both
+                lists the authenticated account's.
+            workflow_id: The workflow's file name, to list its runs alone. Only a
+                repository's runs can be narrowed to one workflow.
+            admin: Whether to list the runs of the whole instance, which answers
+                only to an administrator's token.
             event: The event that triggered the run.
             branch: The branch the run is on.
             status: The status of the runs to list.
@@ -202,6 +220,7 @@ class AsyncActions(BaseActions, AsyncResource):
             owner=owner,
             repository=repository,
             workflow_id=workflow_id,
+            admin=admin,
             event=event,
             branch=branch,
             status=status,
@@ -215,9 +234,10 @@ class AsyncActions(BaseActions, AsyncResource):
 
     async def list_workflow_runs(
         self,
-        owner: str,
-        repository: str,
+        owner: str | None = None,
+        repository: str | None = None,
         workflow_id: str | None = None,
+        admin: bool = False,
         event: str | None = None,
         branch: str | None = None,
         status: str | None = None,
@@ -231,9 +251,15 @@ class AsyncActions(BaseActions, AsyncResource):
         """List the workflow runs of a repository.
 
         Args:
-            owner: The owner of the repository.
-            repository: The name of the repository.
-            workflow_id: The workflow's file name, to list its runs alone.
+            owner: The owner of the repository, or the organization whose runs
+                are listed.
+            repository: The name of the repository, to list its runs alone.
+                Omitting it lists the organization's runs, and omitting both
+                lists the authenticated account's.
+            workflow_id: The workflow's file name, to list its runs alone. Only a
+                repository's runs can be narrowed to one workflow.
+            admin: Whether to list the runs of the whole instance, which answers
+                only to an administrator's token.
             event: The event that triggered the run.
             branch: The branch the run is on.
             status: The status of the runs to list.
@@ -255,6 +281,7 @@ class AsyncActions(BaseActions, AsyncResource):
             owner=owner,
             repository=repository,
             workflow_id=workflow_id,
+            admin=admin,
             event=event,
             branch=branch,
             status=status,
@@ -371,6 +398,90 @@ class AsyncActions(BaseActions, AsyncResource):
             owner=owner,
             repository=repository,
             run_id=run_id,
+            status=status,
+            page=page,
+            limit=limit,
+            **kwargs,
+        )
+        data, status_code = await process_async_response(response, default={})
+        return cast(dict[str, Any], data), {"status_code": status_code}
+
+    async def _list_workflow_jobs(
+        self,
+        owner: str | None = None,
+        repository: str | None = None,
+        admin: bool = False,
+        status: str | None = None,
+        page: int | None = None,
+        limit: int | None = None,
+        **kwargs: Any,
+    ) -> ClientResponse:
+        """List the jobs of a whole scope.
+
+        Args:
+            owner: The owner of the repository, or the organization whose jobs
+                are listed.
+            repository: The name of the repository, to list its jobs alone.
+            admin: Whether to list the jobs of the whole instance.
+            status: The status of the jobs to list.
+            page: The page number for pagination.
+            limit: The number of jobs per page.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint, params = self._list_workflow_jobs_helper(
+            owner=owner,
+            repository=repository,
+            admin=admin,
+            status=status,
+            page=page,
+            limit=limit,
+        )
+        return await self._get(endpoint=endpoint, params=params, **kwargs)
+
+    async def list_workflow_jobs(
+        self,
+        owner: str | None = None,
+        repository: str | None = None,
+        admin: bool = False,
+        status: str | None = None,
+        page: int | None = None,
+        limit: int | None = None,
+        **kwargs: Any,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """List the jobs of a whole scope, rather than of one run.
+
+        This is a different endpoint from `list_workflow_run_jobs`, and the
+        difference is what makes it useful: it answers with every job of the
+        scope, so `status="queued"` finds the jobs that are waiting for a runner
+        without walking the runs to reach them. Asking one run for its jobs is
+        still the way to see how that run went.
+
+        Args:
+            owner: The owner of the repository, or the organization whose jobs
+                are listed. Omitting both this and `repository` lists the jobs of
+                the authenticated account.
+            repository: The name of the repository, to list its jobs alone.
+            admin: Whether to list the jobs of the whole instance, which answers
+                only to an administrator's token.
+            status: The status of the jobs to list: `pending`, `queued`,
+                `in_progress`, `failure`, `success` or `skipped`.
+            page: The page number for pagination.
+            limit: The number of jobs per page.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing the listing - an object carrying `total_count` and
+            `jobs`, as the endpoint answers with - and a dictionary with metadata.
+
+        """
+        response = await self._list_workflow_jobs(
+            owner=owner,
+            repository=repository,
+            admin=admin,
             status=status,
             page=page,
             limit=limit,

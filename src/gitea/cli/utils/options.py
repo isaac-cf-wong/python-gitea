@@ -11,7 +11,12 @@ The CLI names a target the same way in every command family:
   organization case.
 - An entity is named by `--<entity>-id`: `--issue-id`, `--project-id`,
   `--column-id`, `--label-id`, `--comment-id`, `--workflow-id`, `--run-id`,
-  `--job-id`.
+  `--job-id`, `--artifact-id`, `--runner-id`. The two entities Gitea addresses
+  by name rather than by number - a secret and a variable - are named by
+  `--secret-name` and `--variable-name`, since `--secret-id` would promise a
+  number the API does not have.
+- `--admin` asks for the instance-wide form of an endpoint, where one exists. It
+  belongs to no owner, so it is refused together with `--owner`.
 
 A second target in the same command carries its own coordinates, and those are
 required together because there is no scope for them to fall back to:
@@ -27,6 +32,8 @@ user sees the message alone rather than a traceback.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 from gitea.cli.utils.errors import CommandError
 
@@ -45,6 +52,54 @@ DEPRECATED_INDEX_HELP = "Deprecated alias of --issue-id."
 WORKFLOW_ID_HELP = "File name of the workflow, as it is named under .gitea/workflows, e.g. build.yml."
 RUN_ID_HELP = "ID of the workflow run."
 JOB_ID_HELP = "ID of the job of a workflow run."
+ARTIFACT_ID_HELP = "ID of the artifact, as 'gitea-cli actions artifact list' reports it."
+RUNNER_ID_HELP = "ID of the runner, as 'gitea-cli actions runner list' reports it."
+# The help text of an option, not a credential: the name carries the word the
+# security check looks for.
+SECRET_NAME_HELP = "Name of the secret, which is how Gitea addresses it: there is no numeric ID."  # noqa: S105
+VARIABLE_NAME_HELP = "Name of the variable, which is how Gitea addresses it: there is no numeric ID."
+
+# The Actions scopes. Secrets, variables, runners and the run and job listings
+# exist for a repository, for an organization, for the authenticated account and -
+# for the runners and the listings - for the instance, at paths that differ while
+# the request does not. So the coordinates say which is meant, and the help says
+# what omitting one asks for, since an option that is optional everywhere gives no
+# hint of its own.
+OWNER_SCOPE_HELP = (
+    "Owner of the repository, or the organization itself. Omit it together with --repository to address the "
+    "authenticated account."
+)
+REPOSITORY_SCOPE_HELP = "Name of the repository. Omit it to address the owner named by --owner instead."
+ADMIN_HELP = (
+    "Address the whole instance rather than an owner or a repository. Answers only to an administrator's token, "
+    "and cannot be combined with --owner."
+)
+
+
+@contextmanager
+def reporting_scope_errors(command: str) -> Iterator[None]:
+    """Report coordinates that name no endpoint as a CLI error rather than a traceback.
+
+    The rule about which scopes an Actions endpoint has lives in
+    `gitea.actions.scope`, once, and is enforced there for every caller - so the
+    CLI does not restate it, which is how the two would come to disagree. What it
+    does instead is turn the library's `ValueError` into a `CommandError`, so the
+    user sees the sentence and not a stack trace.
+
+    Args:
+        command: The command being run, named as the user invoked it.
+
+    Yields:
+        Nothing; the block runs inside the conversion.
+
+    Raises:
+        CommandError: If the block rejected the coordinates it was given.
+
+    """
+    try:
+        yield
+    except ValueError as e:
+        raise CommandError(f"'{command}' was given coordinates it cannot address: {e}") from e
 
 
 def require_repository(repository: str | None, *, command: str) -> str:

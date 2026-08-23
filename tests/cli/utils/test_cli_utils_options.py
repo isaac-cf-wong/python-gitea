@@ -7,7 +7,7 @@ import logging
 import pytest
 
 from gitea.cli.utils.errors import CommandError
-from gitea.cli.utils.options import require_repository, resolve_issue_id
+from gitea.cli.utils.options import reporting_scope_errors, require_repository, resolve_issue_id
 
 
 class TestRequireRepository:
@@ -111,3 +111,56 @@ class TestResolveIssueId:
             )
 
         assert "--dependency-issue-id" in str(excinfo.value)
+
+
+class TestReportingScopeErrors:
+    """Test cases for `reporting_scope_errors`."""
+
+    def test_a_block_that_succeeds_is_left_alone(self):
+        """The conversion should be invisible when nothing was refused."""
+        with reporting_scope_errors("gitea-cli actions secret list"):
+            outcome = "done"
+
+        assert outcome == "done"
+
+    def test_a_refused_scope_becomes_a_reportable_error(self):
+        """A `ValueError` from the client should become the kind of error the CLI reports.
+
+        The distinction matters: a `CommandError` reaches the user as its message,
+        and anything else reaches them as a traceback. The rule about which scopes
+        exist lives in the client, so this conversion is the whole of the CLI's
+        part in it.
+        """
+        with pytest.raises(CommandError) as excinfo, reporting_scope_errors("gitea-cli actions secret list"):
+            raise ValueError("Gitea has no Actions endpoint here for the authenticated account.")
+
+        message = str(excinfo.value)
+        assert "gitea-cli actions secret list" in message
+        assert "the authenticated account" in message
+
+    def test_the_original_message_is_carried_through_verbatim(self):
+        """The client's sentence should not be paraphrased, since it names what to pass instead."""
+        with (
+            pytest.raises(CommandError, match="offered for a repository or an organization"),
+            reporting_scope_errors("gitea-cli actions secret list"),
+        ):
+            raise ValueError("this one is offered for a repository or an organization")
+
+    def test_other_failures_are_left_to_be_reported_as_failures(self):
+        """Only a `ValueError` is converted; a real fault should still raise as itself.
+
+        Converting everything would turn a bug into a one-line message with no
+        traceback, which is exactly the case where the traceback is what is
+        wanted.
+        """
+        with pytest.raises(RuntimeError), reporting_scope_errors("gitea-cli actions secret list"):
+            raise RuntimeError("something is actually broken")
+
+    def test_the_refusal_keeps_its_cause(self):
+        """The original error should be chained, so a debugger can still reach it."""
+        original = ValueError("no such scope")
+
+        with pytest.raises(CommandError) as excinfo, reporting_scope_errors("gitea-cli actions runner list"):
+            raise original
+
+        assert excinfo.value.__cause__ is original
