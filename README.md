@@ -18,7 +18,8 @@ data retrieval, and management tasks.
 ## Features
 
 - **Full API Coverage**: Repositories, users, organizations, issues, pull
-  requests, comments, labels, milestones, notifications, and projects.
+  requests, comments, labels, milestones, notifications, projects, and Actions
+  workflows, runs, and job logs.
 - **Easy Authentication**: Token-based authentication, with multiple saved
   accounts and a default-account fallback.
 - **Asynchronous Support**: Built with `async`/`await` for non-blocking

@@ -205,6 +205,62 @@ endpoint to serve it with, so they answer by naming the option to pass.
     - Under `--output json` the confirmation prompt is written to stderr so that
       stdout stays parsable; pass `--force` to skip it entirely.
 
+### Actions - run and inspect workflows
+
+A workflow is the file in the repository and what is dispatched, a run is one
+execution of it and what carries the status, and a job is a part of a run and
+what carries the logs. The commands are grouped that way.
+
+`--workflow-id` is the workflow's **file name** - `build.yml` - and not a
+number: that is what Gitea's endpoint takes. `--run-id` and `--job-id` are IDs,
+as everywhere else.
+
+- `gitea-cli actions workflow list --owner <owner> --repository <repo>`
+- `gitea-cli actions workflow get --owner <owner> --repository <repo> --workflow-id <file>`
+- `gitea-cli actions workflow dispatch --owner <owner> --repository <repo> --workflow-id <file> --ref <ref>`
+    - Optional: `--input KEY=VALUE` (repeatable), `--return-run-details`
+    - The workflow has to declare a `workflow_dispatch` trigger: that is the
+      trigger a dispatch fires, so a workflow without one has nothing for this
+      to start.
+    - Gitea accepts a dispatch with `204` and no body, which says the request
+      was taken but not which run it started. `--return-run-details` asks the
+      response to name the run - `workflow_run_id`, `run_url`, `html_url` - so a
+      script can follow the run it dispatched instead of guessing which of the
+      runs that appeared is its own. An instance too old to know the parameter
+      answers without a body as before, so treat an empty `data` as "accepted,
+      run not named" rather than as a failure.
+    - Only the first `=` of an `--input` divides the name from the value, so
+      `--input query=a=b` sets `query` to `a=b`. An input given twice with two
+      different values is refused rather than one of them silently kept.
+- `gitea-cli actions run list --owner <owner> --repository <repo>`
+    - Optional: `--workflow-id`, `--event`, `--branch`, `--status`, `--actor`,
+      `--head-sha`, `--exclude-pull-requests`, `--page`, `--limit`
+    - `--status` is one of `pending`, `queued`, `in_progress`, `failure`,
+      `success`, `skipped`.
+    - `--workflow-id` asks a different endpoint - the workflow's own runs -
+      rather than filtering the repository's.
+- `gitea-cli actions run get --owner <owner> --repository <repo> --run-id <id>`
+    - `status` says how far the run has got, `conclusion` how it ended. A run
+      still going has no conclusion yet.
+- `gitea-cli actions run jobs --owner <owner> --repository <repo> --run-id <id>`
+    - Optional: `--status`, `--page`, `--limit`
+- `gitea-cli actions job get --owner <owner> --repository <repo> --job-id <id>`
+    - The job carries its `steps`, each with a `status` and a `conclusion`,
+      which is where a failure is narrowed to the step that failed.
+- `gitea-cli actions job logs --owner <owner> --repository <repo> --job-id <id>`
+    - Text output is the log itself, so it can be piped, grepped or redirected
+      like the file it is; `--output json` wraps it in the envelope instead,
+      with the log as a string under `logs` and `job_id` alongside it. A job
+      that has produced nothing yet prints nothing.
+
+The three listings here answer with an **object** and not with the bare array
+the other listings in this CLI return: `total_count` alongside `workflows`,
+`workflow_runs` or `jobs`. That is the shape Gitea's Actions endpoints send, and
+[the field-name convention](#field-names) is why it is passed through rather
+than flattened. So a script reads `.data.workflow_runs[]` where it would read
+`.data[]` for issues. One page is fetched per invocation; `--page` and `--limit`
+walk a long history.
+
 ### Issue - manage issues
 
 - `gitea-cli issue create --owner <owner> --repository <repo> --title <title>`
@@ -645,6 +701,33 @@ gitea-cli issue create \
     --title "Fix the docs" \
     --labels 1,2 \
     --milestone 3
+```
+
+Start a workflow, then follow the run it started:
+
+```bash
+run=$(gitea-cli --output json actions workflow dispatch \
+    --owner my-org \
+    --repository my-repo \
+    --workflow-id build.yml \
+    --ref main \
+    --input environment=staging \
+    --return-run-details |
+    jq -r '.data.workflow_run_id')
+
+gitea-cli --output json actions run get --owner my-org --repository my-repo --run-id "$run" |
+    jq -r '.data | "\(.status) \(.conclusion // "-")"'
+```
+
+Read the log of the job that failed:
+
+```bash
+gitea-cli --output json actions run jobs \
+    --owner my-org --repository my-repo --run-id 42 |
+    jq -r '.data.jobs[] | select(.conclusion == "failure") | .id' |
+    while read -r job; do
+        gitea-cli actions job logs --owner my-org --repository my-repo --job-id "$job"
+    done
 ```
 
 Put an issue on a project board, in a column of it, addressing the issue by the

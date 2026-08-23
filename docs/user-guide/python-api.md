@@ -154,6 +154,7 @@ is simpler and sufficient.
 
 | Client attribute      | Gitea domain                          |
 | --------------------- | ------------------------------------- |
+| `client.actions`      | Actions workflows, runs, and job logs |
 | `client.issue`        | Issues and issue dependencies         |
 | `client.pull_request` | Pull requests                         |
 | `client.repository`   | Repositories                          |
@@ -169,6 +170,58 @@ Each resource is implemented in a synchronous class (e.g. `gitea.issue.Issue`)
 and an async class (e.g. `gitea.issue.AsyncIssue`); some modules re-export them
 from the package `__init__` (e.g. `from gitea.issue import Issue`). See the
 [API Reference](../reference/index.md) for the full method list and signatures.
+
+## Actions Workflows, Runs, and Logs
+
+`client.actions` wraps the Actions endpoints: the workflows of a repository,
+dispatching one, the runs and their status, and the jobs of a run with their
+logs.
+
+Two things about it differ from every other resource here, both because the
+endpoints themselves differ:
+
+**A listing answers with an object, not an array.** `total_count` sits alongside
+`workflows`, `workflow_runs` or `jobs`, which is what Gitea sends, so it is what
+these methods hand back - keyed as the API keys it, as
+[the field-name convention](#field-names) requires.
+
+```python
+runs, _ = client.actions.list_workflow_runs(
+    owner="my-org", repository="my-repo", status="failure", limit=10
+)
+print(runs["total_count"])
+for run in runs["workflow_runs"]:
+    print(run["run_number"], run["status"], run["conclusion"])
+```
+
+**A job's logs are text.** `get_workflow_job_logs` is the one method here whose
+payload is not a parsed body: the endpoint answers with the log file, so the
+method hands back the log as a string, decoded as UTF-8, and the empty string
+for a job that has produced no output yet.
+
+```python
+logs, metadata = client.actions.get_workflow_job_logs(
+    owner="my-org", repository="my-repo", job_id=118
+)
+print(logs, end="")
+```
+
+Dispatching answers `204` with no body, which says the request was accepted but
+not which run it started. Ask for the run to be named when you mean to follow
+it; an instance too old to know the parameter answers without a body as before,
+so an empty payload is "accepted, run not named" rather than a failure.
+
+```python
+details, metadata = client.actions.dispatch_workflow(
+    owner="my-org",
+    repository="my-repo",
+    workflow_id="build.yml",  # the file name, which is what the endpoint takes
+    ref="refs/heads/main",
+    inputs={"environment": "staging"},
+    return_run_details=True,
+)
+run_id = details.get("workflow_run_id")
+```
 
 ## Field Names
 

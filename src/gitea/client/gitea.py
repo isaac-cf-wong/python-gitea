@@ -21,6 +21,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
             base_url: The base URL of the Gitea instance.
 
         """
+        from gitea.actions.actions import Actions  # noqa: PLC0415
         from gitea.comment.comment import Comment  # noqa: PLC0415
         from gitea.issue.issue import Issue  # noqa: PLC0415
         from gitea.label.label import Label  # noqa: PLC0415
@@ -36,6 +37,7 @@ class Gitea(Client):  # pylint: disable=too-few-public-methods
         self.session: requests.Session | None = None
 
         # Resource handlers
+        self.actions = Actions(client=self)
         self.issue = Issue(client=self)
         self.pull_request = PullRequest(client=self)
         self.repository = Repository(client=self)

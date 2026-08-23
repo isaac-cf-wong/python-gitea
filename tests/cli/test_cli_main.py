@@ -980,6 +980,7 @@ class TestRegisterCommands:
         register_commands()
 
         expected = {
+            "actions": "Commands for Gitea Actions.",
             "config": "Commands for managing configurations.",
             "issue": "Commands for managing issues.",
             "pull-request": "Commands for managing pull requests.",
