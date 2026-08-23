@@ -171,6 +171,12 @@ and an async class (e.g. `gitea.issue.AsyncIssue`); some modules re-export them
 from the package `__init__` (e.g. `from gitea.issue import Issue`). See the
 [API Reference](../reference/index.md) for the full method list and signatures.
 
+`gitea.actions` is the one package that re-exports nothing, so import its two
+classes from the modules they live in -
+`from gitea.actions.actions import Actions`. It is thirteen modules where the
+others are three, and a re-export would make `import gitea.actions.scope`
+execute all thirteen.
+
 ## Actions
 
 `client.actions` wraps the Actions endpoints: the workflows of a repository and

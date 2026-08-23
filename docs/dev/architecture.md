@@ -128,6 +128,12 @@ than a document, and which scopes each family exists at. The path building for
 all of them stays in one `base.py`, so every URL the resource can address is in
 one place.
 
+That package's `__init__.py` re-exports nothing, unlike its neighbours'. With
+thirteen modules a re-export would make `import gitea.actions.scope` execute all
+of them, and would put each in an import cycle: importing a submodule imports
+its package, so a package that imports its submodules is one they import back.
+`tests/actions/test_actions_imports.py` pins both properties.
+
 ## CLI Layer
 
 The CLI is a single Typer application registered in `cli/main.py`. Each resource
