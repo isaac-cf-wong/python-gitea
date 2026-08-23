@@ -21,4 +21,4 @@ _ORIGINS = {
     "ConfigManager": "gitea.config.manager",
 }
 
-__getattr__, __dir__ = lazy_reexports(__name__, _ORIGINS)
+__getattr__, __dir__ = lazy_reexports(globals(), _ORIGINS)

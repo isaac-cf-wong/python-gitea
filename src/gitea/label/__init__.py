@@ -20,4 +20,4 @@ _ORIGINS = {
     "Label": "gitea.label.label",
 }
 
-__getattr__, __dir__ = lazy_reexports(__name__, _ORIGINS)
+__getattr__, __dir__ = lazy_reexports(globals(), _ORIGINS)

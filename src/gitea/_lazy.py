@@ -19,7 +19,7 @@ package is imported, which is what a module-level `__getattr__` (PEP 562) is for
 `lazy_reexports` builds one, so each package spends a line on it rather than a
 hand-rolled copy of the same lookup:
 
-    __getattr__, __dir__ = lazy_reexports(__name__, {"Issue": "gitea.issue.issue"})
+    __getattr__, __dir__ = lazy_reexports(globals(), {"Issue": "gitea.issue.issue"})
 
 `from gitea.issue import Issue` runs that `__getattr__`, so every name stays importable
 exactly where it was and this is invisible from outside. What it is not is visible to a
@@ -36,30 +36,34 @@ cycles removed here are the ones Python itself has.
 
 from __future__ import annotations
 
-import sys
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable, Mapping, MutableMapping
 
 
-def lazy_reexports(package: str, origins: Mapping[str, str]) -> tuple[Callable[[str], Any], Callable[[], list[str]]]:
+def lazy_reexports(
+    namespace: MutableMapping[str, Any], origins: Mapping[str, str]
+) -> tuple[Callable[[str], Any], Callable[[], list[str]]]:
     """Build the `__getattr__` and `__dir__` with which a package re-exports on first read.
 
     Args:
-        package: The name of the package doing the re-exporting - `__name__` at the
-            call site. Used to find the module to cache onto, and to word the
-            `AttributeError` the way the interpreter would have.
+        namespace: The namespace of the package doing the re-exporting - `globals()` at
+            the call site, which is the module's own `__dict__`. Both hooks work on it
+            directly: reading a name binds it here, and `__dir__` reports what it holds.
+            Taking the namespace rather than looking the module up in `sys.modules` is
+            what makes both correct for a module that has outlived its entry there.
         origins: The public name of each re-export, against the dotted name of the
             module it lives in.
 
     Returns:
-        The `__getattr__` that serves those names, and the `__dir__` that reports them -
-        which is needed because a name nobody has read yet is absent from the module's
-        `__dict__`, and so from an unaided `dir()`.
+        The `__getattr__` that serves those names, and the `__dir__` that adds them to
+        what the module would report anyway - which is needed because a name nobody has
+        read yet is absent from the module's `__dict__`, and so from an unaided `dir()`.
 
     """
+    package = namespace["__name__"]
 
     def __getattr__(name: str) -> Any:  # noqa: N807
         try:
@@ -67,14 +71,20 @@ def lazy_reexports(package: str, origins: Mapping[str, str]) -> tuple[Callable[[
         except KeyError:
             raise AttributeError(f"module {package!r} has no attribute {name!r}") from None
         value = getattr(import_module(origin), name)
-        # Bind it on the package, so later reads take the ordinary attribute path rather
-        # than coming back here. This is also what keeps the semantics identical to the
-        # eager re-export it replaces: that bound the name once, at import, and a test
-        # patching the origin module afterwards did not change what the package exposed.
-        setattr(sys.modules[package], name, value)
+        # Bind it, so later reads take the ordinary attribute path rather than coming back
+        # here. This is also what keeps the semantics identical to the eager re-export it
+        # replaces: that bound the name once, at import, and a test patching the origin
+        # module afterwards did not change what the package exposed.
+        namespace[name] = value
         return value
 
     def __dir__() -> list[str]:  # noqa: N807
-        return sorted(origins)
+        # A module `__dir__` *replaces* the default listing rather than extending it, so
+        # this has to put back what the default would have said: everything already bound
+        # on the module - `__name__`, `__doc__`, `__all__`, the imported submodules - and
+        # not only the re-exports. The namespace is read directly rather than through
+        # `getattr`, so that listing the names is not what loads them; a re-export already
+        # read is in both halves, which the union collapses.
+        return sorted(namespace.keys() | origins.keys())
 
     return __getattr__, __dir__

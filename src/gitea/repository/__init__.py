@@ -20,4 +20,4 @@ _ORIGINS = {
     "Repository": "gitea.repository.repository",
 }
 
-__getattr__, __dir__ = lazy_reexports(__name__, _ORIGINS)
+__getattr__, __dir__ = lazy_reexports(globals(), _ORIGINS)

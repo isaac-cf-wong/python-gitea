@@ -43,4 +43,4 @@ _ORIGINS = {
     "resolve_project_column_ids": "gitea.issue.project_column",
 }
 
-__getattr__, __dir__ = lazy_reexports(__name__, _ORIGINS)
+__getattr__, __dir__ = lazy_reexports(globals(), _ORIGINS)

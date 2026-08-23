@@ -26,6 +26,7 @@ agree is itself one of the assertions below.
 from __future__ import annotations
 
 import ast
+import json
 import subprocess
 import sys
 from collections import defaultdict
@@ -244,25 +245,77 @@ def test_the_origins_table_agrees_with_all_and_with_this_test(package: str) -> N
 
 
 @pytest.mark.parametrize("package", sorted(RE_EXPORTS))
-def test_dir_reports_the_re_exports_without_loading_them(package: str) -> None:
-    """`dir()` should list the names, which it cannot do unaided before they are read.
+def test_dir_adds_the_re_exports_to_the_ordinary_names_without_loading_them(package: str) -> None:
+    """`dir()` must gain the lazy names without losing the ones it already reported.
 
-    A lazy name is absent from the module's `__dict__` until something asks for it, so
-    without the `__dir__` that `lazy_reexports` supplies the package would look empty to
-    anything that introspects it. Listing them must not be what loads them.
+    Two halves, and the second is the easier one to get wrong. A lazy name is absent from
+    the module's `__dict__` until something asks for it, so without a `__dir__` the
+    package would look empty to anything that introspects it - but a module `__dir__`
+    *replaces* the default listing rather than adding to it, so one that returns only the
+    re-exports drops `__name__`, `__doc__`, `__all__` and everything else the module
+    really has. Both halves are asserted here, against the module's own `__dict__` rather
+    than a fixed list, so nothing the package holds can go unlisted.
+
+    Listing the names must also not be what loads them, which is why `__dir__` reads
+    `vars()` rather than reaching through `getattr`.
     """
-    expected = sorted(RE_EXPORTS[package])
+    expected = set(RE_EXPORTS[package])
     origins = set(RE_EXPORTS[package].values())
 
-    program = f"import {package}\nprint(' '.join(sorted(dir({package}))))"
-    listed = subprocess.run(  # noqa: S603
+    # One interpreter, so that what `dir()` listed and what the module then held cannot
+    # come from two different states. `bound` is read after the `dir()` call on purpose.
+    program = (
+        f"import json, sys\n"
+        f"import {package}\n"
+        f"listed = dir({package})\n"
+        f"bound = list(vars({package}))\n"
+        f"loaded = [n for n in sys.modules if n.startswith({package!r})]\n"
+        f"print(json.dumps({{'listed': listed, 'bound': bound, 'loaded': loaded}}))\n"
+    )
+    completed = subprocess.run(  # noqa: S603
         [sys.executable, "-c", program], capture_output=True, text=True, check=True
-    ).stdout.split()
-    loaded = loaded_under(package, f"import {package}\ndir({package})")
+    )
+    result = json.loads(completed.stdout)
+    listed, bound, loaded = set(result["listed"]), set(result["bound"]), set(result["loaded"])
 
-    assert expected == sorted(set(listed) & set(expected)), f"dir({package}) omitted names"
-    assert set(expected) <= set(listed)
+    # The lazy names are listed...
+    assert expected <= listed, f"dir({package}) omitted {sorted(expected - listed)}"
+    # ...and so is everything the module actually holds, dunders included.
+    assert bound <= listed, f"dir({package}) omitted {sorted(bound - listed)}"
+    for ordinary in ("__name__", "__doc__", "__all__", "__file__", "__package__", "__path__", "__spec__"):
+        assert ordinary in listed, f"dir({package}) omitted {ordinary}"
+    # Listing them neither imported an origin nor bound a name.
     assert loaded & origins == set(), f"dir({package}) loaded {sorted(loaded & origins)}"
+    assert bound & expected == set(), f"dir({package}) bound {sorted(bound & expected)}"
+
+
+@pytest.mark.parametrize("package", sorted(RE_EXPORTS))
+def test_dir_and_attribute_access_survive_the_module_leaving_sys_modules(package: str) -> None:
+    """A module object outlives its `sys.modules` entry, and both hooks run on it.
+
+    `monkeypatch.delitem(sys.modules, ...)` is the usual way to arrange that, and a
+    reference to the module kept across it is still a live module whose `__dir__` and
+    `__getattr__` a caller may reach. Both find the module through `sys.modules`, so
+    neither may assume the entry is still there - `dir()` in particular should never
+    raise, which a bare subscript would have made it do.
+    """
+    name = min(RE_EXPORTS[package])
+
+    program = (
+        f"import sys\n"
+        f"import {package} as m\n"
+        f"del sys.modules[{package!r}]\n"
+        f"listed = dir(m)\n"
+        f"assert {name!r} in listed, 'the re-export went missing from dir()'\n"
+        f"assert '__name__' in listed, 'the ordinary names went missing from dir()'\n"
+        f"assert getattr(m, {name!r}).__name__ == {name!r}, 'the re-export stopped resolving'\n"
+        "print('ok')\n"
+    )
+    completed = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", program], capture_output=True, text=True, check=False
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 @pytest.mark.parametrize("package", sorted(RE_EXPORTS))

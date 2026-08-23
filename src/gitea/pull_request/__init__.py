@@ -20,4 +20,4 @@ _ORIGINS = {
     "PullRequest": "gitea.pull_request.pull_request",
 }
 
-__getattr__, __dir__ = lazy_reexports(__name__, _ORIGINS)
+__getattr__, __dir__ = lazy_reexports(globals(), _ORIGINS)

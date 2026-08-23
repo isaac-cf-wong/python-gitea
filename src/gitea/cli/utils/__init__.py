@@ -20,4 +20,4 @@ _ORIGINS = {
     "get_auth_params": "gitea.cli.utils.auth",
 }
 
-__getattr__, __dir__ = lazy_reexports(__name__, _ORIGINS)
+__getattr__, __dir__ = lazy_reexports(globals(), _ORIGINS)
