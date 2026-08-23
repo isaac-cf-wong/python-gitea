@@ -455,6 +455,26 @@ CONTRACTS = (
             "dry_run",
         ),
     ),
+    Contract(
+        path=("watch", "advance"),
+        args=REPO,
+        # As above, the run under test is the second one: the first records what
+        # is there, so this one has a baseline to have moved past.
+        warmup=(("/comments", [COMMENT]), ("", [ISSUE])),
+        routes=(("/comments", [COMMENT]), ("", [OTHER_ISSUE])),
+        # What was recorded, not what changed: the command commits the baseline
+        # rather than reporting the difference. `change_count` is how far it
+        # moved - the issue that appeared and the one that went away.
+        data=[{"scope": WATCH_SCOPE, "issue_count": 1, "change_count": 2, "baselined": False}],
+        metadata=(
+            "status_code",
+            "scopes",
+            "baselined_scopes",
+            "issue_count",
+            "change_count",
+            "state_file",
+        ),
+    ),
 )
 
 
