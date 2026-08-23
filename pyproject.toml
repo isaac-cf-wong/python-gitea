@@ -99,6 +99,8 @@ pytest_add_cli_args = [
   "tests/utils/test_utils_pagination.py::TestEndOfListing::test_the_walkers_decide_nothing_of_their_own",
   "--deselect",
   "tests/project/test_project_requests.py::test_every_project_method_is_declared",
+  "--deselect",
+  "tests/actions/test_actions_requests.py::test_every_actions_method_is_declared",
 ]
 # A mutant is judged to hang when its tests exceed `timeout_multiplier` times what
 # they took clean, plus this constant. Most tests here take a millisecond or two,

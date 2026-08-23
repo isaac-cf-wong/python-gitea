@@ -39,7 +39,7 @@ from gitea.cli.main import app
 from gitea.watch.state import STATE_FILE_ENV
 from tests.cli.envelope import parse_envelope
 from tests.cli.tree import leaf_commands
-from tests.transport import NO_CONTENT, RoutedSession
+from tests.transport import NO_CONTENT, RawBody, RoutedSession
 
 runner = CliRunner()
 
@@ -191,6 +191,47 @@ NOTIFICATION = {
     "updated_at": "2026-08-18T14:42:07+02:00",
 }
 
+# The Actions objects. Their listings are the one place in this API where a
+# listing is an object rather than a bare array: `total_count` alongside the
+# entries, which is what the commands emit and what these pin.
+WORKFLOW = {
+    "id": "build.yml",
+    "name": "Build",
+    "path": ".gitea/workflows/build.yml",
+    "state": "active",
+    "html_url": f"{BASE_URL}/o/r/actions?workflow=build.yml",
+}
+
+WORKFLOWS = {"total_count": 1, "workflows": [WORKFLOW]}
+
+WORKFLOW_RUN = {
+    "id": 42,
+    "run_number": 7,
+    "event": "push",
+    "status": "success",
+    "conclusion": "success",
+    "head_branch": "main",
+    "head_sha": "deadbeef",
+    "pull_requests": [],
+}
+
+WORKFLOW_RUNS = {"total_count": 1, "workflow_runs": [WORKFLOW_RUN]}
+
+WORKFLOW_JOB = {
+    "id": 118,
+    "run_id": 42,
+    "name": "build",
+    "status": "success",
+    "conclusion": "success",
+    "runner_name": "runner-1",
+    "steps": [{"number": 1, "name": "Checkout", "status": "success", "conclusion": "success"}],
+}
+
+WORKFLOW_JOBS = {"total_count": 1, "jobs": [WORKFLOW_JOB]}
+
+# A log as the endpoint sends it: the file itself, not a document describing it.
+JOB_LOGS = "::group::Run\nbuilding\n::endgroup::\n"
+
 USER_SETTINGS = {
     "full_name": "Someone",
     "theme": "gitea",
@@ -283,6 +324,12 @@ class Contract:
 REPO = ("--owner", "o", "--repository", "r")
 ISSUE_ARGS = (*REPO, "--issue-id", "34")
 BOARD = ("--owner", "o", "--project-id", "31")
+
+# The Actions entities, named as the convention names them: a workflow by its
+# file name, a run and a job by their IDs.
+WORKFLOW_ARGS = ("--workflow-id", "build.yml")
+RUN_ARGS = ("--run-id", "42")
+JOB_ARGS = ("--job-id", "118")
 
 CONTRACTS = (
     # --- config: the CLI's own objects, not the API's ----------------------
@@ -378,6 +425,29 @@ CONTRACTS = (
     Contract(path=("notification", "read"), payload=[NOTIFICATION]),
     Contract(path=("user", "get"), payload=USER),
     Contract(path=("user", "update-settings"), args=("--theme", "gitea"), payload=USER_SETTINGS),
+    # --- actions -----------------------------------------------------------
+    Contract(path=("actions", "workflow", "list"), args=REPO, payload=WORKFLOWS),
+    Contract(path=("actions", "workflow", "get"), args=(*REPO, *WORKFLOW_ARGS), payload=WORKFLOW),
+    Contract(
+        path=("actions", "workflow", "dispatch"),
+        args=(*REPO, *WORKFLOW_ARGS, "--ref", "main", "--input", "environment=staging"),
+        # Gitea accepts a dispatch with `204` and no body unless the run details
+        # were asked for, so this is what a dispatch that worked emits.
+        payload=NO_CONTENT,
+        data={},
+    ),
+    Contract(path=("actions", "run", "list"), args=REPO, payload=WORKFLOW_RUNS),
+    Contract(path=("actions", "run", "get"), args=(*REPO, *RUN_ARGS), payload=WORKFLOW_RUN),
+    Contract(path=("actions", "run", "jobs"), args=(*REPO, *RUN_ARGS), payload=WORKFLOW_JOBS),
+    Contract(path=("actions", "job", "get"), args=(*REPO, *JOB_ARGS), payload=WORKFLOW_JOB),
+    Contract(
+        path=("actions", "job", "logs"),
+        args=(*REPO, *JOB_ARGS),
+        # The one endpoint answering with a file rather than a document. The
+        # command names the job the log belongs to, which the response cannot.
+        payload=RawBody(JOB_LOGS),
+        data={"job_id": 118, "logs": JOB_LOGS},
+    ),
     # --- org, repo: discovering what an instance holds ----------------------
     Contract(path=("org", "list"), payload=[ORGANIZATION]),
     Contract(path=("repo", "list"), args=("--owner", "o"), payload=[REPOSITORY]),

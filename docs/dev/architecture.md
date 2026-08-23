@@ -35,6 +35,7 @@ src/gitea/
 │   └── manager.py           # ConfigManager (load/save/CRUD accounts)
 ├── resource/                # Resource base class
 │   └── resource.py          # Shared request helpers for resources
+├── actions/                 # Actions resource (sync + async)
 ├── issue/                   # Issue resource (sync + async)
 ├── pull_request/            # Pull request resource (sync + async)
 ├── repository/              # Repository resource (sync + async)
@@ -48,6 +49,7 @@ src/gitea/
 ├── cli/                     # Typer CLI application
 │   ├── main.py              # gitea-cli entry point, command registration
 │   ├── config/              # config commands
+│   ├── actions/             # actions workflow, run, and job commands
 │   ├── issue/               # issue + issue dependency commands
 │   ├── pull_request/        # pull-request commands
 │   ├── comment/             # comment commands
@@ -80,6 +82,7 @@ Each client exposes one attribute per resource:
 
 ```python
 with Gitea(token="...", base_url="...") as client:
+    client.actions        # Actions
     client.issue          # Issue
     client.pull_request   # PullRequest
     client.repository     # Repository

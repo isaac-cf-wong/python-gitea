@@ -20,6 +20,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
             base_url: The base URL of the Gitea instance.
 
         """
+        from gitea.actions.async_actions import AsyncActions  # noqa: PLC0415
         from gitea.comment.async_comment import AsyncComment  # noqa: PLC0415
         from gitea.issue.async_issue import AsyncIssue  # noqa: PLC0415
         from gitea.label.async_label import AsyncLabel  # noqa: PLC0415
@@ -35,6 +36,7 @@ class AsyncGitea(Client):  # pylint: disable=too-few-public-methods
         self.session: ClientSession | None = None
 
         # Resource handlers
+        self.actions = AsyncActions(client=self)
         self.issue = AsyncIssue(client=self)
         self.pull_request = AsyncPullRequest(client=self)
         self.repository = AsyncRepository(client=self)

@@ -10,7 +10,8 @@ The CLI names a target the same way in every command family:
   parser to reject the invocation with a message that never mentions the
   organization case.
 - An entity is named by `--<entity>-id`: `--issue-id`, `--project-id`,
-  `--column-id`, `--label-id`, `--comment-id`.
+  `--column-id`, `--label-id`, `--comment-id`, `--workflow-id`, `--run-id`,
+  `--job-id`.
 
 A second target in the same command carries its own coordinates, and those are
 required together because there is no scope for them to fall back to:
@@ -36,6 +37,14 @@ REPOSITORY_REQUIRED_HELP = (
 )
 ISSUE_ID_HELP = "Issue number shown in the web UI."
 DEPRECATED_INDEX_HELP = "Deprecated alias of --issue-id."
+
+# The Actions entities. A workflow is named by its file name rather than by a
+# number - that is what Gitea's `workflow_id` path parameter takes - so the help
+# says so wherever the option is offered, since `--workflow-id build.yml` reads
+# like a mistake to anyone expecting the other identifiers here.
+WORKFLOW_ID_HELP = "File name of the workflow, as it is named under .gitea/workflows, e.g. build.yml."
+RUN_ID_HELP = "ID of the workflow run."
+JOB_ID_HELP = "ID of the job of a workflow run."
 
 
 def require_repository(repository: str | None, *, command: str) -> str:
