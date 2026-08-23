@@ -458,14 +458,18 @@ gitea-cli repo list --owner alice --owner-type user    # a user's repositories
 Every other command answers a question about the instance now. `watch` answers
 what moved since you last looked: it keeps a local cache of issue snapshots and
 reports the difference between that cache and the instance, then records the
-instance as the new baseline.
+instance as the new baseline. `list` does both in one run; `--no-advance` and
+`advance` pull them apart, for a caller that wants a change to survive until it
+has been acted on rather than until it has been reported.
 
 The family is called `watch` because that is what it is for. `state` names the
 cache rather than the purpose, and `diff` suggests comparing two things you
 name, where this compares the present against whatever was last seen.
 
 - `gitea-cli watch list --owner <owner> [--repository <repo>] [--project-id <id>]`
-    - Optional: `--state-file`, `--dry-run`
+    - Optional: `--state-file`, `--dry-run` (also spelled `--no-advance`)
+- `gitea-cli watch advance --owner <owner> [--repository <repo>] [--project-id <id>]`
+    - Optional: `--state-file`
 
 Each `--repository` watches the open issues of that repository, and each
 `--project-id` watches the cards on that board. Both may be repeated, and both
@@ -528,10 +532,6 @@ Three behaviours of it are worth knowing before it surprises you:
   announcing every comment on every watched issue as rewritten. It is logged,
   and it happens once.
 
-`--dry-run` reports the changes and leaves the cache untouched, so the same
-changes come back on the next run. Everything else about the run is unchanged,
-including the requests it makes.
-
 A cache that cannot be written fails the run: the changes it reported would
 otherwise be reported again forever, which is worth an error rather than a
 silent one-line difference. As with every other failure, nothing is printed on
@@ -575,12 +575,58 @@ what kind of change it was, and what was added and removed:
 `issue_count`, `change_count`, `state_file` and `dry_run`, so a run that
 reported nothing still says why.
 
+#### Detecting a change without consuming it
+
+By default `list` does both at once: it reports the difference and advances the
+cache past it, so a change is announced exactly once whether or not anyone was
+in a position to act on it. A consumer that was busy - its previous run still in
+flight, its queue full - drops the change, and the next run has nothing to say
+about it.
+
+`--dry-run`, also spelled `--no-advance`, reports the changes and leaves the
+cache exactly as it was, so they come back on the next run. Everything else
+about the run is unchanged, including the requests it makes. `watch advance`
+then records the current state as the new baseline, which is how a caller
+commits the cache once it has actually handled what it was told about:
+
+```bash
+changes=$(gitea-cli --output json watch list --owner my-org --repository my-repo --no-advance)
+if handle "$changes"; then
+    gitea-cli watch advance --owner my-org --repository my-repo
+fi
+```
+
+`advance` names its scopes exactly as `list` does, reads the same
+`--state-file`, and reports one line per scope rather than one per change:
+
+```console
+$ gitea-cli watch advance --owner my-org --repository my-repo --project-id 29
+repo:my-org/my-repo: recorded 12 issues, 1 change baselined
+project:my-org/29: recorded 5 issues, unchanged since the cache
+```
+
+In `json` its `data` is one record per scope - `scope`, `issue_count`,
+`change_count` and `baselined` - and its `metadata` carries `scopes`,
+`baselined_scopes`, `issue_count`, `change_count` and `state_file`.
+
+What it commits is the state of the instance **now**, not the state the dry run
+saw: the dry run deliberately wrote nothing down, so there is nothing else left
+to commit. That leaves one window the pair does not close - a change landing
+between the two calls is baselined without ever having been reported.
+`change_count` is how far the baseline moved, so an advance reporting more
+changes than its dry run did is that window showing; keeping the two calls close
+together is what keeps it small.
+
 #### Cost
 
 A run lists every page of each scope, and then every page of the comments of
 every issue in it. That is one request per page of issues plus one per page of
 comments per issue, which is what makes comment edits detectable and what makes
 a large repository worth a longer interval.
+
+`advance` costs exactly what `list` costs: it walks the same pages, and only
+what it does with them differs. Pairing a dry run with an advance therefore
+doubles the requests of the tick it replaces.
 
 ## Examples
 

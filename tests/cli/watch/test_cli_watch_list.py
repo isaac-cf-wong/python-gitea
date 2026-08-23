@@ -5,135 +5,30 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
 
 from gitea.cli.main import app
-from gitea.cli.watch.list import build_scopes
 from gitea.utils.pagination import PAGE_SIZE
 from gitea.watch.changes import comment_hash
 from gitea.watch.state import STATE_FILE_ENV, empty_state, record_scope, save_state
 from tests.cli.envelope import parse_envelope
 from tests.cli.rendering import unrendered
+from tests.cli.watch.support import (
+    AUTH,
+    COMMENT,
+    ISSUE,
+    OTHER_ISSUE,
+    logged_error,
+    make_client,
+    paged,
+    run,
+)
 from tests.transport import RecordingSession
 
 runner = CliRunner()
-
-AUTH = ["--token", "tok", "--base-url", "https://gitea.invalid"]
-
-ISSUE = {
-    "id": 1854,
-    "number": 15,
-    "title": "Fix the docs",
-    "updated_at": "2026-08-02T10:00:00Z",
-    "assignees": [{"login": "alice"}],
-    "labels": [{"name": "bug"}],
-    "repository": {"owner": "my-org", "name": "my-repo"},
-}
-
-OTHER_ISSUE = {
-    "id": 1900,
-    "number": 16,
-    "title": "Ship the release",
-    "updated_at": "2026-08-02T11:00:00Z",
-    "assignees": [],
-    "labels": [],
-    "repository": {"owner": "my-org", "name": "my-repo"},
-}
-
-COMMENT = {
-    "id": 7,
-    "body": "Looks right to me",
-    "user": {"id": 3, "login": "alice"},
-    "created_at": "2026-08-01T09:00:00Z",
-    "updated_at": "2026-08-01T09:00:00Z",
-}
-
-
-def paged(*pages: list[dict[str, Any]]):
-    """Build a side effect serving one page of a listing per requested page number.
-
-    Args:
-        *pages: The items of each page, in order.
-
-    Returns:
-        A side effect returning the requested page, or an empty page beyond the last one.
-
-    """
-
-    def _side_effect(**kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        page = kwargs.get("page", 1)
-        return (list(pages[page - 1]) if page <= len(pages) else [], {"status_code": 200})
-
-    return _side_effect
-
-
-def paged_by(key: str, pages_by_value: dict[Any, list[list[dict[str, Any]]]]):
-    """Build a side effect serving the pages recorded for one value of an argument.
-
-    Args:
-        key: The keyword argument selecting which listing is being paged.
-        pages_by_value: Mapping of that argument's value to that listing's pages.
-
-    Returns:
-        A side effect returning the requested page, or an empty page beyond the last one.
-
-    """
-
-    def _side_effect(**kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        pages = pages_by_value.get(kwargs[key], [])
-        page = kwargs.get("page", 1)
-        return (list(pages[page - 1]) if page <= len(pages) else [], {"status_code": 200})
-
-    return _side_effect
-
-
-def make_client(
-    issues: list[dict[str, Any]] | None = None,
-    comments: dict[int, list[dict[str, Any]]] | None = None,
-    columns: list[dict[str, Any]] | None = None,
-    column_issues: dict[int, list[dict[str, Any]]] | None = None,
-) -> MagicMock:
-    """Build a client answering the listings a watch run walks.
-
-    Args:
-        issues: The open issues of every repository.
-        comments: The comments of each issue, keyed by issue number.
-        columns: The columns of every project.
-        column_issues: The issues of each column, keyed by column ID.
-
-    Returns:
-        The client.
-
-    """
-    client = MagicMock()
-    client.issue.list_issues.side_effect = paged(issues or [])
-    client.comment.list_comments.side_effect = paged_by(
-        "index", {number: [page] for number, page in (comments or {}).items()}
-    )
-    client.project.list_project_columns.side_effect = paged(columns or [])
-    client.project.list_project_column_issues.side_effect = paged_by(
-        "column_id", {column_id: [page] for column_id, page in (column_issues or {}).items()}
-    )
-    return client
-
-
-def run(*arguments: str, client: MagicMock | None = None):
-    """Invoke the CLI against a stubbed client.
-
-    Args:
-        *arguments: The arguments to invoke with.
-        client: The client every command in this invocation talks to.
-
-    Returns:
-        The result of the invocation.
-
-    """
-    with patch("gitea.client.gitea.Gitea") as gitea:
-        gitea.return_value.__enter__.return_value = client if client is not None else make_client()
-        return runner.invoke(app, list(arguments))
 
 
 def watch(state_path: Path, *extra: str, output: str | None = None) -> list[str]:
@@ -162,77 +57,6 @@ def watch(state_path: Path, *extra: str, output: str | None = None) -> list[str]
         *AUTH,
         *extra,
     ]
-
-
-def logged_error(logger: MagicMock) -> str:
-    """Read the message of the single error a failed run logged.
-
-    Asserting on the rendered stderr would make the assertion depend on the
-    terminal, since `RichHandler` lays a record out as a table and appends the
-    emitting frame to it; the record itself is what the CLI wrote.
-
-    Args:
-        logger: The patched logger of the module reporting the failure.
-
-    Returns:
-        The logged message with its arguments interpolated.
-
-    """
-    template, *arguments = logger.error.call_args.args
-    return str(template) % tuple(arguments)
-
-
-class TestBuildScopes:
-    """Tests for working out what a run watches from the options naming it."""
-
-    def test_every_repository_named_is_a_scope(self) -> None:
-        """Repeating `--repository` should watch each of them."""
-        scopes = build_scopes("my-org", ["one", "two"], [])
-
-        assert [scope.key for scope in scopes] == ["repo:my-org/one", "repo:my-org/two"]
-        assert [scope.repository for scope in scopes] == ["one", "two"]
-        assert [scope.project_id for scope in scopes] == [None, None]
-
-    def test_a_project_without_a_repository_belongs_to_the_owner(self) -> None:
-        """Omitting `--repository` should watch the organization's own project."""
-        scopes = build_scopes("my-org", [], [29])
-
-        assert [scope.key for scope in scopes] == ["project:my-org/29"]
-        assert scopes[0].repository is None
-        assert scopes[0].project_id == 29
-
-    def test_a_project_is_resolved_against_the_single_repository_named(self) -> None:
-        """A repository project should be keyed apart from the organization's."""
-        scopes = build_scopes("my-org", ["my-repo"], [29])
-
-        assert [scope.key for scope in scopes] == ["repo:my-org/my-repo", "project:my-org/my-repo/29"]
-        assert scopes[1].repository == "my-repo"
-
-    def test_watching_nothing_names_the_options_to_pass(self) -> None:
-        """A run with no scope should say what to name, not watch nothing quietly."""
-        from gitea.cli.utils.errors import CommandError
-
-        with pytest.raises(CommandError, match="needs something to watch"):
-            build_scopes("my-org", [], [])
-
-    def test_the_same_repository_named_twice_is_watched_once(self) -> None:
-        """One scope per key, so a repeated name is not fetched and compared twice.
-
-        Both occurrences would otherwise be compared against the same recorded
-        snapshots, reporting every change on it twice.
-        """
-        assert [scope.key for scope in build_scopes("my-org", ["one", "two", "one"], [])] == [
-            "repo:my-org/one",
-            "repo:my-org/two",
-        ]
-        assert [scope.key for scope in build_scopes("my-org", [], [29, 29])] == ["project:my-org/29"]
-
-    def test_a_project_cannot_be_resolved_against_several_repositories(self) -> None:
-        """Two repositories leave no single scope for a project ID to belong to."""
-        from gitea.cli.utils.errors import CommandError
-
-        with pytest.raises(CommandError, match="cannot resolve --project-id against 2 repositories"):
-            build_scopes("my-org", ["one", "two"], [29])
 
 
 class TestBaseline:
@@ -492,6 +316,88 @@ class TestIdempotence:
 
         assert parse_envelope(result.stdout)["metadata"]["dry_run"] is True
         assert not state_path.exists()
+
+    def test_no_advance_is_the_same_flag_as_dry_run(self, tmp_path: Path) -> None:
+        """The two spellings have to mean one thing, not two flags to keep in step.
+
+        `--dry-run` reads as rehearsing a run and `--no-advance` as leaving the
+        cache where it is; a caller pulling detection apart from consumption
+        reaches for the second name, and finding it absent would send them to
+        parse the report instead.
+        """
+        state_path = tmp_path / "watch-state.json"
+
+        result = run(*watch(state_path, "--no-advance", output="json"), client=make_client([ISSUE]))
+
+        assert parse_envelope(result.stdout)["metadata"]["dry_run"] is True
+
+    def test_no_advance_leaves_the_cache_byte_for_byte(self, tmp_path: Path) -> None:
+        """The cache has to be untouched, not merely rewritten with the same bytes."""
+        state_path = tmp_path / "watch-state.json"
+        run(*watch(state_path), client=make_client([ISSUE]))
+        recorded = state_path.read_bytes()
+
+        result = run(*watch(state_path, "--no-advance"), client=make_client([ISSUE, OTHER_ISSUE]))
+
+        # The run has to have happened and seen the change: an invocation
+        # refused for an option it did not recognize also leaves the cache
+        # byte for byte as it was.
+        assert result.exit_code == 0
+        assert result.stdout == "my-org/my-repo#16 new: new issue · Ship the release\n"
+        assert state_path.read_bytes() == recorded
+
+    def test_a_change_seen_with_no_advance_is_reported_again_until_it_is_committed(self, tmp_path: Path) -> None:
+        """The whole point: a change survives a consumer that could not act on it.
+
+        Two further runs are checked rather than one, because a change that came
+        back once would also come back once if the second run were the one that
+        advanced the cache - which is the bug this option exists to avoid.
+        """
+        state_path = tmp_path / "watch-state.json"
+        run(*watch(state_path), client=make_client([ISSUE]))
+        expected = "my-org/my-repo#16 new: new issue · Ship the release\n"
+
+        first = run(*watch(state_path, "--no-advance"), client=make_client([ISSUE, OTHER_ISSUE]))
+        second = run(*watch(state_path, "--no-advance"), client=make_client([ISSUE, OTHER_ISSUE]))
+        third = run(*watch(state_path, "--no-advance"), client=make_client([ISSUE, OTHER_ISSUE]))
+
+        assert [first.stdout, second.stdout, third.stdout] == [expected, expected, expected]
+
+    def test_advance_commits_what_a_no_advance_run_reported(self, tmp_path: Path) -> None:
+        """The pair has to close: what the dry run left, the advance consumes."""
+        state_path = tmp_path / "watch-state.json"
+        run(*watch(state_path), client=make_client([ISSUE]))
+        reported = run(*watch(state_path, "--no-advance"), client=make_client([ISSUE, OTHER_ISSUE]))
+
+        run(
+            "watch",
+            "advance",
+            "--owner",
+            "my-org",
+            "--repository",
+            "my-repo",
+            "--state-file",
+            str(state_path),
+            *AUTH,
+            client=make_client([ISSUE, OTHER_ISSUE]),
+        )
+        result = run(*watch(state_path), client=make_client([ISSUE, OTHER_ISSUE]))
+
+        # Without the first half of the pair the second one would still leave the
+        # last run quiet, so what the dry run reported is asserted as well.
+        assert reported.stdout == "my-org/my-repo#16 new: new issue · Ship the release\n"
+        assert result.stdout == ""
+
+    def test_the_default_still_advances_the_cache(self, tmp_path: Path) -> None:
+        """Neither new spelling may change what an invocation passing neither does."""
+        state_path = tmp_path / "watch-state.json"
+        run(*watch(state_path), client=make_client([ISSUE]))
+        reported = run(*watch(state_path), client=make_client([ISSUE, OTHER_ISSUE]))
+
+        again = run(*watch(state_path), client=make_client([ISSUE, OTHER_ISSUE]))
+
+        assert reported.stdout == "my-org/my-repo#16 new: new issue · Ship the release\n"
+        assert again.stdout == ""
 
 
 class TestSeveralScopes:
@@ -934,6 +840,23 @@ class TestRequests:
 
         assert result.exit_code == 0
         assert parse_envelope(result.stdout)["metadata"]["issue_count"] == 2
+
+    def test_an_issue_with_no_number_is_watched_without_its_comments(self, tmp_path: Path) -> None:
+        """A payload carrying no issue number names no issue to list comments for.
+
+        The issue itself is still cached and still compared - it has a global ID,
+        which is what it is keyed by - so its assignees and labels are watched.
+        Asking for its comments anyway would address `/issues/None/comments`,
+        which is a request for somebody else's error page.
+        """
+        numberless = {key: value for key, value in ISSUE.items() if key != "number"}
+        client = make_client([numberless])
+
+        result = run(*watch(tmp_path / "watch-state.json", output="json"), client=client)
+
+        assert result.exit_code == 0
+        assert parse_envelope(result.stdout)["metadata"]["issue_count"] == 1
+        assert client.comment.list_comments.call_args_list == []
 
     def test_every_page_of_a_listing_is_walked(self, tmp_path: Path) -> None:
         """A scope larger than one page must not look like a scope that shrank."""
