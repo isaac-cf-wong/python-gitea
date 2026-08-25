@@ -39,7 +39,6 @@ class ClientProtocol(Protocol):
             The HTTP response object.
 
         """
-        ...
 
 
 class AsyncClientProtocol(Protocol):
@@ -61,4 +60,3 @@ class AsyncClientProtocol(Protocol):
             The aiohttp ClientResponse object.
 
         """
-        ...
