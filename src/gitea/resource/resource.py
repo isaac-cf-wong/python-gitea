@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING, Any
 from requests import Response
 
 if TYPE_CHECKING:
-    from gitea.client.gitea import Gitea
+    from gitea.resource.protocol import ClientProtocol
 
 
 class Resource:
     """Base class for Gitea API resources."""
 
-    def __init__(self, client: Gitea) -> None:
+    def __init__(self, client: ClientProtocol) -> None:
         """Initialize the Resource with a Gitea client.
 
         Args:
