@@ -10,6 +10,24 @@ from gitea.cli.utils.errors import CommandError
 from gitea.cli.utils.options import reporting_scope_errors, require_repository, resolve_issue_id
 
 
+def _raise(error: BaseException) -> None:
+    """Raise `error` from inside a `with` block.
+
+    Raising through a call rather than a bare `raise` statement keeps the
+    statements after the block reachable - to a reader and to static analysis
+    alike, which otherwise reads a block ending in `raise` as one control never
+    leaves, and the assertions after it as dead code.
+
+    Args:
+        error: The exception the block under test should meet.
+
+    Raises:
+        BaseException: Always; whatever it was handed.
+
+    """
+    raise error
+
+
 class TestRequireRepository:
     """Test cases for `require_repository`."""
 
@@ -132,7 +150,7 @@ class TestReportingScopeErrors:
         part in it.
         """
         with pytest.raises(CommandError) as excinfo, reporting_scope_errors("gitea-cli actions secret list"):
-            raise ValueError("Gitea has no Actions endpoint here for the authenticated account.")
+            _raise(ValueError("Gitea has no Actions endpoint here for the authenticated account."))
 
         message = str(excinfo.value)
         assert "gitea-cli actions secret list" in message
@@ -144,7 +162,7 @@ class TestReportingScopeErrors:
             pytest.raises(CommandError, match="offered for a repository or an organization"),
             reporting_scope_errors("gitea-cli actions secret list"),
         ):
-            raise ValueError("this one is offered for a repository or an organization")
+            _raise(ValueError("this one is offered for a repository or an organization"))
 
     def test_other_failures_are_left_to_be_reported_as_failures(self):
         """Only a `ValueError` is converted; a real fault should still raise as itself.
@@ -154,13 +172,13 @@ class TestReportingScopeErrors:
         wanted.
         """
         with pytest.raises(RuntimeError), reporting_scope_errors("gitea-cli actions secret list"):
-            raise RuntimeError("something is actually broken")
+            _raise(RuntimeError("something is actually broken"))
 
     def test_the_refusal_keeps_its_cause(self):
         """The original error should be chained, so a debugger can still reach it."""
         original = ValueError("no such scope")
 
         with pytest.raises(CommandError) as excinfo, reporting_scope_errors("gitea-cli actions runner list"):
-            raise original
+            _raise(original)
 
         assert excinfo.value.__cause__ is original

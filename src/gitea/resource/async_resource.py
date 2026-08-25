@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING, Any
 from aiohttp import ClientResponse
 
 if TYPE_CHECKING:
-    from gitea.client.async_gitea import AsyncGitea
+    from gitea.resource.protocol import AsyncClientProtocol
 
 
 class AsyncResource:
     """Base class for asynchronous Gitea API resources."""
 
-    def __init__(self, client: AsyncGitea) -> None:
+    def __init__(self, client: AsyncClientProtocol) -> None:
         """Initialize the Resource with a AsyncGitea client.
 
         Args:
