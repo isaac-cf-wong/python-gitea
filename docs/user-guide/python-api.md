@@ -202,9 +202,7 @@ variable listings are the exception: those two really do answer with a bare
 array, so they hand back a list and fall back to the empty one.
 
 ```python
-runs, _ = client.actions.list_workflow_runs(
-    owner="my-org", repository="my-repo", status="failure", limit=10
-)
+runs, _ = client.actions.list_workflow_runs(owner="my-org", repository="my-repo", status="failure", limit=10)
 print(runs["total_count"])
 for run in runs["workflow_runs"]:
     print(run["run_number"], run["status"], run["conclusion"])
@@ -337,11 +335,11 @@ downstream can come to depend on a name the API does not use.
 
 ```python
 column = columns[0]
-column["name"]        # 'Working' - reads the title
-column.get("name")    # 'Working'
-"name" in column      # True
-list(column)          # ['id', 'title', 'default', 'sorting', ...] - no 'name'
-json.dumps(column)    # {"id": 117, "title": "Working", ...} - no 'name'
+column["name"]  # 'Working' - reads the title
+column.get("name")  # 'Working'
+"name" in column  # True
+list(column)  # ['id', 'title', 'default', 'sorting', ...] - no 'name'
+json.dumps(column)  # {"id": 117, "title": "Working", ...} - no 'name'
 ```
 
 Only reading is widened. `column["name"] = x` writes a field called `name`, as
