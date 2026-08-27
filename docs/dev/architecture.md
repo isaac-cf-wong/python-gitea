@@ -90,17 +90,17 @@ Each client exposes one attribute per resource:
 
 ```python
 with Gitea(token="...", base_url="...") as client:
-    client.actions        # Actions
-    client.issue          # Issue
-    client.pull_request   # PullRequest
-    client.repository     # Repository
-    client.user           # User
-    client.comment        # Comment
-    client.label          # Label
-    client.milestone      # Milestone
-    client.notification   # Notification
-    client.project        # Project
-    client.organization   # Organization
+    client.actions  # Actions
+    client.issue  # Issue
+    client.pull_request  # PullRequest
+    client.repository  # Repository
+    client.user  # User
+    client.comment  # Comment
+    client.label  # Label
+    client.milestone  # Milestone
+    client.notification  # Notification
+    client.project  # Project
+    client.organization  # Organization
 ```
 
 ## Resource Layer
