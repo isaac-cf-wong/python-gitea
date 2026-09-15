@@ -397,6 +397,12 @@ for change in detect_changes(current, scope_snapshots(state, SCOPE)):
 save_scopes("watch-state.json", {SCOPE: current})
 ```
 
+Baselining applies to a scope and not to an issue. An issue the recorded scope
+has not seen is compared against an empty snapshot, so `detect_changes` reports
+`new` for it and then reports the assignees, labels and comments it already
+carries as added - which is what keeps a comment written before the issue was
+first seen from being folded into the baseline and never reported.
+
 `issue_snapshot` reduces an issue to the fields the comparison reads,
 `comment_hash` identifies a comment stably across re-fetches - by the author's
 ID rather than their login, so renaming a user does not look like every comment

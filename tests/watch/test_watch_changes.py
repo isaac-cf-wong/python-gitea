@@ -258,7 +258,7 @@ class TestDetectChanges:
 
     def test_an_issue_absent_from_the_cache_is_new(self) -> None:
         """An issue a recorded scope has not seen should be reported as new."""
-        changes = detect_changes({"1854": snapshot()}, {})
+        changes = detect_changes({"1854": snapshot(assignees=[], labels=[], comment_hashes=[])}, {})
 
         assert [change["kind"] for change in changes] == ["new"]
         assert changes[0]["detail"] == "new issue"
@@ -267,9 +267,56 @@ class TestDetectChanges:
         assert changes[0]["added"] == []
         assert changes[0]["removed"] == []
 
+    def test_a_comment_already_on_an_issue_first_seen_is_reported(self) -> None:
+        """A comment written before the run that first saw the issue is a change.
+
+        Reporting only `new` would make it baseline, and the run reporting that
+        also records it, so nothing would ever report it: a consumer acting on
+        `comments` rather than on `new` - because a comment is worth reacting to
+        wherever the issue sits - would never learn the comment was there.
+        """
+        changes = detect_changes({"1854": snapshot(assignees=[], labels=[])}, {})
+
+        assert [change["kind"] for change in changes] == ["new", "comments"]
+        assert changes[1]["added"] == [comment_hash(COMMENT)]
+        assert changes[1]["removed"] == []
+        assert changes[1]["detail"] == "1 new"
+        assert changes[1]["number"] == 15
+
+    def test_an_issue_first_seen_reports_the_fields_it_already_carries(self) -> None:
+        """Its assignees and labels are additions against an empty snapshot."""
+        changes = detect_changes({"1854": snapshot(comment_hashes=[])}, {})
+
+        assert [change["kind"] for change in changes] == ["new", "assignees", "labels"]
+        assert changes[1]["added"] == ["alice", "bob"]
+        assert changes[1]["removed"] == []
+        assert changes[2]["added"] == ["bug", "docs"]
+        assert changes[2]["removed"] == []
+
+    def test_an_issue_first_seen_still_reports_new_before_what_it_carries(self) -> None:
+        """The `new` record stays, and stays first, so a consumer keyed on it is unaffected."""
+        changes = detect_changes({"1854": snapshot()}, {})
+
+        assert [change["kind"] for change in changes] == ["new", "assignees", "labels", "comments"]
+        assert changes[0]["detail"] == "new issue"
+        assert changes[0]["added"] == []
+        assert changes[0]["removed"] == []
+
+    def test_an_issue_first_seen_is_reported_once(self) -> None:
+        """The run that reports it also records it, so the next run is quiet."""
+        current = {"1854": snapshot()}
+
+        assert detect_changes(current, {}) != []
+        # The run that reported recorded these same snapshots, and they are what
+        # the next run compares against.
+        assert detect_changes(current, {key: dict(value) for key, value in current.items()}) == []
+
     def test_every_new_issue_is_reported_not_only_the_first(self) -> None:
         """Two issues opened between runs are two changes."""
-        current = {"1854": snapshot(), "1900": snapshot(issue_id=1900, number=16)}
+        current = {
+            "1854": snapshot(assignees=[], labels=[], comment_hashes=[]),
+            "1900": snapshot(issue_id=1900, number=16, assignees=[], labels=[], comment_hashes=[]),
+        }
 
         changes = detect_changes(current, {})
 
@@ -368,7 +415,10 @@ class TestDetectChanges:
     def test_a_change_record_carries_the_same_keys_whatever_the_kind(self) -> None:
         """A consumer should be able to read `added` without asking the kind first."""
         changes = detect_changes(
-            {"1854": snapshot(assignees=["alice"]), "1855": snapshot(issue_id=1855, number=16)},
+            {
+                "1854": snapshot(assignees=["alice"]),
+                "1855": snapshot(issue_id=1855, number=16, assignees=[], labels=[], comment_hashes=[]),
+            },
             {"1854": snapshot(), "1900": snapshot(issue_id=1900, number=17)},
         )
 

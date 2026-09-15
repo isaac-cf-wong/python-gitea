@@ -36,6 +36,7 @@ from typer.main import get_command
 from typer.testing import CliRunner
 
 from gitea.cli.main import app
+from gitea.watch.changes import comment_hash
 from gitea.watch.state import STATE_FILE_ENV
 from tests.cli.envelope import parse_envelope
 from tests.cli.tree import leaf_commands
@@ -293,13 +294,21 @@ BOARD_ROUTES = (
 WATCH_SCOPE = "repo:o/r"
 
 
-def _change(issue: dict[str, Any], kind: str, detail: str) -> dict[str, Any]:
+def _change(
+    issue: dict[str, Any],
+    kind: str,
+    detail: str,
+    added: list[str] | None = None,
+    removed: list[str] | None = None,
+) -> dict[str, Any]:
     """Build the change record a watch reports for one issue.
 
     Args:
         issue: The issue the change is on.
         kind: What changed.
         detail: The change, as the human digest phrases it.
+        added: What appeared, for a kind that has something to add.
+        removed: What went away, for a kind that has something to remove.
 
     Returns:
         The change record, including the scope the command adds.
@@ -312,8 +321,8 @@ def _change(issue: dict[str, Any], kind: str, detail: str) -> dict[str, Any]:
         "title": issue["title"],
         "repository": "o/r",
         "detail": detail,
-        "added": [],
-        "removed": [],
+        "added": added or [],
+        "removed": removed or [],
         "scope": WATCH_SCOPE,
     }
 
@@ -622,7 +631,15 @@ CONTRACTS = (
         # under test is the second one, which meets a different issue.
         warmup=(("/comments", [COMMENT]), ("", [ISSUE])),
         routes=(("/comments", [COMMENT]), ("", [OTHER_ISSUE])),
-        data=[_change(OTHER_ISSUE, "new", "new issue"), _change(ISSUE, "gone", "no longer listed")],
+        # The issue that appeared is reported twice: once as the issue itself,
+        # and once for the comment that was already on it when it was first
+        # seen, which a consumer acting on comments would otherwise never hear
+        # about.
+        data=[
+            _change(OTHER_ISSUE, "new", "new issue"),
+            _change(OTHER_ISSUE, "comments", "1 new", added=[comment_hash(COMMENT)]),
+            _change(ISSUE, "gone", "no longer listed"),
+        ],
         metadata=(
             "status_code",
             "scopes",
@@ -642,8 +659,9 @@ CONTRACTS = (
         routes=(("/comments", [COMMENT]), ("", [OTHER_ISSUE])),
         # What was recorded, not what changed: the command commits the baseline
         # rather than reporting the difference. `change_count` is how far it
-        # moved - the issue that appeared and the one that went away.
-        data=[{"scope": WATCH_SCOPE, "issue_count": 1, "change_count": 2, "baselined": False}],
+        # moved - the issue that appeared, the comment it already carried, and
+        # the issue that went away.
+        data=[{"scope": WATCH_SCOPE, "issue_count": 1, "change_count": 3, "baselined": False}],
         metadata=(
             "status_code",
             "scopes",
