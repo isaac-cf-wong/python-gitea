@@ -137,6 +137,72 @@ class TestReportedChanges:
 
         assert result.stdout == "my-org/my-repo#16 new: new issue · Ship the release\n"
 
+    def test_a_comment_written_before_an_issue_was_first_seen_is_reported(self, tmp_path: Path) -> None:
+        """A comment already on an issue the run first meets has to be reported.
+
+        This is the window a comment can fall into and never come out of: it is
+        written after the issue is opened and before the run that first records
+        the issue. Reporting only `new` makes the comment part of the baseline,
+        and the same run writes that baseline down, so no later run has anything
+        left to compare it against - the comment is consumed without ever having
+        been reported, and a consumer that reacts to comments rather than to new
+        issues is never told about it.
+        """
+        state_path = tmp_path / "watch-state.json"
+        run(*watch(state_path), client=make_client([ISSUE], comments={15: [COMMENT]}))
+
+        # The issue arrives already carrying the comment, as one commented on
+        # between two ticks does.
+        result = run(
+            *watch(state_path, output="json"),
+            client=make_client([ISSUE, OTHER_ISSUE], comments={15: [COMMENT], 16: [COMMENT]}),
+        )
+
+        assert result.exit_code == 0
+        reported = [change for change in parse_envelope(result.stdout)["data"] if change["kind"] == "comments"]
+        assert [change["number"] for change in reported] == [16]
+        assert reported[0]["added"] == [comment_hash(COMMENT)]
+        assert reported[0]["removed"] == []
+
+    def test_the_new_issue_carrying_the_comment_is_still_reported_as_new(self, tmp_path: Path) -> None:
+        """The comment record is additional to `new`, not a replacement for it."""
+        state_path = tmp_path / "watch-state.json"
+        run(*watch(state_path), client=make_client([ISSUE]))
+
+        result = run(*watch(state_path), client=make_client([ISSUE, OTHER_ISSUE], comments={16: [COMMENT]}))
+
+        assert result.stdout.splitlines() == [
+            "my-org/my-repo#16 new: new issue · Ship the release",
+            "my-org/my-repo#16 comments: 1 new · Ship the release",
+        ]
+
+    def test_a_comment_on_a_first_seen_issue_is_reported_once(self, tmp_path: Path) -> None:
+        """Reporting it on first sight must not make every later run report it again."""
+        state_path = tmp_path / "watch-state.json"
+        run(*watch(state_path), client=make_client([ISSUE]))
+        run(*watch(state_path), client=make_client([ISSUE, OTHER_ISSUE], comments={16: [COMMENT]}))
+
+        result = run(*watch(state_path), client=make_client([ISSUE, OTHER_ISSUE], comments={16: [COMMENT]}))
+
+        assert result.stdout == ""
+
+    def test_the_comment_is_reported_whatever_board_the_issue_is_on(self, tmp_path: Path) -> None:
+        """Nothing here gates a comment on the issue being on a project board.
+
+        A repository scope watches the open issues of the repository, on a board
+        or not, and the issue in this suite carries no `projects` at all - so a
+        gate of that shape would have to be added here to break this. A consumer
+        that applies one of its own is free to, but a comment it never hears
+        about cannot be gated on anything.
+        """
+        state_path = tmp_path / "watch-state.json"
+        run(*watch(state_path), client=make_client([ISSUE]))
+        unboarded = {**OTHER_ISSUE, "projects": []}
+
+        result = run(*watch(state_path), client=make_client([ISSUE, unboarded], comments={16: [COMMENT]}))
+
+        assert "my-org/my-repo#16 comments: 1 new · Ship the release" in result.stdout.splitlines()
+
     def test_an_assignee_change_is_reported(self, tmp_path: Path) -> None:
         """Handing an issue over should reach the digest."""
         state_path = tmp_path / "watch-state.json"

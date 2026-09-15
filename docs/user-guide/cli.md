@@ -722,6 +722,15 @@ or its comments changed. An issue that dropped out of what is being watched -
 closed, deleted, or moved off the board - is reported as `gone`. An issue that
 changed in more than one way is reported once per way.
 
+An issue seen for the first time is one of those: it is reported as `new`, and
+what it already carries - its assignees, its labels, and the comments already on
+it - is reported alongside as added. That matters for a comment written between
+an issue being opened and the next run: reporting only `new` would fold it into
+the baseline the same run records, so no later run would have anything left to
+compare it against and it would never be reported at all. It also means a
+consumer that reacts to `comments` and not to `new` still hears about it. A
+scope seen for the first time is still silent - see the cache below.
+
 Comments are compared by a stable hash of each comment rather than by counting
 them, so a comment edited in place is reported, and a comment added while
 another was deleted is two movements rather than none.

@@ -13,6 +13,12 @@ comparison needs nothing from the previous run except the hashes it recorded.
 same value, and an edited one does not, which is what makes an edit show up as a
 change rather than disappear.
 
+A comment is reported whether or not the issue carrying it was already known.
+An issue seen for the first time is compared against an empty snapshot rather
+than passed over, so a comment that was already on it is an addition and not a
+baseline - what it costs to pass over is a comment nobody is ever told about,
+since the run that passed over it also recorded it.
+
 `updated_at` is recorded but is not itself compared. Gitea bumps it for every
 edit, including ones a watch has nothing to say about, so comparing it would
 report a body reworded as indistinguishable from a comment added. The
@@ -271,6 +277,17 @@ def detect_changes(
     An issue that changed in more than one way contributes one record per way,
     as a digest reads better naming each change than one line naming three.
 
+    An issue the recorded scope has not seen is one of those: it contributes the
+    `new` record naming it, and then the same records everything else
+    contributes, taken against the empty snapshot it is being compared to - so
+    the assignees, labels and comments it already carries are reported as added.
+    Reporting only `new` would make them baseline, which loses a comment written
+    between an issue being opened and the run that first saw it, and loses it
+    permanently: the run that swallowed it records it and the next one has
+    nothing left to compare against. It matters most to a consumer that reacts
+    to a kind rather than to an issue - one acting on `comments` and not on
+    `new` would never learn the comment was there.
+
     Args:
         current: The snapshot of each issue in the scope now, keyed by
             `issue_key`.
@@ -293,7 +310,14 @@ def detect_changes(
         before = previous.get(key)
         if before is None:
             changes.append(_change(snapshot, "new", "new issue", [], []))
-            continue
+            # An issue first seen here is compared against an empty snapshot
+            # rather than skipped, so what it already carries is reported as
+            # added. Skipping it would make the comments an issue was opened
+            # with - or the ones written before the run that first saw it -
+            # baseline instead of a change, and they would never be reported:
+            # the one record that mentioned the issue would be `new`, which a
+            # consumer filtering on the kinds it acts on may not act on at all.
+            before = {}
 
         for field, kind in _FIELD_KINDS:
             added, removed = _delta(before.get(field, []), snapshot.get(field, []))
