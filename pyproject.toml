@@ -52,7 +52,7 @@ docs = [
   "mike>=2.2.0",
 ]
 build = ["hatch>=1.18.1"]
-release = ["git-cliff>=2.13.1"]
+release = ["git-cliff>=2.14.2"]
 
 [project.scripts]
 gitea-cli = "gitea.cli.main:app"
