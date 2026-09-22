@@ -1983,7 +1983,7 @@ docs = [
     { name = "mkdocs-section-index", specifier = ">=0.3.12" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0.6" },
 ]
-release = [{ name = "git-cliff", specifier = ">=2.13.1" }]
+release = [{ name = "git-cliff", specifier = ">=2.14.2" }]
 
 [[package]]
 name = "pywin32-ctypes"
