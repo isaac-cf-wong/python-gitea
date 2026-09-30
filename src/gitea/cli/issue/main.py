@@ -19,6 +19,7 @@ def register_commands() -> None:
     from gitea.cli.issue.dependency.main import dependency_app  # noqa: PLC0415
     from gitea.cli.issue.edit import edit_command  # noqa: PLC0415
     from gitea.cli.issue.get import get_command  # noqa: PLC0415
+    from gitea.cli.issue.label.main import label_app  # noqa: PLC0415
     from gitea.cli.issue.list import list_command  # noqa: PLC0415
 
     issue_app.command("close", help="Close an issue.")(close_command)
@@ -27,6 +28,7 @@ def register_commands() -> None:
     issue_app.command("get", help="Get an issue.")(get_command)
     issue_app.command("list", help="List issues.")(list_command)
     issue_app.add_typer(dependency_app, name="dependency", help="Commands for managing issue dependencies.")
+    issue_app.add_typer(label_app, name="label", help="Commands for managing the labels of issues.")
     # Alias of the top-level `comment` app: agents and users naturally look for
     # comment commands under `issue`. Both entry points share the same commands.
     issue_app.add_typer(comment_app, name="comment", help="Commands for managing comments.")

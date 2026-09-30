@@ -382,3 +382,60 @@ class BaseIssue:
             payload["ref"] = ref
 
         return endpoint, payload
+
+    def _issue_labels_endpoint(self, owner: str, repository: str, index: int) -> str:
+        """Construct the endpoint URL for the labels of an issue.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+
+        Returns:
+            The endpoint URL for the issue's labels.
+
+        """
+        return f"/repos/{owner}/{repository}/issues/{index}/labels"
+
+    def _issue_label_endpoint(self, owner: str, repository: str, index: int, label: int) -> str:
+        """Construct the endpoint URL for one label of an issue.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            label: The ID of the label.
+
+        Returns:
+            The endpoint URL for the label on the issue.
+
+        """
+        return f"{self._issue_labels_endpoint(owner=owner, repository=repository, index=index)}/{label}"
+
+    def _issue_labels_helper(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        labels: list[int | str],
+    ) -> tuple[str, dict[str, Any]]:
+        """Get the endpoint and payload for adding or replacing the labels of an issue.
+
+        Adding and replacing send the same body to the same endpoint; they differ
+        only in the method, so both are built here.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            labels: The labels, as IDs or, on a Gitea recent enough to accept them, names.
+
+        Returns:
+            A tuple containing the endpoint and the request payload.
+
+        """
+        endpoint = self._issue_labels_endpoint(owner=owner, repository=repository, index=index)
+
+        payload = {"labels": list(labels)}
+
+        return endpoint, payload
