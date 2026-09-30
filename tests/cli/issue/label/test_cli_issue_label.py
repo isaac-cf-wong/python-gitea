@@ -178,8 +178,37 @@ def run(server: LabelServer, config_path: Path, *args: str) -> Any:
         BASE_URL,
     ]
     with patch("gitea.client.gitea.requests.Session", return_value=server):
-        # Wide enough that an error logged to the console is not wrapped mid-sentence.
-        return runner.invoke(app, arguments, env={"COLUMNS": "500"})
+        return runner.invoke(app, arguments)
+
+
+def run_failing(server: LabelServer, config_path: Path, *args: str) -> str:
+    """Run one `issue label` command that has to fail, and read the error it reported.
+
+    The error is read from the call that logs it rather than from the console:
+    the console renders it through Rich, which folds it to the terminal's width,
+    and on a forced or dumb terminal colours it or ignores `COLUMNS`, so a
+    sentence in it is only sometimes on one line. The logged message is the text
+    the command wrote, whatever the terminal.
+
+    Args:
+        server: The stand-in to answer with.
+        config_path: The configuration to read.
+        *args: The subcommand and its options, after `issue label`.
+
+    Returns:
+        The one error the command reported, with its whitespace as written.
+
+    """
+    with patch("gitea.cli.utils.api.logger") as logger:
+        result = run(server, config_path, *args)
+
+    assert result.exit_code == 1, result.output
+    assert result.stdout == ""
+    # An unexpected failure is logged with its traceback instead, never as a plain error.
+    assert logger.exception.call_args_list == []
+    assert len(logger.error.call_args_list) == 1, logger.error.call_args_list
+    template, *values = logger.error.call_args.args
+    return template % tuple(values)
 
 
 def data_of(result: Any) -> Any:
@@ -249,12 +278,11 @@ def test_an_unknown_name_is_an_error_and_nothing_is_written(config_path, command
     """An unknown name should fail the command before any issue is changed."""
     server = LabelServer({34: [3], 35: [3]})
 
-    result = run(server, config_path, command, "--issue-id", "34", "--issue-id", "35", "--label", "5", "--label", "Bug")
+    error = run_failing(
+        server, config_path, command, "--issue-id", "34", "--issue-id", "35", "--label", "5", "--label", "Bug"
+    )
 
-    assert result.exit_code == 1
-    assert result.stdout == ""
-    assert "no label named 'Bug' in o/r" in result.output
-    assert "Traceback" not in result.output
+    assert "no label named 'Bug' in o/r" in error
     assert server.writes == []
     assert server.carried == {34: [3], 35: [3]}
 
@@ -264,10 +292,9 @@ def test_a_name_shared_by_two_labels_is_an_error(config_path):
     twins = [BUG, {**DOCS, "name": "bug"}]
     server = LabelServer({34: []}, defined=twins)
 
-    result = run(server, config_path, "add", "--issue-id", "34", "--label", "bug")
+    error = run_failing(server, config_path, "add", "--issue-id", "34", "--label", "bug")
 
-    assert result.exit_code == 1
-    assert "more than one label" in result.output
+    assert "more than one label is named 'bug' in o/r" in error
     assert server.writes == []
 
 
@@ -321,10 +348,9 @@ def test_a_command_writing_labels_needs_one(config_path, command):
     """Without a --label there is nothing to write, which should be an error rather than a no-op."""
     server = LabelServer({34: [3]})
 
-    result = run(server, config_path, command, "--issue-id", "34")
+    error = run_failing(server, config_path, command, "--issue-id", "34")
 
-    assert result.exit_code == 1
-    assert "--label" in result.output
+    assert "needs a label: pass --label NAME_OR_ID" in error
     assert server.requests == []
 
 
@@ -335,10 +361,9 @@ def test_every_command_needs_an_issue(config_path, command):
 
     labels = ("--label", "3") if command in {"add", "set", "remove"} else ()
 
-    result = run(server, config_path, command, *labels)
+    error = run_failing(server, config_path, command, *labels)
 
-    assert result.exit_code == 1
-    assert "--issue-id" in result.output
+    assert "needs an issue: pass --issue-id NUMBER" in error
     assert server.requests == []
 
 
@@ -374,14 +399,12 @@ def test_a_failure_part_way_names_the_issues_already_done(config_path):
     """A failure on a later issue should say which issues were already changed."""
     server = LabelServer({34: [], 35: [], 36: []}, failing=frozenset({35}))
 
-    result = run(
+    error = run_failing(
         server, config_path, "add", "--issue-id", "34", "--issue-id", "35", "--issue-id", "36", "--label", "docs"
     )
 
-    assert result.exit_code == 1
-    assert result.stdout == ""
-    assert "failed on issue 35" in result.output
-    assert "Issues 34 were already done" in result.output
+    assert "failed on issue 35" in error
+    assert "Issues 34 were already done" in error
     assert server.carried == {34: [5], 35: [], 36: []}
 
 
