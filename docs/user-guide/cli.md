@@ -478,6 +478,36 @@ otherwise look like.
 - `gitea-cli issue dependency remove --owner <owner> --repository <repo> --issue-id <number>`
     - Required: `--dependency-owner <owner>`, `--dependency-repository <repo>`,
       `--dependency-issue-id <number>`
+- `gitea-cli issue label list --owner <owner> --repository <repo> --issue-id <number>`
+- `gitea-cli issue label add --owner <owner> --repository <repo> --issue-id <number> --label <name-or-id>`
+    - Adds the labels and keeps the ones the issue already has.
+- `gitea-cli issue label remove --owner <owner> --repository <repo> --issue-id <number> --label <name-or-id>`
+    - A label the issue does not carry is left alone: the command still
+      succeeds, logs a warning, and names the label's ID in `not_on_issue` in
+      the issue's metadata.
+- `gitea-cli issue label set --owner <owner> --repository <repo> --issue-id <number> --label <name-or-id>`
+    - Replaces every label of the issue with the given ones.
+- `gitea-cli issue label clear --owner <owner> --repository <repo> --issue-id <number>`
+    - Removes every label from the issue.
+
+The `issue label` commands act on the labels an issue carries; the
+[`label` commands](#label---manage-labels) manage the labels a repository
+defines. In all of them:
+
+- `--label` is repeated once per label, and takes a label's name or its numeric
+  ID. A name is resolved to its ID through the repository's labels before
+  anything is written, so it works on a Gitea that only accepts IDs. Names are
+  matched exactly, case included. A name that matches no label, or more than
+  one, fails the command and no issue is changed. A value made only of digits is
+  taken as an ID and sent as it is, which is how a label defined on the
+  organization rather than the repository is named.
+- `--issue-id` can be repeated to act on several issues in one run. With one
+  issue, `data` is the list of labels the issue is left with. With several,
+  `data` holds one entry per issue, in the order given:
+  `{"issue_id": <number>, "labels": [...]}`, plus `not_on_issue` for `remove`.
+  The issues are changed one after another; if one fails, the command stops,
+  prints nothing on stdout, and its error names the issues that were already
+  changed.
 
 ### Pull Request - manage pull requests
 
@@ -884,6 +914,16 @@ gitea-cli issue create \
     --title "Fix the docs" \
     --labels 1,2 \
     --milestone 3
+```
+
+Add a label to several existing issues, keeping the labels they already have:
+
+```bash
+gitea-cli issue label add \
+    --owner my-org \
+    --repository my-repo \
+    --issue-id 12 --issue-id 13 --issue-id 14 \
+    --label "needs review"
 ```
 
 Start a workflow, then follow the run it started:

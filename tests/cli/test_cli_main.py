@@ -53,6 +53,13 @@ _NO_NOOP_INVOCATION: frozenset[tuple[str, ...]] = frozenset({("actions", "artifa
 # owner-wide one.
 _SCOPE_OPTIONS = frozenset({"--owner", "--repository", "--issue-id", "--dependency-issue-id"})
 
+# Options a command declares repeatable, and so optional to the parser, but rejects
+# at run time when none is given, with the value a no-op invocation passes. A
+# `--label` is given as an ID so that it is sent as it is: a name would be looked
+# up among the stub's labels, find none, and fail for a reason unrelated to the
+# command under test.
+_RUNTIME_REQUIRED_OPTIONS = {"--label": "1"}
+
 # The helpers a command routes its result and its failures through. A command
 # with a human-readable rendering of its own calls `execute_api_call` and reports
 # the result itself, where one that only reports an API result calls
@@ -85,6 +92,10 @@ def _noop_invocation(command: Any) -> list[str]:
         if getattr(param, "is_flag", False):
             if flag == "--force":
                 args.append(flag)
+            continue
+
+        if flag in _RUNTIME_REQUIRED_OPTIONS:
+            args.extend([flag, _RUNTIME_REQUIRED_OPTIONS[flag]])
             continue
 
         if not param.required and flag not in _SCOPE_OPTIONS:

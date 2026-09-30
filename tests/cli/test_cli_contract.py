@@ -451,6 +451,18 @@ CONTRACTS = (
         args=(*ISSUE_ARGS, "--dependency-owner", "o", "--dependency-repository", "r", "--dependency-issue-id", "35"),
         payload=ISSUE,
     ),
+    # An issue's labels are emitted as the API lists them. `remove` reads them back
+    # after removing, and names the requested labels the issue did not carry.
+    Contract(path=("issue", "label", "add"), args=(*ISSUE_ARGS, "--label", "3"), payload=[LABEL]),
+    Contract(path=("issue", "label", "clear"), args=ISSUE_ARGS, payload=[]),
+    Contract(path=("issue", "label", "list"), args=ISSUE_ARGS, payload=[LABEL]),
+    Contract(
+        path=("issue", "label", "remove"),
+        args=(*ISSUE_ARGS, "--label", "bug"),
+        payload=[LABEL],
+        metadata=("status_code", "not_on_issue"),
+    ),
+    Contract(path=("issue", "label", "set"), args=(*ISSUE_ARGS, "--label", "bug"), payload=[LABEL]),
     # `issue comment` and `comment` are the same commands under two names, so
     # both spellings are pinned: one of them could be rewired alone.
     Contract(path=("issue", "comment", "add"), args=(*ISSUE_ARGS, "--body", "hi"), payload=COMMENT),

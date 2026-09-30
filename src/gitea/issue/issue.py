@@ -589,3 +589,245 @@ class Issue(BaseIssue, Resource):
         )
         data, status_code = process_response(response, default={})
         return cast(dict[str, Any], data), {"status_code": status_code}
+
+    def _list_issue_labels(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        **kwargs: Any,
+    ) -> Response:
+        """List the labels of an issue.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint = self._issue_labels_endpoint(owner=owner, repository=repository, index=index)
+        return self._get(endpoint=endpoint, **kwargs)
+
+    def list_issue_labels(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        **kwargs: Any,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """List the labels of an issue.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing a list of the issue's labels as dictionaries and a dictionary with metadata.
+
+        """
+        response = self._list_issue_labels(owner=owner, repository=repository, index=index, **kwargs)
+        data, status_code = process_response(response, default=[])
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
+
+    def _add_issue_labels(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        labels: list[int | str],
+        **kwargs: Any,
+    ) -> Response:
+        """Add labels to an issue, keeping the labels it already has.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            labels: The labels to add, as IDs or, on a Gitea recent enough to accept them, names.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint, payload = self._issue_labels_helper(owner=owner, repository=repository, index=index, labels=labels)
+        return self._post(endpoint=endpoint, json=payload, **kwargs)
+
+    def add_issue_labels(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        labels: list[int | str],
+        **kwargs: Any,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Add labels to an issue, keeping the labels it already has.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            labels: The labels to add, as IDs or, on a Gitea recent enough to accept them, names.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing a list of the issue's resulting labels as dictionaries and a dictionary with metadata.
+
+        """
+        response = self._add_issue_labels(owner=owner, repository=repository, index=index, labels=labels, **kwargs)
+        data, status_code = process_response(response, default=[])
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
+
+    def _replace_issue_labels(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        labels: list[int | str],
+        **kwargs: Any,
+    ) -> Response:
+        """Replace every label of an issue with the given ones.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            labels: The labels the issue is left with, as IDs or, on a Gitea recent enough to accept them, names.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint, payload = self._issue_labels_helper(owner=owner, repository=repository, index=index, labels=labels)
+        return self._put(endpoint=endpoint, json=payload, **kwargs)
+
+    def replace_issue_labels(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        labels: list[int | str],
+        **kwargs: Any,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Replace every label of an issue with the given ones.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            labels: The labels the issue is left with, as IDs or, on a Gitea recent enough to accept them, names.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing a list of the issue's resulting labels as dictionaries and a dictionary with metadata.
+
+        """
+        response = self._replace_issue_labels(owner=owner, repository=repository, index=index, labels=labels, **kwargs)
+        data, status_code = process_response(response, default=[])
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
+
+    def _remove_issue_label(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        label: int,
+        **kwargs: Any,
+    ) -> Response:
+        """Remove one label from an issue.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            label: The ID of the label to remove.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint = self._issue_label_endpoint(owner=owner, repository=repository, index=index, label=label)
+        return self._delete(endpoint=endpoint, **kwargs)
+
+    def remove_issue_label(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        label: int,
+        **kwargs: Any,
+    ) -> tuple[None, dict[str, Any]]:
+        """Remove one label from an issue.
+
+        Gitea answers `204 No Content`, so there is no data; list the issue's
+        labels to read back what it is left with.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            label: The ID of the label to remove.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing None and a dictionary with metadata.
+
+        """
+        response = self._remove_issue_label(owner=owner, repository=repository, index=index, label=label, **kwargs)
+        _, status_code = process_response(response)
+        return None, {"status_code": status_code}
+
+    def _clear_issue_labels(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        **kwargs: Any,
+    ) -> Response:
+        """Remove every label from an issue.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint = self._issue_labels_endpoint(owner=owner, repository=repository, index=index)
+        return self._delete(endpoint=endpoint, **kwargs)
+
+    def clear_issue_labels(
+        self,
+        owner: str,
+        repository: str,
+        index: int,
+        **kwargs: Any,
+    ) -> tuple[None, dict[str, Any]]:
+        """Remove every label from an issue.
+
+        Gitea answers `204 No Content`, so there is no data.
+
+        Args:
+            owner: The owner of the repository.
+            repository: The name of the repository.
+            index: The index of the issue.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing None and a dictionary with metadata.
+
+        """
+        response = self._clear_issue_labels(owner=owner, repository=repository, index=index, **kwargs)
+        _, status_code = process_response(response)
+        return None, {"status_code": status_code}

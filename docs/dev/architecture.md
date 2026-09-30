@@ -58,7 +58,7 @@ src/gitea/
 │   ├── main.py              # gitea-cli entry point, command registration
 │   ├── config/              # config commands
 │   ├── actions/             # actions workflow, run, job, artifact, secret, variable, runner commands
-│   ├── issue/               # issue + issue dependency commands
+│   ├── issue/               # issue, issue dependency + issue label commands
 │   ├── pull_request/        # pull-request commands
 │   ├── comment/             # comment commands
 │   ├── label/               # label commands
@@ -150,7 +150,8 @@ absence of any module-level import cycle anywhere in `gitea`.
 
 The CLI is a single Typer application registered in `cli/main.py`. Each resource
 has a command group (e.g. `gitea-cli issue`, `gitea-cli project`), and nested
-groups exist where the domain nests (e.g. `project column`, `issue dependency`).
+groups exist where the domain nests (e.g. `project column`, `issue dependency`,
+`issue label`).
 
 CLI commands reuse the client through thin helper functions in `cli/utils/`
 (`auth.py` resolves authentication, `api.py` and `convert.py` handle requests

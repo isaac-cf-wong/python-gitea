@@ -155,12 +155,12 @@ is simpler and sufficient.
 | Client attribute      | Gitea domain                                                           |
 | --------------------- | ---------------------------------------------------------------------- |
 | `client.actions`      | Actions: workflows, runs, jobs, artifacts, secrets, variables, runners |
-| `client.issue`        | Issues and issue dependencies                                          |
+| `client.issue`        | Issues, issue dependencies and issue labels                            |
 | `client.pull_request` | Pull requests                                                          |
 | `client.repository`   | Repositories                                                           |
 | `client.user`         | Users and user settings                                                |
 | `client.comment`      | Issue comments                                                         |
-| `client.label`        | Issue labels                                                           |
+| `client.label`        | The labels a repository defines                                        |
 | `client.milestone`    | Milestones                                                             |
 | `client.notification` | Notifications                                                          |
 | `client.project`      | Projects, columns, and project issues                                  |
