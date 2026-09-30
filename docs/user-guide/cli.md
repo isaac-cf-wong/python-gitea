@@ -499,8 +499,13 @@ defines. In all of them:
   anything is written, so it works on a Gitea that only accepts IDs. Names are
   matched exactly, case included. A name that matches no label, or more than
   one, fails the command and no issue is changed. A value made only of digits is
-  taken as an ID and sent as it is, which is how a label defined on the
-  organization rather than the repository is named.
+  taken as an ID, which is how a label defined on the organization rather than
+  the repository is named. An ID is checked as well: one that is neither a label
+  of the repository nor of the organization owning it fails the command in the
+  same way, before anything is written. Label IDs belong to the repository or
+  organization that defines them, so an ID read from another repository names a
+  different label, or none; prefer the name, which means the same label wherever
+  it is defined.
 - `--issue-id` can be repeated to act on several issues in one run. With one
   issue, `data` is the list of labels the issue is left with. With several,
   `data` holds one entry per issue, in the order given:

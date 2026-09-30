@@ -18,6 +18,18 @@ class TestBaseLabel:
         assert endpoint == "/repos/owner/repo/labels"
         assert params == {"page": 1, "limit": 20}
 
+    def test_list_organization_labels_helper(self):
+        """Test _list_organization_labels_helper builds the endpoint and params."""
+        base = BaseLabel()
+        endpoint, params = base._list_organization_labels_helper("org", page=2, limit=50)
+        assert endpoint == "/orgs/org/labels"
+        assert params == {"page": 2, "limit": 50}
+
+    def test_list_organization_labels_helper_without_paging(self):
+        """Test _list_organization_labels_helper omits the paging params when absent."""
+        base = BaseLabel()
+        assert base._list_organization_labels_helper("org") == ("/orgs/org/labels", {})
+
     def test_create_label_helper(self):
         """Test _create_label_helper builds the payload."""
         base = BaseLabel()

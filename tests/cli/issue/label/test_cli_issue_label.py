@@ -2,7 +2,9 @@
 
 The commands are run against a stand-in for the instance that keeps each issue's
 labels as Gitea does: a POST to an issue's labels appends, a PUT replaces them, a
-DELETE of the list clears it and a DELETE of one label removes that one. A command
+DELETE of the list clears it and a DELETE of one label removes that one. As Gitea
+does, a POST or PUT drops without a word any ID that is not a label of the
+repository or of the organization owning it. A command
 that sent the wrong method would therefore leave the issue with the wrong labels,
 which is what these tests look at, rather than only at which method was sent.
 """
@@ -11,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -32,22 +35,33 @@ BUG = {"id": 3, "name": "bug", "color": "ff0000"}
 DOCS = {"id": 5, "name": "docs", "color": "00ff00"}
 URGENT = {"id": 8, "name": "priority: urgent", "color": "0000ff"}
 DEFINED = [BUG, DOCS, URGENT]
+ORG_WIDE = {"id": 900, "name": "org-wide", "color": "cccccc"}
+# An ID no label of the repository or its organization has, as one copied from another repository would be.
+FOREIGN = 266
 
 
 class FailedResponse:
     """The answer of an endpoint refusing a request, as far as the client reads it."""
 
-    status_code = 404
     content = b""
 
+    def __init__(self, status_code: int = 404) -> None:
+        """Answer with the given status.
+
+        Args:
+            status_code: The status of the refusal.
+
+        """
+        self.status_code = status_code
+
     def raise_for_status(self) -> None:
-        """Raise as a refused request does.
+        """Raise as a refused request does, carrying the response as requests does.
 
         Raises:
             requests.HTTPError: Always.
 
         """
-        raise requests.HTTPError("404 Client Error: Not Found")
+        raise requests.HTTPError(f"{self.status_code} Client Error", response=self)
 
     def close(self) -> None:
         """Release the response, as the client does on a failure."""
@@ -61,6 +75,8 @@ class LabelServer(RecordingSession):
         carried: dict[int, list[int]],
         defined: list[dict[str, Any]] | None = None,
         failing: frozenset[int] = frozenset(),
+        organization: list[dict[str, Any]] | None = None,
+        organization_status: int = 200,
     ) -> None:
         """Start the instance with the labels each issue carries.
 
@@ -68,20 +84,27 @@ class LabelServer(RecordingSession):
             carried: The IDs of the labels each issue carries, by issue number.
             defined: The labels the repository defines.
             failing: Issues whose label endpoints refuse every request.
+            organization: The labels the organization owning the repository defines.
+            organization_status: The status the organization's label listing answers
+                with: 404 is what Gitea answers when the owner is a user.
 
         """
         super().__init__()
         self.defined = DEFINED if defined is None else defined
+        self.organization = [] if organization is None else organization
+        self.organization_status = organization_status
         self.carried = {issue: list(ids) for issue, ids in carried.items()}
         self.failing = failing
 
     def _labels_of(self, issue: int) -> list[dict[str, Any]]:
-        by_id = {label["id"]: label for label in self.defined}
+        by_id = {label["id"]: label for label in [*self.defined, *self.organization]}
         return [by_id[label_id] for label_id in self.carried[issue]]
 
     def _ids(self, values: list[int | str]) -> list[int]:
         by_name = {label["name"]: label["id"] for label in self.defined}
-        return [value if isinstance(value, int) else by_name[value] for value in values]
+        applicable = {label["id"] for label in [*self.defined, *self.organization]}
+        ids = [value if isinstance(value, int) else by_name[value] for value in values]
+        return [label_id for label_id in ids if label_id in applicable]
 
     def request(self, method: str, url: str, **kwargs: Any) -> Any:
         """Record a request and answer it as the instance would.
@@ -101,10 +124,17 @@ class LabelServer(RecordingSession):
         self._record(method, url, **kwargs)
         path = url.removeprefix(API_ROOT)
 
-        if path == "/repos/o/r/labels" and method == "GET":
+        listings = {
+            "/repos/o/r/labels": (self.defined, 200),
+            "/orgs/o/labels": (self.organization, self.organization_status),
+        }
+        if path in listings and method == "GET":
+            listed, status = listings[path]
+            if status != HTTPStatus.OK:
+                return FailedResponse(status)
             params = kwargs.get("params") or {}
-            page, limit = params.get("page", 1), params.get("limit", len(self.defined))
-            return RecordedResponse(self.defined[(page - 1) * limit : page * limit])
+            page, limit = params.get("page", 1), params.get("limit", len(listed))
+            return RecordedResponse(listed[(page - 1) * limit : page * limit])
 
         match = re.fullmatch(r"/repos/o/r/issues/(\d+)/labels(?:/(\d+))?", path)
         assert match, f"unexpected request: {method} {url}"
@@ -263,14 +293,90 @@ def test_add_resolves_a_name_on_a_later_page_of_the_listing(config_path):
     assert server.bodies[-1] == {"labels": [159]}
 
 
-def test_a_numeric_label_is_sent_as_an_id_without_listing_the_labels(config_path):
-    """A numeric value is an ID, which needs no lookup and may name an organization label."""
-    server = LabelServer({34: []}, defined=[{"id": 900, "name": "org-wide", "color": "cccccc"}])
+def test_an_id_of_the_repository_is_sent_without_listing_the_organization(config_path):
+    """An ID among the repository's labels needs no further lookup."""
+    server = LabelServer({34: []})
 
-    data_of(run(server, config_path, "add", "--issue-id", "34", "--label", "900"))
+    data_of(run(server, config_path, "add", "--issue-id", "34", "--label", "5"))
 
-    assert server.requests[0] == ("POST", f"{API_ROOT}/repos/o/r/issues/34/labels")
-    assert server.bodies[0] == {"labels": [900]}
+    assert [url for _, url in server.requests if "/orgs/" in url] == []
+    assert server.bodies[-1] == {"labels": [5]}
+
+
+def test_an_id_of_an_organization_label_is_applied(config_path):
+    """An ID the repository's listing lacks but its organization defines is a label the issue can carry."""
+    server = LabelServer({34: [3]}, organization=[ORG_WIDE])
+
+    data = data_of(run(server, config_path, "add", "--issue-id", "34", "--label", "900"))
+
+    assert server.bodies[-1] == {"labels": [900]}
+    assert server.carried[34] == [3, 900]
+    assert data == [BUG, ORG_WIDE]
+
+
+@pytest.mark.parametrize("command", ["add", "set", "remove"])
+@pytest.mark.parametrize("organization_status", [200, 404], ids=["organization", "user"])
+def test_an_unknown_id_is_an_error_and_nothing_is_written(config_path, command, organization_status):
+    """An ID of no label here should fail before any issue is changed, whether the owner is an organization or not."""
+    server = LabelServer({34: [3, 5], 35: [8]}, organization=[ORG_WIDE], organization_status=organization_status)
+
+    error = run_failing(server, config_path, command, "--issue-id", "34", "--issue-id", "35", "--label", str(FOREIGN))
+
+    assert f"no label with ID {FOREIGN} in o/r or on its owner o" in error
+    assert "Pass the label's name instead" in error
+    assert server.writes == []
+    assert server.carried == {34: [3, 5], 35: [8]}
+
+
+def test_set_with_known_and_unknown_ids_changes_nothing(config_path):
+    """One unknown ID among known ones should stop `set` before it replaces anything, and be the one named."""
+    server = LabelServer({34: [3, 5]}, organization=[ORG_WIDE])
+
+    error = run_failing(
+        server, config_path, "set", "--issue-id", "34", "--label", "8", "--label", str(FOREIGN), "--label", "900"
+    )
+
+    assert f"no label with ID {FOREIGN} in" in error
+    assert "8," not in error
+    assert "900" not in error
+    assert server.writes == []
+    assert server.carried[34] == [3, 5]
+
+
+def test_every_unknown_id_is_named(config_path):
+    """Several unknown IDs should all be named, each once, so one run shows everything to fix."""
+    server = LabelServer({34: [3]})
+
+    error = run_failing(
+        server,
+        config_path,
+        "add",
+        "--issue-id",
+        "34",
+        "--label",
+        "266",
+        "--label",
+        "3",
+        "--label",
+        "270",
+        "--label",
+        "266",
+    )
+
+    assert "no label with ID 266, 270 in o/r" in error
+    assert server.writes == []
+
+
+def test_a_failing_organization_listing_fails_the_command_before_writing(config_path):
+    """A refusal other than the 404 of a user owner cannot be read as 'no such label', and should stop the command."""
+    server = LabelServer({34: [3]}, organization_status=500)
+
+    with patch("gitea.cli.utils.api.logger"):
+        result = run(server, config_path, "set", "--issue-id", "34", "--label", "900")
+
+    assert result.exit_code == 1
+    assert server.writes == []
+    assert server.carried[34] == [3]
 
 
 @pytest.mark.parametrize("command", ["add", "set", "remove"])

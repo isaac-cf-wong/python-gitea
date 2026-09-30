@@ -50,6 +50,45 @@ class BaseLabel:
 
         return endpoint, params
 
+    def _list_organization_labels_endpoint(self, organization: str) -> str:
+        """Construct the endpoint URL for listing the labels defined on an organization.
+
+        Args:
+            organization: The name of the organization.
+
+        Returns:
+            The endpoint URL for listing the organization's labels.
+
+        """
+        return f"/orgs/{organization}/labels"
+
+    def _list_organization_labels_helper(
+        self,
+        organization: str,
+        page: int | None = None,
+        limit: int | None = None,
+    ) -> tuple[str, dict[str, Any]]:
+        """Get the endpoint and parameters for listing the labels defined on an organization.
+
+        Args:
+            organization: The name of the organization.
+            page: The page number for pagination.
+            limit: The number of labels per page.
+
+        Returns:
+            A tuple containing the endpoint and the request arguments.
+
+        """
+        endpoint = self._list_organization_labels_endpoint(organization=organization)
+
+        params = {}
+        if page is not None:
+            params["page"] = page
+        if limit is not None:
+            params["limit"] = limit
+
+        return endpoint, params
+
     def _create_label_endpoint(self, owner: str, repository: str) -> str:
         """Construct the endpoint URL for creating a label in a repository.
 

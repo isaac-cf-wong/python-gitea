@@ -39,6 +39,19 @@ class TestAsyncLabel:
             assert result == ([{"id": 1, "name": "bug"}], {"status_code": 200})
 
     @pytest.mark.asyncio
+    async def test_list_organization_labels(self, async_label, mock_client):
+        """Test list_organization_labels."""
+        with patch("gitea.label.async_label.process_async_response") as mock_process:
+            mock_process.return_value = ([{"id": 900, "name": "org-wide"}], 200)
+            result = await async_label.list_organization_labels(organization="test_org", page=1, limit=50)
+            mock_client._request.assert_called_once_with(
+                method="GET",
+                endpoint="/orgs/test_org/labels",
+                params={"page": 1, "limit": 50},
+            )
+            assert result == ([{"id": 900, "name": "org-wide"}], {"status_code": 200})
+
+    @pytest.mark.asyncio
     async def test_create_label(self, async_label, mock_client):
         """Test create_label."""
         with patch("gitea.label.async_label.process_async_response") as mock_process:
