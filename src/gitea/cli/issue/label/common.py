@@ -7,9 +7,13 @@ and one that does not rejects the whole request. Resolving first also means an
 unknown name is an error before anything is written, rather than a label silently
 not applied, and before the first of several issues has been changed.
 
-A value made only of ASCII digits is taken to be an ID and is sent as it is,
-without being looked up. That is what lets a label defined on the organization,
-which the repository's listing does not include, be applied at all.
+A value made only of ASCII digits is taken to be an ID. An ID is checked too,
+against the repository's labels and then, for one not among them, against the
+labels of the organization owning the repository, which the repository's listing
+does not include. An ID found in neither is an error before anything is written:
+Gitea drops an ID it cannot apply without saying so, so an ID copied from another
+repository would otherwise be a silent no-op for `add`, and for `set` would leave
+the issue with no labels at all.
 
 Every command takes one `--issue-id` or several. With one, `data` is that issue's
 labels, as `gitea-cli issue label list` emits them. With several, `data` holds one
@@ -25,6 +29,8 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from requests import HTTPError
+
 from gitea.cli.utils.errors import CommandError
 from gitea.utils.pagination import PAGE_SIZE, collect_all_pages
 
@@ -37,6 +43,7 @@ ISSUE_IDS_HELP = "Issue number shown in the web UI. Repeat the option to act on 
 LABEL_HELP = "Label name or numeric ID. Repeat the option for several labels."
 
 _NUMERIC_ID = re.compile(r"[0-9]+")
+_NOT_FOUND = 404
 
 
 def require_issue_ids(issue_ids: list[int] | None, *, command: str) -> list[int]:
@@ -79,14 +86,41 @@ def require_labels(labels: list[str] | None, *, command: str, hint: str = "") ->
     return labels
 
 
-def resolve_label_ids(client: Gitea, owner: str, repository: str, labels: list[str], *, command: str) -> list[int]:
-    """Resolve the labels given on the command line to their IDs.
-
-    The repository's labels are listed only when a name has to be resolved, and
-    then only once for all of them.
+def _organization_label_ids(client: Gitea, owner: str) -> set[int]:
+    """Read the IDs of the labels defined on the organization owning a repository.
 
     Args:
-        client: The client to list the repository's labels with.
+        client: The client to list the labels with.
+        owner: The owner of the repository.
+
+    Returns:
+        The IDs, or none when the owner is a user rather than an organization,
+        which Gitea answers with a 404.
+
+    Raises:
+        HTTPError: If the listing failed for any other reason.
+
+    """
+    try:
+        defined, _ = collect_all_pages(
+            lambda page: client.label.list_organization_labels(organization=owner, page=page, limit=PAGE_SIZE)
+        )
+    except HTTPError as e:
+        response = getattr(e, "response", None)
+        if response is None or response.status_code != _NOT_FOUND:
+            raise
+        return set()
+    return {label["id"] for label in defined}
+
+
+def resolve_label_ids(client: Gitea, owner: str, repository: str, labels: list[str], *, command: str) -> list[int]:
+    """Resolve the labels given on the command line to their IDs, and check that each exists.
+
+    The repository's labels are listed once for all of them. The organization's
+    are listed only when an ID is not among the repository's.
+
+    Args:
+        client: The client to list the labels with.
         owner: The owner of the repository.
         repository: The name of the repository.
         labels: The labels, each a name or a numeric ID.
@@ -96,18 +130,19 @@ def resolve_label_ids(client: Gitea, owner: str, repository: str, labels: list[s
         The label IDs, in the order given, each once.
 
     Raises:
-        CommandError: If a name matches no label of the repository, or more than one.
+        CommandError: If a name matches no label of the repository, or more than
+            one, or an ID is neither a label of the repository nor of the
+            organization owning it.
 
     """
-    names = [label for label in labels if not _NUMERIC_ID.fullmatch(label)]
+    defined, _ = collect_all_pages(
+        lambda page: client.label.list_labels(owner=owner, repository=repository, page=page, limit=PAGE_SIZE)
+    )
     by_name: dict[str, list[int]] = {}
-    if names:
-        defined, _ = collect_all_pages(
-            lambda page: client.label.list_labels(owner=owner, repository=repository, page=page, limit=PAGE_SIZE)
-        )
-        for label in defined:
-            by_name.setdefault(label["name"], []).append(label["id"])
+    for label in defined:
+        by_name.setdefault(label["name"], []).append(label["id"])
 
+    names = [label for label in labels if not _NUMERIC_ID.fullmatch(label)]
     unknown = [name for name in names if name not in by_name]
     if unknown:
         raise CommandError(
@@ -122,8 +157,23 @@ def resolve_label_ids(client: Gitea, owner: str, repository: str, labels: list[s
             f"in {owner}/{repository}. Pass the numeric ID of the one you mean."
         )
 
-    ids = [int(label) if _NUMERIC_ID.fullmatch(label) else by_name[label][0] for label in labels]
-    return list(dict.fromkeys(ids))
+    repository_ids = {label["id"] for label in defined}
+    ids = [int(label) for label in labels if _NUMERIC_ID.fullmatch(label)]
+    elsewhere = [label_id for label_id in dict.fromkeys(ids) if label_id not in repository_ids]
+    if elsewhere:
+        organization_ids = _organization_label_ids(client, owner)
+        missing = [label_id for label_id in elsewhere if label_id not in organization_ids]
+        if missing:
+            raise CommandError(
+                f"'{command}': no label with ID {', '.join(str(label_id) for label_id in missing)} "
+                f"in {owner}/{repository} or on its owner {owner}. "
+                f"A label's ID belongs to the repository or organization defining it, so an ID read from "
+                f"another repository names a different label there, or none; nothing was changed. "
+                f"Pass the label's name instead; 'gitea-cli label list' shows the repository's labels."
+            )
+
+    resolved = [int(label) if _NUMERIC_ID.fullmatch(label) else by_name[label][0] for label in labels]
+    return list(dict.fromkeys(resolved))
 
 
 def for_each_issue(

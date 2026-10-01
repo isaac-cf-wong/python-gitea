@@ -74,6 +74,63 @@ class Label(BaseLabel, Resource):
         data, status_code = process_response(response, default=[])
         return cast(list[dict[str, Any]], data), {"status_code": status_code}
 
+    def _list_organization_labels(
+        self,
+        organization: str,
+        page: int | None = None,
+        limit: int | None = None,
+        **kwargs: Any,
+    ) -> Response:
+        """List the labels defined on an organization.
+
+        Args:
+            organization: The name of the organization.
+            page: The page number for pagination.
+            limit: The number of labels per page.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            The HTTP response object.
+
+        """
+        endpoint, params = self._list_organization_labels_helper(
+            organization=organization,
+            page=page,
+            limit=limit,
+        )
+        return self._get(endpoint=endpoint, params=params, **kwargs)
+
+    def list_organization_labels(
+        self,
+        organization: str,
+        page: int | None = None,
+        limit: int | None = None,
+        **kwargs: Any,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """List the labels defined on an organization.
+
+        These are the labels every repository of the organization can use, and
+        which the listing of a repository's own labels does not include.
+
+        Args:
+            organization: The name of the organization.
+            page: The page number for pagination.
+            limit: The number of labels per page.
+            **kwargs: Additional arguments for the request.
+
+        Returns:
+            A tuple containing a list of labels as dictionaries and a dictionary with metadata.
+
+        """
+        response = self._list_organization_labels(
+            organization=organization,
+            page=page,
+            limit=limit,
+            **kwargs,
+        )
+        data, status_code = process_response(response, default=[])
+        return cast(list[dict[str, Any]], data), {"status_code": status_code}
+
     def _create_label(
         self,
         owner: str,

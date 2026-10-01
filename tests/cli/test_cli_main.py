@@ -55,9 +55,8 @@ _SCOPE_OPTIONS = frozenset({"--owner", "--repository", "--issue-id", "--dependen
 
 # Options a command declares repeatable, and so optional to the parser, but rejects
 # at run time when none is given, with the value a no-op invocation passes. A
-# `--label` is given as an ID so that it is sent as it is: a name would be looked
-# up among the stub's labels, find none, and fail for a reason unrelated to the
-# command under test.
+# `--label` is checked against the repository's labels, so it is given as the ID
+# of the one label the stub lists.
 _RUNTIME_REQUIRED_OPTIONS = {"--label": "1"}
 
 # The helpers a command routes its result and its failures through. A command
@@ -214,6 +213,24 @@ class _StubGitea:
 
         """
         return {"id": 1}, {"status_code": 200}
+
+    def list_labels(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Return the single label of the repository the walk's `--label` names.
+
+        Declared for the same reason as `get_issue`: the `issue label` commands
+        check every `--label` against the repository's labels, and a repository
+        with none would fail them for a reason that has nothing to do with the
+        command under test.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Returns:
+            One label and its metadata.
+
+        """
+        return [{"id": 1, "name": "stub"}], {"status_code": 200}
 
     def list_project_columns(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Return the single column of the board the walk's project has.
@@ -386,6 +403,23 @@ class _UnreachableGitea(_StubGitea):
 
     def list_project_column_issues(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Fail as every other endpoint of an unreachable instance does.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Returns:
+            Never; the call always raises.
+
+        """
+        return self(*args, **kwargs)
+
+    def list_labels(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        """Fail as every other endpoint of an unreachable instance does.
+
+        Overridden for the same reason as `get_issue`: the base stub lists a
+        label, which would let `label list` succeed on an instance that cannot
+        be reached.
 
         Args:
             *args: Ignored.
