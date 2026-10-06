@@ -579,9 +579,15 @@ gitea-cli project list --owner my-org --repository my-repo  # that repository's 
 - `gitea-cli project column create --owner <owner> [--repository <repo>] --project-id <id> --title <title>`
     - Optional: `--color`
 - `gitea-cli project column list --owner <owner> [--repository <repo>] --project-id <id>`
+    - Optional: `--fields`
 - `gitea-cli project column issues --owner <owner> [--repository <repo>] --project-id <id> --column-id <id>`
-    - Optional: `--page`, `--limit`
+    - Optional: `--page`, `--limit`, `--fields`
+    - `data` is `{"column": {"id": ..., "title": ...}, "issues": [...]}`: the
+      column is echoed by the ID and title the API reports for `--column-id`, so
+      a read of another column of the same project says which column it read.
+      Earlier releases emitted the list of issues alone as `data`.
 - `gitea-cli project issues --owner <owner> [--repository <repo>] --project-id <id>`
+    - Optional: `--fields`
 - `gitea-cli project issue add --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
     - Optional: `--issue-repository`
 - `gitea-cli project issue move --owner <owner> [--repository <repo>] --project-id <id> --column-id <id> --issue-id <id>`
@@ -595,6 +601,12 @@ gitea-cli project list --owner my-org --repository my-repo  # that repository's 
     - Takes the issue's card off the project. `--column-id` is the column the
       card is in, and is found on the board when it is omitted; an issue with no
       card there is reported as having none.
+
+`--fields id,number,title,state` cuts every record of the listing - each column
+for `column list`, each issue for `column issues` and `project issues` - down to
+the named fields, in that order. The echoed column is never cut. A field a
+record does not carry is emitted as `null`, so a misspelled field shows up as
+nulls rather than disappearing.
 
 The project endpoints identify an issue by its global ID, which is not the
 number shown in the web UI: `my-org/my-repo#15` may well be global ID `1854`.

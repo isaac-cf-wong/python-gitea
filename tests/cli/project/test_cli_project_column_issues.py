@@ -18,6 +18,9 @@ ISSUES = [
     {"number": 9, "title": "Ship the release", "state": "closed"},
 ]
 
+# The column `project column issues` reads, as the API returns it.
+COLUMN = {"id": 5, "title": "Done", "default": False, "sorting": 2, "project_id": 1}
+
 
 def make_ctx():
     """Create a mock context object."""
@@ -70,6 +73,7 @@ def test_list_column_issues_command(mock_gitea, mock_get_auth_params, mock_execu
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
     client = MagicMock()
+    client.project.get_project_column.return_value = (COLUMN, {"status_code": 200})
     client.project.list_project_column_issues.return_value = (ISSUES, {"status_code": 200})
     mock_gitea.return_value.__enter__.return_value = client
 
@@ -91,10 +95,13 @@ def test_list_column_issues_command(mock_gitea, mock_get_auth_params, mock_execu
     assert call_kwargs["command_name"] == "gitea-cli project column issues"
 
     result = call_kwargs["api_call"]()
+    client.project.get_project_column.assert_called_once_with(
+        owner="owner", repository="repo", project_id=1, column_id=5
+    )
     client.project.list_project_column_issues.assert_called_once_with(
         owner="owner", repository="repo", project_id=1, column_id=5, page=2, limit=10
     )
-    assert result == (ISSUES, {"status_code": 200})
+    assert result == ({"column": {"id": 5, "title": "Done"}, "issues": ISSUES}, {"status_code": 200})
 
 
 @patch("gitea.cli.utils.api.execute_api_command")
@@ -106,6 +113,7 @@ def test_list_column_issues_command_organization_project(mock_gitea, mock_get_au
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
     client = MagicMock()
+    client.project.get_project_column.return_value = (COLUMN, {"status_code": 200})
     client.project.list_project_column_issues.return_value = (ISSUES, {"status_code": 200})
     mock_gitea.return_value.__enter__.return_value = client
 
@@ -126,10 +134,11 @@ def test_list_column_issues_command_organization_project(mock_gitea, mock_get_au
 @patch("gitea.cli.utils.auth.get_auth_params")
 @patch("gitea.client.gitea.Gitea")
 def test_list_column_issues_output_envelope(mock_gitea, mock_get_auth_params):
-    """`project column issues` should print the issues in the standard JSON envelope."""
+    """`project column issues` should print the column read and its issues in the standard JSON envelope."""
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
 
     client = MagicMock()
+    client.project.get_project_column.return_value = (COLUMN, {"status_code": 200})
     client.project.list_project_column_issues.return_value = (ISSUES, {"status_code": 200})
     mock_gitea.return_value.__enter__.return_value = client
 
@@ -140,8 +149,192 @@ def test_list_column_issues_output_envelope(mock_gitea, mock_get_auth_params):
 
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload == {"data": ISSUES, "metadata": {"status_code": 200}}
-    assert [issue["number"] for issue in payload["data"]] == [7, 9]
+    assert payload == {
+        "data": {"column": {"id": 5, "title": "Done"}, "issues": ISSUES},
+        "metadata": {"status_code": 200},
+    }
+    assert [issue["number"] for issue in payload["data"]["issues"]] == [7, 9]
+    # The column leads the output, so a read cut short still says what it read.
+    assert result.stdout.index('"column"') < result.stdout.index('"issues"')
+
+
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_list_column_issues_echoes_the_column_the_api_reports(mock_gitea, mock_get_auth_params):
+    """The echoed column is the one the API reports for the ID, not the ID passed back verbatim.
+
+    A sibling column of the same project lists without error, so the title is the
+    only thing that can tell the reader the ID named a different column than meant.
+    """
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.get_project_column.return_value = ({"id": 135, "title": "Done"}, {"status_code": 200})
+    client.project.list_project_column_issues.return_value = (ISSUES, {"status_code": 200})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app,
+        ["project", "column", "issues", "--owner", "my-org", "--project-id", "35", "--column-id", "135"],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["data"]["column"] == {"id": 135, "title": "Done"}
+    client.project.get_project_column.assert_called_once_with(
+        owner="my-org", repository=None, project_id=35, column_id=135
+    )
+
+
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_list_column_issues_fails_when_the_column_cannot_be_read(mock_gitea, mock_get_auth_params):
+    """A column that cannot be read fails the command rather than listing issues under no column."""
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.get_project_column.side_effect = RuntimeError("404 Not Found")
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app,
+        ["project", "column", "issues", "--owner", "my-org", "--project-id", "1", "--column-id", "999"],
+    )
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    client.project.list_project_column_issues.assert_not_called()
+
+
+FULL_ISSUES = [
+    {"id": 1001, "number": 7, "title": "Fix the docs", "state": "open", "user": {"id": 1, "login": "someone"}},
+    {"id": 1002, "number": 9, "title": "Ship the release", "state": "closed", "user": {"id": 2, "login": "other"}},
+]
+
+
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_list_column_issues_fields_keeps_only_the_named_fields(mock_gitea, mock_get_auth_params):
+    """`--fields` cuts each issue down to the named fields, in order; the column is echoed whole."""
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.get_project_column.return_value = (COLUMN, {"status_code": 200})
+    client.project.list_project_column_issues.return_value = (FULL_ISSUES, {"status_code": 200})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "column",
+            "issues",
+            "--owner",
+            "my-org",
+            "--project-id",
+            "1",
+            "--column-id",
+            "5",
+            "--fields",
+            "number, title,state,number",
+        ],
+    )
+
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)["data"]
+    assert data == {
+        "column": {"id": 5, "title": "Done"},
+        "issues": [
+            {"number": 7, "title": "Fix the docs", "state": "open"},
+            {"number": 9, "title": "Ship the release", "state": "closed"},
+        ],
+    }
+    assert "user" not in result.stdout
+
+
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_list_columns_fields_keeps_only_the_named_fields(mock_gitea, mock_get_auth_params):
+    """`project column list --fields` cuts each column down to the named fields."""
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.list_project_columns.return_value = (
+        [{**COLUMN, "creator": {"id": 1, "login": "someone"}}],
+        {"status_code": 200},
+    )
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app,
+        ["project", "column", "list", "--owner", "my-org", "--project-id", "1", "--fields", "id,title"],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {"data": [{"id": 5, "title": "Done"}], "metadata": {"status_code": 200}}
+
+
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_list_project_issues_fields_keeps_only_the_named_fields(mock_gitea, mock_get_auth_params):
+    """`project issues --fields` cuts every column's issues down, and keeps each column's id and title."""
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.list_project_columns.side_effect = paged_columns(
+        [{"id": 5, "title": "Todo"}, {"id": 6, "title": "Done"}]
+    )
+    client.project.list_project_column_issues.side_effect = paged_issues({5: [FULL_ISSUES[:1]], 6: [FULL_ISSUES[1:]]})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app, ["project", "issues", "--owner", "my-org", "--project-id", "1", "--fields", "id,number,state"]
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["data"] == [
+        {"column": {"id": 5, "title": "Todo"}, "issues": [{"id": 1001, "number": 7, "state": "open"}]},
+        {"column": {"id": 6, "title": "Done"}, "issues": [{"id": 1002, "number": 9, "state": "closed"}]},
+    ]
+    assert payload["metadata"]["issue_count"] == 2
+
+
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_fields_reports_a_field_no_record_carries_as_null(mock_gitea, mock_get_auth_params):
+    """A misspelled field shows up as null rather than vanishing from the records."""
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.list_project_columns.return_value = ([COLUMN], {"status_code": 200})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app,
+        ["project", "column", "list", "--owner", "my-org", "--project-id", "1", "--fields", "id,colour"],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["data"] == [{"id": 5, "colour": None}]
+
+
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_fields_naming_no_field_is_an_error(mock_gitea, mock_get_auth_params):
+    """`--fields` with nothing but separators is refused before any request is made."""
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app,
+        ["project", "issues", "--owner", "my-org", "--project-id", "1", "--fields", " , "],
+    )
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    client.project.list_project_columns.assert_not_called()
 
 
 @patch("gitea.cli.utils.api.execute_api_command")

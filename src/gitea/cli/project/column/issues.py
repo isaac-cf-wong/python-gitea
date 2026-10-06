@@ -6,6 +6,8 @@ from typing import Annotated
 
 import typer
 
+from gitea.cli.utils.projection import FIELDS_HELP
+
 
 def list_column_issues_command(
     ctx: typer.Context,
@@ -23,6 +25,10 @@ def list_column_issues_command(
     repository: Annotated[
         str | None,
         typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
+    ] = None,
+    fields: Annotated[
+        str | None,
+        typer.Option("--fields", help=FIELDS_HELP),
     ] = None,
     account_name: Annotated[
         str | None,
@@ -46,7 +52,11 @@ def list_column_issues_command(
         ),
     ] = None,
 ) -> None:
-    """List the issues in a project's column.
+    """List the issues in a project's column, together with the column read.
+
+    The column is echoed by the ID and title the API reports for it, so a read of
+    the wrong column of the right project says which column it read instead of
+    passing for the intended one.
 
     Args:
         ctx: The Typer context.
@@ -56,6 +66,7 @@ def list_column_issues_command(
         column_id: The ID of the column.
         page: The page number for pagination.
         limit: The number of issues per page.
+        fields: Comma-separated fields to keep on each issue, or None for all of them.
         account_name: Name of the account to use for authentication.
         token: Token for authentication.
         base_url: Base URL of the Gitea platform.
@@ -65,6 +76,7 @@ def list_column_issues_command(
 
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
+    from gitea.cli.utils.projection import parse_fields, project_records  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -78,11 +90,18 @@ def list_column_issues_command(
         """List the issues in a project column.
 
         Returns:
-            A tuple containing the issue data and metadata.
+            A tuple containing the column read with its issues, and metadata.
 
         """
+        names = parse_fields(fields)
         with Gitea(token=token, base_url=base_url) as client:
-            return client.project.list_project_column_issues(
+            column, _ = client.project.get_project_column(
+                owner=owner,
+                repository=repository,
+                project_id=project_id,
+                column_id=column_id,
+            )
+            issues, metadata = client.project.list_project_column_issues(
                 owner=owner,
                 repository=repository,
                 project_id=project_id,
@@ -90,5 +109,10 @@ def list_column_issues_command(
                 page=page,
                 limit=limit,
             )
+        data = {
+            "column": {"id": column["id"], "title": column.get("title")},
+            "issues": project_records(issues, names),
+        }
+        return data, metadata
 
     execute_api_command(api_call=api_call, base_url=base_url, command_name="gitea-cli project column issues")

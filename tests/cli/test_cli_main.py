@@ -214,6 +214,22 @@ class _StubGitea:
         """
         return {"id": 1}, {"status_code": 200}
 
+    def get_project_column(self, *args: Any, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Return the single column that a column lookup is expected to return.
+
+        Declared for the same reason as `get_issue`: `project column issues`
+        echoes the column it read by reading `id` off it.
+
+        Args:
+            *args: Ignored.
+            **kwargs: Ignored.
+
+        Returns:
+            One column and its metadata.
+
+        """
+        return {"id": 1, "title": "Column"}, {"status_code": 200}
+
     def list_labels(self, *args: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         """Return the single label of the repository the walk's `--label` names.
 
