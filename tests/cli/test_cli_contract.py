@@ -613,7 +613,17 @@ CONTRACTS = (
     ),
     Contract(path=("project", "column", "create"), args=(*BOARD, "--title", "Working"), payload=COLUMN),
     Contract(path=("project", "column", "list"), args=BOARD, payload=[COLUMN]),
-    Contract(path=("project", "column", "issues"), args=(*BOARD, "--column-id", "117"), payload=[ISSUE]),
+    Contract(
+        path=("project", "column", "issues"),
+        args=(*BOARD, "--column-id", "117"),
+        # The column is read as well as its issues, and echoed by the ID and title
+        # the API reports, so a read of the wrong column says which one it read.
+        routes=(
+            (f"/columns/{COLUMN['id']}/issues", [ISSUE]),
+            (f"/columns/{COLUMN['id']}", COLUMN),
+        ),
+        data={"column": {"id": COLUMN["id"], "title": COLUMN["title"]}, "issues": [ISSUE]},
+    ),
     Contract(
         path=("project", "issue", "add"),
         args=(*BOARD, "--column-id", "117", "--issue-id", "1873"),

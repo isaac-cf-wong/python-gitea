@@ -6,6 +6,7 @@ from typing import Annotated, Any
 
 import typer
 
+from gitea.cli.utils.projection import FIELDS_HELP
 from gitea.utils.pagination import PAGE_SIZE, collect_all_pages
 
 
@@ -16,6 +17,10 @@ def list_project_issues_command(
     repository: Annotated[
         str | None,
         typer.Option("--repository", help="Name of the repository. Omit for organization projects."),
+    ] = None,
+    fields: Annotated[
+        str | None,
+        typer.Option("--fields", help=FIELDS_HELP),
     ] = None,
     account_name: Annotated[
         str | None,
@@ -46,6 +51,7 @@ def list_project_issues_command(
         owner: The owner of the repository.
         repository: The name of the repository, or None for organization projects.
         project_id: The ID of the project.
+        fields: Comma-separated fields to keep on each issue, or None for all of them.
         account_name: Name of the account to use for authentication.
         token: Token for authentication.
         base_url: Base URL of the Gitea platform.
@@ -53,6 +59,7 @@ def list_project_issues_command(
     """
     from gitea.cli.utils.api import execute_api_command  # noqa: PLC0415
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
+    from gitea.cli.utils.projection import parse_fields, project_records  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
 
     token, base_url = get_auth_params(
@@ -71,6 +78,7 @@ def list_project_issues_command(
             A tuple containing one entry per column, each with its issues, and metadata.
 
         """
+        names = parse_fields(fields)
         with Gitea(token=token, base_url=base_url) as client:
             columns, metadata = collect_all_pages(
                 lambda page: client.project.list_project_columns(
@@ -99,7 +107,7 @@ def list_project_issues_command(
                 data.append(
                     {
                         "column": {"id": column["id"], "title": column.get("title")},
-                        "issues": issues,
+                        "issues": project_records(issues, names),
                     }
                 )
 
