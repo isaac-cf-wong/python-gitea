@@ -187,6 +187,26 @@ def test_list_column_issues_echoes_the_column_the_api_reports(mock_gitea, mock_g
 
 @patch("gitea.cli.utils.auth.get_auth_params")
 @patch("gitea.client.gitea.Gitea")
+def test_list_column_issues_echoes_an_absent_column_id_as_null(mock_gitea, mock_get_auth_params):
+    """A column read carrying no id echoes the id as null, the way an absent title is echoed."""
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = MagicMock()
+    client.project.get_project_column.return_value = ({"title": "Done"}, {"status_code": 200})
+    client.project.list_project_column_issues.return_value = (ISSUES, {"status_code": 200})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    result = runner.invoke(
+        app,
+        ["project", "column", "issues", "--owner", "my-org", "--project-id", "1", "--column-id", "5"],
+    )
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout)["data"] == {"column": {"id": None, "title": "Done"}, "issues": ISSUES}
+
+
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
 def test_list_column_issues_fails_when_the_column_cannot_be_read(mock_gitea, mock_get_auth_params):
     """A column that cannot be read fails the command rather than listing issues under no column."""
     mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")

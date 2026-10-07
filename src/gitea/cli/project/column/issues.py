@@ -110,7 +110,7 @@ def list_column_issues_command(
                 limit=limit,
             )
         data = {
-            "column": {"id": column["id"], "title": column.get("title")},
+            "column": {"id": column.get("id"), "title": column.get("title")},
             "issues": project_records(issues, names),
         }
         return data, metadata
