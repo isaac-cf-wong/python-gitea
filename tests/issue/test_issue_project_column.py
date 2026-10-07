@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from requests import HTTPError
 
-from gitea.issue.project_column import resolve_project_column_ids
+from gitea.issue.project_column import ColumnListings, resolve_project_column_ids
 from gitea.utils.pagination import PAGE_SIZE
 from tests.board import (
     ISSUE_ID,
@@ -332,3 +332,32 @@ def test_scopes_the_column_listing_to_the_kind_of_project(project, expected_repo
     resolve_project_column_ids(client=client, owner="example-org", repository="example-repo", issue=make_issue(project))
 
     assert client.project.list_project_columns.call_args.kwargs["repository"] == expected_repository
+
+
+def test_shared_listings_page_a_board_only_as_far_as_a_walk_needed():
+    """Sharing listings should keep each walk as lazy as its own, and fetch no page twice."""
+    client = make_client(
+        {29: [[{"id": 100 + n} for n in range(PAGE_SIZE)], [{"id": 200}]]},
+        {100: [[{"id": ISSUE_ID}]], 200: [[{"id": 1857}]], **{100 + n: [[]] for n in range(1, PAGE_SIZE)}},
+    )
+    columns = ColumnListings()
+    elsewhere = {**make_issue(ORGANIZATION_PROJECT), "id": 1857}
+
+    first = resolve_project_column_ids(
+        client=client,
+        owner="example-org",
+        repository="example-repo",
+        issue=make_issue(ORGANIZATION_PROJECT),
+        columns=columns,
+    )
+    # The card is in the first column, so the second page is not asked for yet.
+    assert [call.kwargs["page"] for call in client.project.list_project_columns.call_args_list] == [1]
+
+    second = resolve_project_column_ids(
+        client=client, owner="example-org", repository="example-repo", issue=elsewhere, columns=columns
+    )
+
+    assert column_ids(first) == [100]
+    assert column_ids(second) == [200]
+    # The second walk replays page 1 and pages on from there; page 2 is short, so it ends the listing.
+    assert [call.kwargs["page"] for call in client.project.list_project_columns.call_args_list] == [1, 2]

@@ -34,6 +34,17 @@ lists the issue. It is the answer to "has this issue a card on this project, and
 where" wherever that has to be told apart from "the board could not be read" -
 the project issue commands ask it before moving a card, because Gitea's move
 endpoint reports success without doing anything when there is no card to move.
+
+A caller resolving many issues in one run - ``gitea-cli issue get`` given a list
+of them - passes one ``ColumnListings`` to every lookup, so that a board the
+issues share has its columns listed once for the run rather than once per issue.
+The listing is still paged only as far as some walk needed it, and a lookup that
+fails while paging it is forgotten rather than kept, so the next issue on that
+board pages it afresh: each issue meets the failures a walk of its own would have
+met, and only the requests already answered are not repeated. The columns' issue
+listings are not kept, since they are what tells one issue's card from another's.
+A column added to a board during the run is not seen by the issues after the
+listing was paged, which is the same race the walk already has within one issue.
 """
 
 from __future__ import annotations
@@ -47,6 +58,8 @@ from requests import RequestException
 from gitea.utils.pagination import PAGE_SIZE, iter_async_pages, iter_pages
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from gitea.client.async_gitea import AsyncGitea
     from gitea.client.gitea import Gitea
 
@@ -123,6 +136,99 @@ def _holds_issue(issues: list[Any], issue_id: int) -> bool:
     return any(_identifier(issue) == issue_id for issue in issues)
 
 
+class _ColumnListing:
+    """The IDs of one project's columns, paged in as a walk asks for them.
+
+    Every walk over it replays the IDs already paged in and asks for the next
+    page only once it has passed them all, so walks sharing the listing request
+    each page once. A page that fails propagates its error and ends the listing.
+    """
+
+    def __init__(self, pages: Iterator[tuple[list[Any], dict[str, Any]]]) -> None:
+        """Wrap the pages of a column listing.
+
+        Args:
+            pages: The listing's pages, each fetched when it is first reached.
+
+        """
+        self._pages = pages
+        self._ids: list[int] = []
+        self._complete = False
+
+    def __iter__(self) -> Iterator[int]:
+        """Walk the column IDs in board order.
+
+        Yields:
+            The ID of each column that carries a usable one.
+
+        """
+        index = 0
+        while True:
+            if index < len(self._ids):
+                yield self._ids[index]
+                index += 1
+                continue
+            if self._complete:
+                return
+            try:
+                columns, _ = next(self._pages)
+            except StopIteration:
+                self._complete = True
+                return
+            self._ids.extend(column_id for column in columns if (column_id := _identifier(column)) is not None)
+
+
+class ColumnListings:
+    """The column listings of the projects one run has looked a card up on.
+
+    Meant to live for one run and no longer: a listing kept is not listed again,
+    so a board edited between two runs would otherwise be read as it was.
+    """
+
+    def __init__(self) -> None:
+        """Start with no project listed."""
+        self._listings: dict[tuple[str, str | None, int], _ColumnListing] = {}
+
+    def column_ids(self, *, client: Gitea, owner: str, repository: str | None, project_id: int) -> Iterator[int]:
+        """Walk the IDs of a project's columns, listing them only as far as no walk has before.
+
+        Args:
+            client: The Gitea client used for the lookups.
+            owner: The owner of the repository or organization holding the project.
+            repository: The name of the repository holding the project, or None for
+                an organization project.
+            project_id: The ID of the project.
+
+        Yields:
+            The ID of each column of the project, in board order.
+
+        Raises:
+            Exception: Whatever listing a page raised. The listing is then
+                forgotten, so the next walk of the project lists it afresh.
+
+        """
+        key = (owner, repository, project_id)
+        listing = self._listings.get(key)
+        if listing is None:
+            listing = self._listings[key] = _ColumnListing(
+                iter_pages(
+                    lambda page: client.project.list_project_columns(
+                        owner=owner,
+                        repository=repository,
+                        project_id=project_id,
+                        page=page,
+                        limit=PAGE_SIZE,
+                    )
+                )
+            )
+        try:
+            yield from listing
+        except Exception:
+            if self._listings.get(key) is listing:
+                del self._listings[key]
+            raise
+
+
 _LOOKUP_FAILED = "Could not resolve the column of issue %s on project %s, reporting it as null: %s"
 
 # aiohttp raises its total timeout as a bare asyncio.TimeoutError, which is the
@@ -138,6 +244,7 @@ def resolve_project_column_ids(
     owner: str,
     repository: str,
     issue: dict[str, Any],
+    columns: ColumnListings | None = None,
 ) -> dict[str, Any]:
     """Populate the ``column_id`` of every project an issue is on.
 
@@ -146,6 +253,8 @@ def resolve_project_column_ids(
         owner: The owner of the repository holding the issue.
         repository: The name of the repository holding the issue.
         issue: The issue data returned by the API.
+        columns: The column listings to share with the other issues of the run,
+            or None to list each project's columns for this issue alone.
 
     Returns:
         The issue data with a ``column_id`` on every project entry, holding the
@@ -178,6 +287,7 @@ def resolve_project_column_ids(
                     repository=_column_scope_repository(project, repository),
                     project_id=project_id,
                     issue_id=issue_id,
+                    columns=columns,
                 )
             except RequestException as e:
                 # Enriching the issue is not worth failing the issue over: the
@@ -195,6 +305,7 @@ def find_card_column_id(
     repository: str | None,
     project_id: int,
     issue_id: int,
+    columns: ColumnListings | None = None,
 ) -> int | None:
     """Find the column of a project that lists an issue.
 
@@ -205,34 +316,25 @@ def find_card_column_id(
             an organization project.
         project_id: The ID of the project.
         issue_id: The global ID of the issue.
+        columns: The column listings to share with the other lookups of the run,
+            or None to list the project's columns for this lookup alone.
 
     Returns:
         The ID of the column listing the issue, or None when no column of the
         project lists it.
 
     """
-    for columns, _ in iter_pages(
-        lambda page: client.project.list_project_columns(
+    listings = ColumnListings() if columns is None else columns
+    for column_id in listings.column_ids(client=client, owner=owner, repository=repository, project_id=project_id):
+        if column_holds_card(
+            client=client,
             owner=owner,
             repository=repository,
             project_id=project_id,
-            page=page,
-            limit=PAGE_SIZE,
-        )
-    ):
-        for column in columns:
-            column_id = _identifier(column)
-            if column_id is None:
-                continue
-            if column_holds_card(
-                client=client,
-                owner=owner,
-                repository=repository,
-                project_id=project_id,
-                column_id=column_id,
-                issue_id=issue_id,
-            ):
-                return column_id
+            column_id=column_id,
+            issue_id=issue_id,
+        ):
+            return column_id
     return None
 
 

@@ -3,6 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from requests import HTTPError
+
 from gitea.cli.issue.get import get_command
 from tests.board import ISSUE_ID, ORGANIZATION_PROJECT, REPOSITORY_PROJECT, make_client, make_issue
 
@@ -207,3 +209,89 @@ def test_get_command_reports_a_column_on_every_project_of_an_issue_without_a_glo
 
     assert [project["column_id"] for project in data["projects"]] == [None, None]
     client.project.list_project_columns.assert_not_called()
+
+
+def on_boards(number, issue_id, *projects):
+    """Describe an issue on the given boards, as the API returns it.
+
+    Args:
+        number: The issue number.
+        issue_id: The global ID the column listings name the issue by.
+        *projects: The projects the issue is on.
+
+    Returns:
+        The issue payload and the metadata of its response.
+
+    """
+    return {"id": issue_id, "number": number, "projects": [dict(project) for project in projects]}, {"status_code": 200}
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_get_command_lists_a_shared_board_once_for_several_issues(mock_gitea, mock_get_auth_params, mock_execute):
+    """A run over several issues on one board should list that board's columns once, not once per issue."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = make_client(
+        {29: [[{"id": 107}, {"id": 109}]], 31: [[{"id": 5}]]},
+        {107: [[{"id": 2001}]], 109: [[{"id": 2002}, {"id": 2003}]], 5: [[{"id": 2003}]]},
+    )
+    client.issue.get_issue.side_effect = [
+        on_boards(1, 2001, ORGANIZATION_PROJECT),
+        on_boards(2, 2002, ORGANIZATION_PROJECT),
+        on_boards(3, 2003, ORGANIZATION_PROJECT, REPOSITORY_PROJECT),
+    ]
+    mock_gitea.return_value.__enter__.return_value = client
+
+    get_command(
+        ctx=ctx,
+        owner="example-org",
+        repository="example-repo",
+        issue_ids=[1, 2, 3],
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    data, _ = mock_execute.call_args[1]["api_call"]()
+
+    assert [[project["column_id"] for project in issue["projects"]] for issue in data] == [[107], [109], [109, 5]]
+    listed = [call.kwargs["project_id"] for call in client.project.list_project_columns.call_args_list]
+    assert sorted(listed) == [29, 31]
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_get_command_lists_a_board_again_after_its_listing_failed(mock_gitea, mock_get_auth_params, mock_execute):
+    """A failed column listing is not kept: the next issue on the board lists it afresh, as it always did."""
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = make_client({}, {109: [[{"id": 2002}]]})
+    client.project.list_project_columns.side_effect = [
+        HTTPError("503 Server Error"),
+        ([{"id": 109}], {"status_code": 200}),
+    ]
+    client.issue.get_issue.side_effect = [
+        on_boards(1, 2001, ORGANIZATION_PROJECT),
+        on_boards(2, 2002, ORGANIZATION_PROJECT),
+    ]
+    mock_gitea.return_value.__enter__.return_value = client
+
+    get_command(
+        ctx=ctx,
+        owner="example-org",
+        repository="example-repo",
+        issue_ids=[1, 2],
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    data, _ = mock_execute.call_args[1]["api_call"]()
+
+    assert [[project["column_id"] for project in issue["projects"]] for issue in data] == [[None], [109]]
+    assert client.project.list_project_columns.call_count == 2

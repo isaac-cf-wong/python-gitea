@@ -81,7 +81,7 @@ def get_command(
     from gitea.cli.utils.auth import get_auth_params  # noqa: PLC0415
     from gitea.cli.utils.options import require_repository  # noqa: PLC0415
     from gitea.client.gitea import Gitea  # noqa: PLC0415
-    from gitea.issue.project_column import resolve_project_column_ids  # noqa: PLC0415
+    from gitea.issue.project_column import ColumnListings, resolve_project_column_ids  # noqa: PLC0415
 
     command = "gitea-cli issue get"
     token, base_url = get_auth_params(
@@ -96,7 +96,9 @@ def get_command(
 
         The column of each project an issue is on is resolved from the project's
         board, because the issue payload names the projects without saying where
-        on them the issue's card sits.
+        on them the issue's card sits. The issues of one run share the listings
+        of their boards' columns, so a board is listed once however many of the
+        issues are on it.
 
         Returns:
             A tuple containing the issue data, or a list of it, and metadata.
@@ -106,10 +108,13 @@ def get_command(
         targets, single = _requested_issues(issue_ids, issue_id_file, index, command=command)
 
         with Gitea(token=token, base_url=base_url) as client:
+            columns = ColumnListings()
 
             def get_one(number: int) -> tuple[dict[str, Any], dict[str, Any]]:
                 data, metadata = client.issue.get_issue(owner=owner, repository=target_repository, index=number)
-                data = resolve_project_column_ids(client=client, owner=owner, repository=target_repository, issue=data)
+                data = resolve_project_column_ids(
+                    client=client, owner=owner, repository=target_repository, issue=data, columns=columns
+                )
                 return data, metadata
 
             if single:
