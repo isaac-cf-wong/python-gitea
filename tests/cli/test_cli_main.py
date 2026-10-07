@@ -911,9 +911,9 @@ class TestOptionNaming:
         assert result.exit_code == 1
         assert result.stdout == ""
         assert mock_logger.error.call_count == 1
-        assert "'gitea-cli issue get' needs an issue: pass --issue-id NUMBER." in _logged_message(
-            mock_logger.error.call_args
-        )
+        message = _logged_message(mock_logger.error.call_args)
+        assert "'gitea-cli issue get' needs an issue: pass --issue-id NUMBER" in message
+        assert "--index" not in message
 
     def test_the_deprecated_index_still_names_an_issue(self, tmp_path: Path) -> None:
         """`--index` should keep working, so scripts written against it survive.

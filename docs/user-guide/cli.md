@@ -442,8 +442,21 @@ otherwise look like.
       `--due-date`, `--closed`
 - `gitea-cli issue list --owner <owner> --repository <repo>`
     - Optional: `--state`, `--labels`, `--search-string`, `--created-by`,
-      `--assigned-by`, `--since`, `--before`, `--page`, `--limit`
+      `--assigned-by`, `--since`, `--before`, `--page`, `--limit`, `--issue-ids`
+    - `--issue-ids 12,7,40` lists only those issues, in that order. Gitea's
+      listing has no such filter, so its pages are walked until every one of
+      them has been seen; the other filters still apply, so
+      `--state open --issue-ids ...` answers "which of these are open" in one
+      call. `metadata.not_listed` names each requested issue the listing did not
+      hold - one the filters exclude, or one that does not exist. `--page`
+      cannot be combined with it; `--limit` still sets the page size.
 - `gitea-cli issue get --owner <owner> --repository <repo> --issue-id <number>`
+    - `--issue-id` can be repeated, and `--issue-id-file <path>` reads more
+      numbers - separated by commas, whitespace or newlines - from a file, or
+      from stdin when the path is `-`. With one `--issue-id` and no file, `data`
+      is the issue, as it always was; otherwise it is a list of the issues in
+      the order requested, each once. An issue that does not exist fails the
+      run, which prints nothing on stdout and names every missing issue.
     - The `comments` field is the number of comments on the issue, not the
       comments themselves; use `gitea-cli issue comment list` to read the
       bodies. The field keeps the API's name, as
