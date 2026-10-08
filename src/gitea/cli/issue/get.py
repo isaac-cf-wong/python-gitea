@@ -17,6 +17,16 @@ issues in the order they were asked for, each once. An issue that does not exist
 fails the run, after every requested issue has been tried, with an error naming
 each missing one, so a single typo in a long list is not reported one run at a
 time.
+
+Every project an issue is on is emitted with the column its card sits in there,
+resolved from that project's board: the issue payload names the projects without
+saying where on them the card sits, so the column costs a walk of the board's
+columns and their issue listings, a few requests per project. `--no-columns`
+turns that walk off. Every project entry is then emitted as the API sent it,
+without a `column_id`, and the run reads no board at all - one request per issue,
+whatever boards the issues are on. It is the form to use when the issue's own
+fields are what is wanted: `state`, `labels`, `title`, and reads of a set of
+issues are exactly the runs that pay the walk most.
 """
 
 from __future__ import annotations
@@ -32,6 +42,10 @@ from gitea.cli.utils.options import DEPRECATED_INDEX_HELP, REPOSITORY_REQUIRED_H
 _NOT_FOUND = 404
 
 ISSUE_IDS_HELP = "Issue number shown in the web UI. Repeat the option to read several issues."
+ISSUE_COLUMNS_HELP = (
+    "Resolve the project column of each issue's card. Pass --no-columns to leave every project entry "
+    "as the API sent it and read no board, which is what a read of the issue's own fields wants."
+)
 
 
 def get_command(
@@ -40,6 +54,7 @@ def get_command(
     repository: Annotated[str | None, typer.Option("--repository", help=REPOSITORY_REQUIRED_HELP)] = None,
     issue_ids: Annotated[list[int] | None, typer.Option("--issue-id", help=ISSUE_IDS_HELP)] = None,
     issue_id_file: Annotated[str | None, typer.Option("--issue-id-file", help=ISSUE_ID_FILE_HELP)] = None,
+    resolve_columns: Annotated[bool, typer.Option("--columns/--no-columns", help=ISSUE_COLUMNS_HELP)] = True,
     index: Annotated[int | None, typer.Option("--index", help=DEPRECATED_INDEX_HELP, hidden=True)] = None,
     account_name: Annotated[
         str | None,
@@ -71,6 +86,7 @@ def get_command(
         repository: The name of the repository, which this command requires.
         issue_ids: The issue numbers shown in the web UI.
         issue_id_file: A file listing more issue numbers, or `-` to read them from stdin.
+        resolve_columns: Whether to resolve the column each issue's card sits in.
         index: The deprecated name of `--issue-id`, which names one issue.
         account_name: Name of the account to use for authentication.
         token: Token for authentication. If not provided, the token from the specified account will be used.
@@ -98,7 +114,9 @@ def get_command(
         board, because the issue payload names the projects without saying where
         on them the issue's card sits. The issues of one run share the listings
         of their boards' columns, so a board is listed once however many of the
-        issues are on it.
+        issues are on it. `--no-columns` asks for no such resolution: the issues
+        are emitted as the API sent them and no board is read, which is what a
+        read of the issues' own fields wants.
 
         Returns:
             A tuple containing the issue data, or a list of it, and metadata.
@@ -108,10 +126,12 @@ def get_command(
         targets, single = _requested_issues(issue_ids, issue_id_file, index, command=command)
 
         with Gitea(token=token, base_url=base_url) as client:
-            columns = ColumnListings()
+            columns = ColumnListings() if resolve_columns else None
 
             def get_one(number: int) -> tuple[dict[str, Any], dict[str, Any]]:
                 data, metadata = client.issue.get_issue(owner=owner, repository=target_repository, index=number)
+                if not resolve_columns:
+                    return data, metadata
                 data = resolve_project_column_ids(
                     client=client, owner=owner, repository=target_repository, issue=data, columns=columns
                 )

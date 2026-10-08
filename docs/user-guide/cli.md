@@ -474,6 +474,13 @@ otherwise look like.
       so `null` means "no card here" and "could not tell" alike. The columns of
       a user-owned (individual) project cannot be listed at all, so its
       `column_id` is always `null`.
+    - `--no-columns` turns that resolution off. Every project entry is then
+      emitted as the API sent it, without a `column_id`, and no board is read:
+      the run costs one request per issue however many projects the issues are
+      on. `--columns`, the default, resolves the columns. Reach for
+      `--no-columns` when the issue's own fields are what is wanted - `state`,
+      `labels`, `title` - since it is the board walk that a read of a set of
+      issues pays most for.
 - `gitea-cli issue edit --owner <owner> --repository <repo> --issue-id <number>`
     - Optional: `--title`, `--body`, `--state`, `--assignees`, `--milestone`,
       `--due-date`
