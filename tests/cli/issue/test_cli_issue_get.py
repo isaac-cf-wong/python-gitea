@@ -295,3 +295,40 @@ def test_get_command_lists_a_board_again_after_its_listing_failed(mock_gitea, mo
 
     assert [[project["column_id"] for project in issue["projects"]] for issue in data] == [[None], [109]]
     assert client.project.list_project_columns.call_count == 2
+
+
+@patch("gitea.cli.utils.api.execute_api_command")
+@patch("gitea.cli.utils.auth.get_auth_params")
+@patch("gitea.client.gitea.Gitea")
+def test_get_command_reads_no_board_when_the_columns_are_not_wanted(mock_gitea, mock_get_auth_params, mock_execute):
+    """--no-columns should emit the projects as the API sent them and cost no board request.
+
+    The columns are what makes a read of a set of issues expensive - a walk of
+    each project's board - so a read that does not want them must not walk one,
+    not even to report a null.
+    """
+    ctx = make_ctx()
+    mock_get_auth_params.return_value = ("tok", "https://gitea.example.com")
+
+    client = make_client({29: [[{"id": 107}]]}, {107: [[{"id": ISSUE_ID}]]})
+    client.issue.get_issue.return_value = (make_issue(ORGANIZATION_PROJECT), {"status_code": 200})
+    mock_gitea.return_value.__enter__.return_value = client
+
+    get_command(
+        ctx=ctx,
+        owner="example-org",
+        repository="example-repo",
+        issue_ids=[15],
+        resolve_columns=False,
+        account_name="acct",
+        token=None,
+        base_url=None,
+    )
+
+    data, metadata = mock_execute.call_args[1]["api_call"]()
+
+    assert data["projects"] == [ORGANIZATION_PROJECT]
+    assert "column_id" not in data["projects"][0]
+    assert metadata == {"status_code": 200}
+    client.project.list_project_columns.assert_not_called()
+    client.project.list_project_column_issues.assert_not_called()
