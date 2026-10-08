@@ -166,7 +166,10 @@ def test_get_with_columns_asks_for_them_explicitly(config_path: Path):
     assert result.exit_code == 0, result.output
     envelope = parse_envelope(result.stdout)
     assert [project["column_id"] for project in envelope["data"]["projects"]] == [COLUMN_ID]
-    assert board_requests(server) != []
+    assert board_requests(server) == [
+        f"{API_ROOT}/orgs/o/projects/{PROJECT['id']}/columns",
+        f"{API_ROOT}/orgs/o/projects/{PROJECT['id']}/columns/{COLUMN_ID}/issues",
+    ]
 
 
 def test_get_without_columns_leaves_the_projects_to_the_api(config_path: Path):

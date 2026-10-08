@@ -25,8 +25,8 @@ columns and their issue listings, a few requests per project. `--no-columns`
 turns that walk off. Every project entry is then emitted as the API sent it,
 without a `column_id`, and the run reads no board at all - one request per issue,
 whatever boards the issues are on. It is the form to use when the issue's own
-fields are what is wanted: `state`, `labels`, `title`, and reads of a set of
-issues are exactly the runs that pay the walk most.
+fields are what is wanted - `state`, `labels`, `title` - since it is the board
+walk that a read of a set of issues pays most for.
 """
 
 from __future__ import annotations
@@ -126,7 +126,7 @@ def get_command(
         targets, single = _requested_issues(issue_ids, issue_id_file, index, command=command)
 
         with Gitea(token=token, base_url=base_url) as client:
-            columns = ColumnListings() if resolve_columns else None
+            columns = ColumnListings()
 
             def get_one(number: int) -> tuple[dict[str, Any], dict[str, Any]]:
                 data, metadata = client.issue.get_issue(owner=owner, repository=target_repository, index=number)

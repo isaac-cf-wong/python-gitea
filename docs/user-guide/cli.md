@@ -74,10 +74,10 @@ non-zero, so nothing is printed on stdout for a failed command. Log output also
 goes to stderr in both formats, so stdout stays parsable.
 
 One failure is deliberately not an error: the board lookup that fills in the
-`column_id` of `issue get`. A refused, timed-out or otherwise failed lookup logs
-a warning to stderr and reports that project's column as `null`, because the
-issue the command was asked for has already been retrieved and is not worth
-failing over an enrichment of it.
+`column_id` of `issue get`, unless `--no-columns` turns it off. A refused,
+timed-out or otherwise failed lookup logs a warning to stderr and reports that
+project's column as `null`, because the issue the command was asked for has
+already been retrieved and is not worth failing over an enrichment of it.
 
 Tokens are never included in the output of `config` commands in either format.
 
@@ -91,9 +91,9 @@ which command fetched it.
 
 A field the API cannot send is added only where it carries something the API has
 no way of saying, and is documented with the command that adds it: `column_id`
-on the project entries of `issue get`, and `issue_count` and `issue_ids` on the
-columns of `project show`, are the ones today. Such a field is never a second
-name for a field already in the payload.
+on the project entries of `issue get` (omitted under `--no-columns`), and
+`issue_count` and `issue_ids` on the columns of `project show`, are the ones
+today. Such a field is never a second name for a field already in the payload.
 
 Two consequences worth knowing:
 
@@ -462,10 +462,11 @@ otherwise look like.
       bodies. The field keeps the API's name, as
       [the field-name convention](#field-names) requires: this command used to
       rename it to `comment_count` and was alone in doing so.
-    - Each entry of `projects` carries a `column_id`: the column the issue's
-      card sits in, or `null` when the issue has no card on that project. Gitea
-      does not report it on the issue itself, so it is resolved from each
-      project's board, which costs a few extra requests per project.
+    - Unless `--no-columns` is passed, each entry of `projects` carries a
+      `column_id`: the column the issue's card sits in, or `null` when the issue
+      has no card on that project. Gitea does not report it on the issue itself,
+      so it is resolved from each project's board, which costs a few extra
+      requests per project.
     - Resolution is best-effort. It reflects the board as it was during the
       walk, not at one instant: a card moved while the columns are being read
       may be reported under either column or as `null`. A lookup that is
