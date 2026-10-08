@@ -168,6 +168,8 @@ class _ColumnListing:
                 yield self._ids[index]
                 index += 1
                 continue
+            # An exhausted generator stops without a request, but `pages` may be any
+            # Iterator: once complete, never ask the source for another page.
             if self._complete:
                 return
             try:
