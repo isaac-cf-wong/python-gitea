@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from requests import HTTPError
 
-from gitea.issue.project_column import ColumnListings, resolve_project_column_ids
+from gitea.issue.project_column import ColumnListings, _ColumnListing, resolve_project_column_ids
 from gitea.utils.pagination import PAGE_SIZE
 from tests.board import (
     ISSUE_ID,
@@ -361,3 +361,71 @@ def test_shared_listings_page_a_board_only_as_far_as_a_walk_needed():
     assert column_ids(second) == [200]
     # The second walk replays page 1 and pages on from there; page 2 is short, so it ends the listing.
     assert [call.kwargs["page"] for call in client.project.list_project_columns.call_args_list] == [1, 2]
+
+
+def test_shared_listings_replay_a_fully_listed_board_without_listing_it_again():
+    """A board one walk listed to its end should be walked again at no further listing request."""
+    client = make_client(
+        {29: [[{"id": 100 + n} for n in range(PAGE_SIZE)], [{"id": 200}]]},
+        {100 + n: [[]] for n in range(PAGE_SIZE)} | {200: [[]]},
+    )
+    columns = ColumnListings()
+
+    first = resolve_project_column_ids(
+        client=client,
+        owner="example-org",
+        repository="example-repo",
+        issue=make_issue(ORGANIZATION_PROJECT),
+        columns=columns,
+    )
+    # The card is on no column, so the first walk lists the board to its end.
+    assert [call.kwargs["page"] for call in client.project.list_project_columns.call_args_list] == [1, 2]
+    client.project.list_project_columns.reset_mock()
+    client.project.list_project_column_issues.reset_mock()
+
+    second = resolve_project_column_ids(
+        client=client,
+        owner="example-org",
+        repository="example-repo",
+        issue=make_issue(ORGANIZATION_PROJECT),
+        columns=columns,
+    )
+
+    assert column_ids(first) == column_ids(second) == [None]
+    client.project.list_project_columns.assert_not_called()
+    # The replay still visits every column of the board, in board order.
+    assert [call.kwargs["column_id"] for call in client.project.list_project_column_issues.call_args_list] == [
+        *(100 + n for n in range(PAGE_SIZE)),
+        200,
+    ]
+
+
+class _CountedPages:
+    """Pages of a column listing that count every time they are asked for the next one."""
+
+    def __init__(self, *pages):
+        self.pages = [(page, {}) for page in pages]
+        self.asked = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.asked += 1
+        if self.asked > len(self.pages):
+            raise StopIteration
+        return self.pages[self.asked - 1]
+
+
+def test_a_completed_listing_does_not_ask_its_pages_again():
+    """A listing walked to its end should replay its IDs without asking its pages for another."""
+    pages = _CountedPages([{"id": 107}, {"id": 108}], [{"id": 109}])
+    listing = _ColumnListing(pages)
+
+    assert list(listing) == [107, 108, 109]
+    # Both pages, then the one ask that found the listing ended.
+    assert pages.asked == 3
+
+    assert list(listing) == [107, 108, 109]
+    assert list(listing) == [107, 108, 109]
+    assert pages.asked == 3
