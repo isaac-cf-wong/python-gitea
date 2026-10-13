@@ -2123,7 +2123,7 @@ docs = [
     { name = "mkdocs-literate-nav", specifier = ">=0.6.3" },
     { name = "mkdocs-material", specifier = ">=9.7.7" },
     { name = "mkdocs-section-index", specifier = ">=0.3.12" },
-    { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0.6" },
+    { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0.7" },
 ]
 release = [{ name = "git-cliff", specifier = ">=2.14.2" }]
 
