@@ -2132,7 +2132,7 @@ dev = [
     { name = "mutmut", specifier = ">=3.8.0" },
     { name = "prek", specifier = ">=0.5.7" },
     { name = "pytest", specifier = ">=9.1.1" },
-    { name = "pytest-asyncio", specifier = ">=1.4.0" },
+    { name = "pytest-asyncio", specifier = ">=1.4.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-github-actions-annotate-failures", specifier = ">=0.4.2" },
     { name = "pytest-mock", specifier = ">=3.17.0" },
