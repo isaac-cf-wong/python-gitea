@@ -18,7 +18,7 @@ configuring, or using `python-gitea`, and how to resolve them.
    `rm -rf .venv`):
 
     ```bash
-    uv venv --clear --python 3.12
+    uv venv --clear --python 3.13
     source .venv/bin/activate  # On Windows: .venv\Scripts\activate
     ```
 

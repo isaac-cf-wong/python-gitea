@@ -9,7 +9,7 @@ See [Installation](installation.md) for the full guide, including development
 setups. The short version:
 
 ```bash
-uv venv --python 3.12
+uv venv --python 3.13
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install python-gitea
 ```

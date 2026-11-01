@@ -13,7 +13,7 @@ pages for more details:
 
 ## Requirements
 
-- Python 3.12 or higher
+- Python 3.13 or higher
 - Operating System: Linux, macOS, or Windows
 
 <!-- prettier-ignore -->
@@ -29,7 +29,7 @@ The recommended way to install `python-gitea` is from PyPI:
 
 ```bash
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.12
+uv venv --python 3.13
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install python-gitea
 ```
@@ -57,7 +57,7 @@ For the latest development version:
 git clone git@github.com:isaac-cf-wong/python-gitea.git
 cd python-gitea
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.12
+uv venv --python 3.13
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv sync
 ```
@@ -71,7 +71,7 @@ git clone git@github.com:isaac-cf-wong/python-gitea.git
 cd python-gitea
 
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.12
+uv venv --python 3.13
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv sync --group dev
 
