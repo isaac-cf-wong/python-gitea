@@ -13,14 +13,14 @@ pages for more details:
 
 ## Requirements
 
-- Python 3.12 or higher
+- Python 3.13 or higher
 - Operating System: Linux, macOS, or Windows
 
 <!-- prettier-ignore -->
 !!!note
-    The package requires Python 3.12 or later and is built and tested against Python 3.12-3.14. When creating a
-    virtual environment with `uv`, specify the Python version to ensure compatibility: `uv venv --python 3.12`
-    (replace `3.12` with your preferred supported version: 3.12, 3.13, or 3.14). This avoids potential issues
+    The package requires Python 3.13 or later and is built and tested against Python 3.13-3.15. When creating a
+    virtual environment with `uv`, specify the Python version to ensure compatibility: `uv venv --python 3.13`
+    (replace `3.13` with your preferred supported version: 3.13, 3.14, or 3.15). This avoids potential issues
     with unsupported Python versions.
 
 ## Install from PyPI
@@ -29,7 +29,7 @@ The recommended way to install `python-gitea` is from PyPI:
 
 ```bash
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.12
+uv venv --python 3.13
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv pip install python-gitea
 ```
@@ -57,7 +57,7 @@ For the latest development version:
 git clone git@github.com:isaac-cf-wong/python-gitea.git
 cd python-gitea
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.12
+uv venv --python 3.13
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv sync
 ```
@@ -71,7 +71,7 @@ git clone git@github.com:isaac-cf-wong/python-gitea.git
 cd python-gitea
 
 # Create a virtual environment (recommended with uv)
-uv venv --python 3.12
+uv venv --python 3.13
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 uv sync --group dev
 

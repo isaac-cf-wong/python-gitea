@@ -18,7 +18,7 @@ configuring, or using `python-gitea`, and how to resolve them.
    `rm -rf .venv`):
 
     ```bash
-    uv venv --clear --python 3.12
+    uv venv --clear --python 3.13
     source .venv/bin/activate  # On Windows: .venv\Scripts\activate
     ```
 
@@ -58,12 +58,12 @@ For details, see the [Installation Guide](../user-guide/installation.md).
     python --version
     ```
 
-2. `python-gitea` requires Python 3.12 or later and is built and tested against
-   Python 3.12-3.14.
+2. `python-gitea` requires Python 3.13 or later and is built and tested against
+   Python 3.13-3.15.
 3. Create the virtual environment with a supported version:
 
     ```bash
-    uv venv --python 3.12  # 3.12, 3.13, or 3.14
+    uv venv --python 3.13  # 3.13, 3.14, or 3.15
     source .venv/bin/activate
     ```
 
