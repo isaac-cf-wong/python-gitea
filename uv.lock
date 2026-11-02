@@ -1951,7 +1951,7 @@ requires-dist = [
 build = [{ name = "hatch", specifier = ">=1.18.2" }]
 dev = [
     { name = "mutmut", specifier = ">=3.8.1" },
-    { name = "prek", specifier = ">=0.5.7" },
+    { name = "prek", specifier = ">=0.5.9" },
     { name = "pytest", specifier = ">=9.2.0" },
     { name = "pytest-asyncio", specifier = ">=1.4.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
