@@ -162,7 +162,7 @@ commands =
 
 [tool.ruff]
 line-length = 120 # Matches Black's default
-target-version = "py312" # Align with CI (3.12–3.14) and requires-python (>=3.12)
+target-version = "py313" # Align with CI (3.13–3.15) and requires-python (>=3.13)
 lint.extend-select = [
   "E",
   "F",
