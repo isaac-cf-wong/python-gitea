@@ -2,8 +2,9 @@
 
 import importlib
 import inspect
+from enum import Enum
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Self, get_args
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -67,6 +68,58 @@ _RUNTIME_REQUIRED_OPTIONS = {"--label": "1"}
 _API_HELPERS = ("execute_api_command", "execute_api_call")
 
 
+def _option_choices(param: Any) -> Any | None:
+    """The option's allowed values, across typer versions.
+
+    Older typer versions expose Click's ``ParamType`` as ``param.type``;
+    typer 0.29 replaced it with a ``type_descriptor`` that carries the
+    choices itself. Either way the values come back in declaration order.
+
+    Args:
+        param: The command parameter to inspect.
+
+    Returns:
+        The option's choices, or ``None`` when the option takes any value.
+
+    """
+    param_type = getattr(param, "type", None)
+    if param_type is not None:
+        return getattr(param_type, "choices", None)
+    descriptor = getattr(param, "type_descriptor", None)
+    if descriptor is not None:
+        return getattr(descriptor, "choices", None)
+    return None
+
+
+def _is_number_option(param: Any) -> bool:
+    """Whether the option takes an ``int`` or a ``float``.
+
+    Older typer versions name the number in ``param.type.name``; typer 0.29
+    drops Click's ``ParamType`` and keeps the Python annotation on
+    ``param.type_descriptor`` instead. There is no public number check to
+    borrow: ``bare_type()`` renders the annotation for display and returns a
+    string, while a repeatable option carries its scalar inside the annotation
+    (``list[int]``), so the name is read after one unwrap.
+
+    Args:
+        param: The command parameter to inspect.
+
+    Returns:
+        Whether a numeric value satisfies the option's type.
+
+    """
+    param_type = getattr(param, "type", None)
+    if param_type is not None:
+        return getattr(param_type, "name", "") in {"int", "integer", "float"}
+
+    descriptor = getattr(param, "type_descriptor", None)
+    annotation = getattr(descriptor, "annotation", None) if descriptor is not None else None
+    args = get_args(annotation)
+    if args:
+        annotation = args[0]
+    return getattr(annotation, "__name__", "") in {"int", "float"}
+
+
 def _noop_invocation(command: Any) -> list[str]:
     """Build a harmless argument list satisfying a leaf command's required options.
 
@@ -100,10 +153,13 @@ def _noop_invocation(command: Any) -> list[str]:
         if not param.required and flag not in _SCOPE_OPTIONS:
             continue
 
-        choices = getattr(param.type, "choices", None)
+        choices = _option_choices(param)
         if choices:
-            value = str(choices[0])
-        elif getattr(param.type, "name", "") in {"int", "integer", "float"}:
+            # Enum choices arrive as members on typer 0.29 (Click handed over
+            # their values before); both render as the value on the command line.
+            first = choices[0]
+            value = first.value if isinstance(first, Enum) else str(first)
+        elif _is_number_option(param):
             value = "1"
         else:
             value = _STUB
