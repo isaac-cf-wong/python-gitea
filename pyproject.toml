@@ -29,7 +29,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-  "ruff>=0.17.5",
+  "ruff>=0.17.6",
   # The mutation runner, in the environment `uv run` resolves, so that
   # `uv run mutmut run` reaches the same interpreter as `uv run pytest` and finds
   # the pytest plugins the suite's own options need. Run from a tool environment
@@ -44,7 +44,7 @@ dev = [
 ]
 docs = [
   "mkdocs>=1.6.1",
-  "mkdocs-material>=9.8.1",
+  "mkdocs-material>=9.8.2",
   "mkdocstrings[python]>=1.0.8",
   "mkdocs-gen-files>=0.6.1",
   "mkdocs-literate-nav>=0.6.3",
